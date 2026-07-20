@@ -1,54 +1,5 @@
 services:
-  web-pendaftar:
-    image: serversideup/php:8.4-fpm-nginx
-    container_name: ticketin-web-pendaftar
-    ports:
-      - "8000:8080"
-    environment:
-      - AUTORUN_LARAVEL_MIGRATION=false
-      - DB_HOST=host.docker.internal
-      - DB_PORT=15432
-      - SUPABASE_URL=http://host.docker.internal:15431
-    volumes:
-      - ./web:/var/www/html
-    networks:
-      - TiketIn-network
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-
-  web-panitia:
-    image: serversideup/php:8.4-fpm-nginx
-    container_name: ticketin-web-panitia
-    ports:
-      - "8001:8080"
-    environment:
-      - AUTORUN_LARAVEL_MIGRATION=false
-      - DB_HOST=host.docker.internal
-      - DB_PORT=15432
-      - SUPABASE_URL=http://host.docker.internal:15431
-    volumes:
-      - ./web:/var/www/html
-    networks:
-      - TiketIn-network
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-
-  api:
-    image: serversideup/php:8.4-fpm-nginx
-    container_name: ticketin-api
-    ports:
-      - "8002:8080"
-    environment:
-      - AUTORUN_LARAVEL_MIGRATION=false
-      - DB_HOST=host.docker.internal
-      - DB_PORT=15432
-      - SUPABASE_URL=http://host.docker.internal:15431
-    volumes:
-      - ./web:/var/www/html
-    networks:
-      - TiketIn-network
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
+  # Node.js backend container configuration will be added here in the future.
 
   mobile-admin-build:
     image: ghcr.io/cirruslabs/flutter:latest
