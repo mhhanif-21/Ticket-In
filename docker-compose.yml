@@ -1,0 +1,67 @@
+services:
+  web-pendaftar:
+    image: serversideup/php:8.3-fpm-nginx
+    container_name: ticketin-web-pendaftar
+    ports:
+      - "8000:8080"
+    environment:
+      - AUTORUN_LARAVEL_MIGRATION=false
+      - DB_HOST=host.docker.internal
+      - DB_PORT=54322
+      - SUPABASE_URL=http://host.docker.internal:54321
+    volumes:
+      - ./web:/var/www/html
+    networks:
+      - TiketIn-network
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  web-panitia:
+    image: serversideup/php:8.3-fpm-nginx
+    container_name: ticketin-web-panitia
+    ports:
+      - "8001:8080"
+    environment:
+      - AUTORUN_LARAVEL_MIGRATION=false
+      - DB_HOST=host.docker.internal
+      - DB_PORT=54322
+      - SUPABASE_URL=http://host.docker.internal:54321
+    volumes:
+      - ./web:/var/www/html
+    networks:
+      - TiketIn-network
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  api:
+    image: serversideup/php:8.3-fpm-nginx
+    container_name: ticketin-api
+    ports:
+      - "8002:8080"
+    environment:
+      - AUTORUN_LARAVEL_MIGRATION=false
+      - DB_HOST=host.docker.internal
+      - DB_PORT=54322
+      - SUPABASE_URL=http://host.docker.internal:54321
+    volumes:
+      - ./web:/var/www/html
+    networks:
+      - TiketIn-network
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  mobile-admin-build:
+    image: ghcr.io/cirruslabs/flutter:latest
+    container_name: ticketin-mobile-admin-build
+    volumes:
+      - ./mobile:/workspace
+    working_dir: /workspace
+    command: tail -f /dev/null
+    networks:
+      - TiketIn-network
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+networks:
+  TiketIn-network:
+    driver: bridge
