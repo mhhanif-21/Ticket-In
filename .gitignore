@@ -1,20 +1,11 @@
-# Laravel (Web)
-/web/vendor/
+# Next.js (Web)
 /web/node_modules/
-/web/public/build/
-/web/public/hot
-/web/public/storage
-/web/storage/*.key
-/web/storage/logs/
-/web/storage/framework/cache/
-/web/storage/framework/sessions/
-/web/storage/framework/views/
-/web/bootstrap/cache/
+/web/.next/
+/web/build/
+/web/out/
 /web/.env
-/web/.env.backup
-/web/.env.production
-/web/.phpunit.result.cache
-
+/web/.env*.local
+/web/.vercel/
 # Flutter (Mobile)
 /mobile/.dart_tool/
 /mobile/.flutter-plugins
