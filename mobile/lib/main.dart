@@ -4,6 +4,10 @@ import 'package:go_router/go_router.dart';
 import 'screens/home_screen.dart';
 import 'theme/app_theme.dart';
 import 'screens/login_screen.dart';
+import 'screens/create_event_screen.dart';
+import 'screens/edit_event_screen.dart';
+import 'screens/form_builder_screen.dart';
+import 'screens/access_management_screen.dart';
 
 void main() {
   runApp(
@@ -23,6 +27,22 @@ final _router = GoRouter(
     GoRoute(
       path: '/home',
       builder: (context, state) => const HomeScreen(),
+    ),
+    GoRoute(
+      path: '/create-event',
+      builder: (context, state) => const CreateEventScreen(),
+    ),
+    GoRoute(
+      path: '/edit-event/:id',
+      builder: (context, state) => EditEventScreen(eventId: state.pathParameters['id']!),
+    ),
+    GoRoute(
+      path: '/form-builder/:id',
+      builder: (context, state) => FormBuilderScreen(eventId: state.pathParameters['id']!),
+    ),
+    GoRoute(
+      path: '/access-management/:id',
+      builder: (context, state) => AccessManagementScreen(eventId: state.pathParameters['id']!),
     ),
   ],
 );

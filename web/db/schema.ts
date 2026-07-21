@@ -47,9 +47,10 @@ export const formFields = pgTable('form_fields', {
     .notNull()
     .references(() => events.id, { onDelete: 'cascade' }),
   fieldName: varchar('field_name', { length: 255 }).notNull(),
-  fieldType: varchar('field_type', { length: 50 }).notNull(), // text, number, options, file
+  fieldType: varchar('field_type', { length: 50 }).notNull(), // text, number, options, file, email, textarea, image
   isRequired: boolean('is_required').default(false).notNull(),
   options: jsonb('options'), // array of options for type 'options'
+  order: integer('order').default(0).notNull(),
 });
 
 export const formFieldsRelations = relations(formFields, ({ one }) => ({
