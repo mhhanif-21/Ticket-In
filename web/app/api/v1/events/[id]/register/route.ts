@@ -3,9 +3,9 @@ import { processRegistrationAction } from '@/lib/actions/processRegistrationActi
 
 export const runtime = 'nodejs';
 
-export async function POST(req: NextRequest, { params }: { params: { slug: string } }) {
+export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const slug = params.slug;
+    const slug = params.id;
     
     // Check if it's multipart/form-data
     const contentType = req.headers.get('content-type') || '';
