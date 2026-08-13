@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import { db } from '../../../../../db';
-import { registrations, events } from '../../../../../db/schema';
+import { db } from '@/db';
+import { registrations, events } from '@/db/schema';
 import { eq, and, ilike } from 'drizzle-orm';
 
 export const runtime = 'nodejs';

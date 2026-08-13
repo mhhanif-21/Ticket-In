@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server';
-import { db } from '../../../../../../db';
-import { registrations } from '../../../../../../db/schema';
+import { db } from '@/db';
+import { registrations } from '@/db/schema';
 import { eq, and } from 'drizzle-orm';
 import {
   ensureTicketGenerationJobTx,
   getTicketGenerationJob,
   publishTicketGenerationJob,
-} from '../../../../../../lib/actions/ticketGenerationJob';
+} from '@/lib/actions/ticketGenerationJob';
 
 export const runtime = 'nodejs';
 

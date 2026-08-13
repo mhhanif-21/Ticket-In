@@ -3,6 +3,7 @@ import { db } from '@/db';
 import { events } from '@/db/schema';
 import { eq } from 'drizzle-orm';
 import { supabaseAdmin } from '@/lib/supabase';
+import { STORAGE_BUCKETS } from '@/lib/storage/buckets';
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -46,7 +47,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     const filePath = `${fileName}`;
 
     const { data: uploadData, error: uploadError } = await supabaseAdmin.storage
-      .from('event_posters')
+      .from(STORAGE_BUCKETS.eventPosters)
       .upload(filePath, buffer, {
         contentType: detectedMime,
         upsert: true,
@@ -59,7 +60,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
     // Get public URL
     const { data: publicUrlData } = supabaseAdmin.storage
-      .from('event_posters')
+      .from(STORAGE_BUCKETS.eventPosters)
       .getPublicUrl(filePath);
 
     const publicUrl = publicUrlData.publicUrl;

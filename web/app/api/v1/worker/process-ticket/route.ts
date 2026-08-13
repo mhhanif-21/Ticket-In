@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { GenerateTicketAction } from '../../../../../lib/actions/ticket';
+import { GenerateTicketAction } from '@/lib/actions/ticket';
 import { readVerifiedQStashBody } from '@/lib/security/qstash';
 import {
   ensureTicketGenerationJob,

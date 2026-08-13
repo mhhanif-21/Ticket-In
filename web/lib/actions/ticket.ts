@@ -3,6 +3,7 @@ import { registrations } from '../../db/schema';
 import { and, eq, isNull } from 'drizzle-orm';
 import { generateRandomTicketCode, generateQrCodeWithText } from '../utils/ticketUtils';
 import { supabaseAdmin } from '../supabase';
+import { STORAGE_BUCKETS } from '../storage/buckets';
 
 import { sendEmail } from '../services/brevo';
 import { events } from '../../db/schema';
@@ -100,7 +101,7 @@ export async function GenerateTicketAction(registrationId: string) {
       // 6. Upload to Supabase Storage (bucket: tickets)
       const fileName = `${registrationId}-${ticketCode}.png`;
       const { data, error } = await supabaseAdmin.storage
-        .from('tickets')
+        .from(STORAGE_BUCKETS.tickets)
         .upload(fileName, qrBuffer, {
           contentType: 'image/png',
           upsert: true,
@@ -111,7 +112,7 @@ export async function GenerateTicketAction(registrationId: string) {
       }
 
       // Get public URL
-      const { data: publicUrlData } = supabaseAdmin.storage.from('tickets').getPublicUrl(fileName);
+      const { data: publicUrlData } = supabaseAdmin.storage.from(STORAGE_BUCKETS.tickets).getPublicUrl(fileName);
       const publicUrl = publicUrlData.publicUrl;
 
       // 7. Update DB in transaction

@@ -1,55 +1,60 @@
 import { createClient } from '@supabase/supabase-js';
+import { STORAGE_BUCKETS } from '../lib/storage/buckets';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
 const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
+const bucketDefinitions = [
+  {
+    name: STORAGE_BUCKETS.eventPosters,
+    public: true,
+    allowedMimeTypes: ['image/png', 'image/jpeg', 'image/jpg'],
+    fileSizeLimit: 5 * 1024 * 1024,
+  },
+  {
+    name: STORAGE_BUCKETS.participantFiles,
+    public: false,
+    allowedMimeTypes: ['image/png', 'image/jpeg', 'image/jpg'],
+    fileSizeLimit: 1 * 1024 * 1024,
+  },
+  {
+    name: STORAGE_BUCKETS.tickets,
+    public: true,
+    allowedMimeTypes: ['image/png'],
+    fileSizeLimit: 5 * 1024 * 1024,
+  },
+] as const;
+
 async function setupStorage() {
-  console.log('Checking posters bucket...');
-  const { data: buckets, error } = await supabaseAdmin.storage.listBuckets();
-  
-  if (error) {
-    console.error('Error listing buckets:', error);
-    process.exit(1);
+  const { data: buckets, error: listError } = await supabaseAdmin.storage.listBuckets();
+
+  if (listError) {
+    throw new Error(`Error listing buckets: ${listError.message}`);
   }
 
-  const posterBucketExists = buckets.some(b => b.name === 'posters');
-  
-  if (!posterBucketExists) {
-    console.log('Bucket "posters" not found. Creating...');
-    const { error: createError } = await supabaseAdmin.storage.createBucket('posters', {
-      public: true, // Make it public so anyone can view the poster
-      allowedMimeTypes: ['image/png', 'image/jpeg', 'image/jpg', 'image/webp'],
-      fileSizeLimit: 5242880, // 5MB
+  for (const definition of bucketDefinitions) {
+    if (buckets.some((bucket) => bucket.name === definition.name)) {
+      console.log(`Bucket "${definition.name}" already exists.`);
+      continue;
+    }
+
+    const { error: createError } = await supabaseAdmin.storage.createBucket(definition.name, {
+      public: definition.public,
+      allowedMimeTypes: [...definition.allowedMimeTypes],
+      fileSizeLimit: definition.fileSizeLimit,
     });
 
     if (createError) {
-      console.error('Failed to create bucket:', createError);
-      process.exit(1);
+      throw new Error(`Failed to create bucket "${definition.name}": ${createError.message}`);
     }
-    console.log('Bucket "posters" created successfully.');
-  } else {
-    console.log('Bucket "posters" already exists.');
-  }
 
-  const ticketBucketExists = buckets.some(b => b.name === 'tickets');
-  if (!ticketBucketExists) {
-    console.log('Bucket "tickets" not found. Creating...');
-    const { error: createError } = await supabaseAdmin.storage.createBucket('tickets', {
-      public: true, // Make it public so users can download it
-      allowedMimeTypes: ['image/png'],
-      fileSizeLimit: 5242880, // 5MB
-    });
-
-    if (createError) {
-      console.error('Failed to create bucket:', createError);
-      process.exit(1);
-    }
-    console.log('Bucket "tickets" created successfully.');
-  } else {
-    console.log('Bucket "tickets" already exists.');
+    console.log(`Bucket "${definition.name}" created successfully.`);
   }
 }
 
-setupStorage().catch(console.error);
+setupStorage().catch((error: unknown) => {
+  console.error(error instanceof Error ? error.message : error);
+  process.exitCode = 1;
+});

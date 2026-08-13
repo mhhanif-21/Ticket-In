@@ -6,6 +6,7 @@ import { events, formFields } from '@/db/schema';
 import { eq } from 'drizzle-orm';
 import { RegistrationFormValidationError, validateRegistrationAnswers } from '@/lib/validation/registrationForm';
 import { publishTicketGenerationJob } from '@/lib/actions/ticketGenerationJob';
+import { STORAGE_BUCKETS } from '@/lib/storage/buckets';
 
 export const runtime = 'nodejs';
 
@@ -80,7 +81,7 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
         const filePath = `${slug}/${Date.now()}-${Math.floor(Math.random() * 1000)}-${safeFileName}`;
 
         const { error: uploadError } = await supabaseAdmin.storage
-          .from('participant_files')
+          .from(STORAGE_BUCKETS.participantFiles)
           .upload(filePath, buffer, {
             contentType: detectedMime,
             upsert: false,
