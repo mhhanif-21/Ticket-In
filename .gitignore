@@ -6,6 +6,7 @@
 /web/.env
 /web/.env*.local
 /web/.vercel/
+*.tsbuildinfo
 # Flutter (Mobile)
 /mobile/.dart_tool/
 /mobile/.flutter-plugins
@@ -31,13 +32,34 @@
 /mobile/linux/flutter/ephemeral/
 /mobile/windows/flutter/ephemeral/
 /mobile/*.g.dart
+/mobile/android/.gradle/
+/mobile/android/build/
 
 # General/Environment
 .env
 *.key
+*.log
+*.pid
 .DS_Store
 .idea/
 .vscode/
 *.swp
 *.swo
 docker-compose.override.yml
+
+# Local scratch and one-off diagnostics
+/payload.bin
+/test-bug-*.js
+/test_*.js
+/test_*.png
+/web/create_admin.js
+/web/test-bug*.ts
+/web/test-qr.js
+/web/test-script.ts
+/web/test-ticket.png
+/web/test_poster.js
+/web/test_poster.png
+/web/scripts/accept_chantika.ts
+/web/scripts/seed_auto_accept.ts
+/web/scripts/seed_final.ts
+/web/scripts/seed_registration.ts

@@ -3,6 +3,8 @@ services:
     image: node:20-alpine
     container_name: ticketin-web-app
     working_dir: /app
+    env_file:
+      - ./web/.env.local
     volumes:
       - ./web:/app
     ports:
@@ -10,27 +12,38 @@ services:
     environment:
       - NODE_ENV=development
       # Database URL mengarah ke Supabase lokal via network bridge
-      - DATABASE_URL=postgresql://postgres:postgres@host.docker.internal:15432/postgres
-      - NEXT_PUBLIC_SUPABASE_URL=http://host.docker.internal:15431
-      - NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0
-      - SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/postgres
+      - NEXT_PUBLIC_SUPABASE_URL=http://kong:8000
       - BREVO_API_KEY=${BREVO_API_KEY:-}
+      - BREVO_SENDER_EMAIL=${BREVO_SENDER_EMAIL:-}
+      - BREVO_SENDER_NAME=${BREVO_SENDER_NAME:-Event Gate}
       - QSTASH_TOKEN=${QSTASH_TOKEN:-}
       - QSTASH_URL=${QSTASH_URL:-}
+      - QSTASH_CURRENT_SIGNING_KEY=${QSTASH_CURRENT_SIGNING_KEY:-}
+      - QSTASH_NEXT_SIGNING_KEY=${QSTASH_NEXT_SIGNING_KEY:-}
       - UPSTASH_REDIS_REST_URL=${UPSTASH_REDIS_REST_URL:-}
       - UPSTASH_REDIS_REST_TOKEN=${UPSTASH_REDIS_REST_TOKEN:-}
       - JWT_SECRET=${JWT_SECRET:-super-secret-key}
+      - REGISTRATION_RESUBMIT_SECRET=${REGISTRATION_RESUBMIT_SECRET:-}
+      - NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
     networks:
       - TiketIn-network
+      - supabase-local
     extra_hosts:
       - "host.docker.internal:host-gateway"
     command: sh -c "npm install && npm run dev"
 
   mobile-admin-build:
-    image: ghcr.io/cirruslabs/flutter:latest
+    image: ghcr.io/cirruslabs/flutter@sha256:217a3d81b124f3fab82b24633bf66b256cc74528b894e7f17103f70150232077
     container_name: ticketin-mobile-admin-build
     volumes:
       - ./mobile:/workspace
+      - flutter-build-output:/workspace/build
+      - flutter-project-gradle:/workspace/android/.gradle
+      - flutter-pub-cache:/root/.pub-cache
+      - flutter-gradle-cache:/root/.gradle
+      - flutter-android-ndk:/opt/android-sdk-linux/ndk
+      - flutter-android-platforms:/opt/android-sdk-linux/platforms
     working_dir: /workspace
     command: tail -f /dev/null
     networks:
@@ -41,3 +54,14 @@ services:
 networks:
   TiketIn-network:
     driver: bridge
+  supabase-local:
+    external: true
+    name: supabase_network_event_gate
+
+volumes:
+  flutter-build-output:
+  flutter-project-gradle:
+  flutter-pub-cache:
+  flutter-gradle-cache:
+  flutter-android-ndk:
+  flutter-android-platforms:
