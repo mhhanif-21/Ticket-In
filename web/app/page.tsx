@@ -1,65 +1,79 @@
-import Image from "next/image";
+import Image from 'next/image';
+import Link from 'next/link';
+import { getPublicEventsAction } from '@/lib/actions/getPublicEventsAction';
 
-export default function Home() {
+export default async function Home() {
+  const events = await getPublicEventsAction();
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
+    <main className="min-h-screen bg-background text-on-background">
+      <section className="border-b border-outline-variant bg-surface px-margin-mobile py-16 md:px-margin-desktop md:py-24">
+        <div className="mx-auto max-w-[1200px]">
+          <p className="font-label-caps text-label-caps uppercase tracking-[0.2em] text-secondary">
+            Ticket-In
+          </p>
+          <h1 className="mt-4 max-w-3xl font-display-lg-mobile text-display-lg-mobile text-primary md:font-display-lg md:text-display-lg">
+            Temukan event dan amankan tiketmu.
           </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+          <p className="mt-6 max-w-2xl font-body-lg text-body-lg text-on-surface-variant">
+            Ticket-In membantu kamu menemukan event yang sedang tersedia, mendaftar dengan mudah,
+            dan mengakses tiket digital di satu tempat.
           </p>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+      </section>
+
+      <section className="mx-auto w-full max-w-[1200px] px-margin-mobile py-12 md:px-margin-desktop md:py-16">
+        <div className="mb-8">
+          <p className="font-label-caps text-label-caps uppercase tracking-[0.16em] text-secondary">
+            Event tersedia
+          </p>
+          <h2 className="mt-2 font-headline-md text-headline-md text-primary">Pilih event favoritmu</h2>
         </div>
-      </main>
-    </div>
+
+        {events.length === 0 ? (
+          <div className="rounded-2xl border border-outline-variant bg-surface-container-lowest px-6 py-12 text-center">
+            <h3 className="font-headline-md text-headline-md text-primary">Belum ada event tersedia</h3>
+            <p className="mt-3 font-body-md text-body-md text-on-surface-variant">
+              Event baru akan tampil di halaman ini setelah dipublikasikan oleh panitia.
+            </p>
+          </div>
+        ) : (
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            {events.map((event) => (
+              <Link
+                key={event.slug}
+                href={`/${event.slug}`}
+                className="group overflow-hidden rounded-2xl border border-outline-variant bg-surface-container-lowest shadow-[0_4px_12px_rgba(0,0,0,0.05)] transition-transform duration-150 hover:-translate-y-1"
+              >
+                <div className="relative aspect-[16/9] overflow-hidden bg-surface-container-highest">
+                  {event.posterUrl ? (
+                    <Image
+                      src={event.posterUrl}
+                      alt={event.name}
+                      fill
+                      className="object-cover transition-transform duration-300 group-hover:scale-105"
+                    />
+                  ) : (
+                    <div className="flex h-full items-center justify-center px-6 text-center font-headline-md text-headline-md text-secondary">
+                      {event.name}
+                    </div>
+                  )}
+                </div>
+                <div className="p-6">
+                  <h3 className="font-headline-md text-headline-md text-primary">{event.name}</h3>
+                  <p className="mt-2 line-clamp-2 font-body-md text-body-md text-on-surface-variant">
+                    {event.description || 'Lihat detail event dan informasi pendaftarannya.'}
+                  </p>
+                  <div className="mt-5 flex items-center justify-between gap-4 font-description text-description text-secondary">
+                    <span>{event.location}</span>
+                    <span className="font-semibold text-primary">Lihat event →</span>
+                  </div>
+                </div>
+              </Link>
+            ))}
+          </div>
+        )}
+      </section>
+    </main>
   );
 }
