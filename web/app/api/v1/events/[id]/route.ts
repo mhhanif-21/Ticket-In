@@ -5,6 +5,10 @@ import { asc, eq } from 'drizzle-orm';
 
 const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+function publicAppUrl(): string {
+  return (process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000').replace(/\/$/, '');
+}
+
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
@@ -43,6 +47,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       .orderBy(asc(formFields.order));
 
     const publicEvent = {
+      id: event.id,
       name: event.name,
       slug: event.slug,
       description: event.description,
@@ -52,6 +57,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       capacity: event.capacity,
       registrationMode: event.registrationMode,
       formFields: publicFormFields,
+      public_registration_url: `${publicAppUrl()}/${event.slug}/register`,
+      public_qr_code_url: `${publicAppUrl()}/api/v1/events/${event.slug}/qr`,
     };
 
     return NextResponse.json({ status: 'success', data: publicEvent });

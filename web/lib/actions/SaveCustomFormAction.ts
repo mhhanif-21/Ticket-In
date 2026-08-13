@@ -5,6 +5,14 @@ import { eq } from 'drizzle-orm';
 export type AllowedFieldType = 'text' | 'number' | 'select' | 'checkbox' | 'radio' | 'file' | 'email' | 'textarea' | 'image';
 
 export interface FormFieldPayload {
+  field_name: string;
+  field_type: AllowedFieldType;
+  is_required: boolean;
+  options: any | null;
+  order: number;
+}
+
+interface NormalizedFormFieldPayload {
   fieldName: string;
   fieldType: AllowedFieldType;
   isRequired: boolean;
@@ -19,13 +27,21 @@ export class SaveCustomFormAction {
   static readonly ALLOWED_TYPES = ['text', 'number', 'select', 'checkbox', 'radio', 'file', 'email', 'textarea', 'image'];
 
   static async execute(eventId: string, fields: FormFieldPayload[]) {
+    const normalizedFields: NormalizedFormFieldPayload[] = fields.map((field) => ({
+      fieldName: field.field_name,
+      fieldType: field.field_type,
+      isRequired: field.is_required,
+      options: field.options,
+      order: field.order,
+    }));
+
     // 1. Validate max fields (TDS-004)
-    if (fields.length > this.MAX_FIELDS) {
+    if (normalizedFields.length > this.MAX_FIELDS) {
       throw new Error(`Maksimal ${this.MAX_FIELDS} field yang diizinkan (TDS-004)`);
     }
 
     // 2. Validate field types
-    for (const field of fields) {
+    for (const field of normalizedFields) {
       if (!this.ALLOWED_TYPES.includes(field.fieldType)) {
         throw new Error(`Tipe field tidak diizinkan: ${field.fieldType}`);
       }
@@ -51,8 +67,8 @@ export class SaveCustomFormAction {
       await tx.delete(formFields).where(eq(formFields.eventId, eventId));
 
       // Insert new fields if any
-      if (fields.length > 0) {
-        const insertPayload = fields.map(f => ({
+      if (normalizedFields.length > 0) {
+        const insertPayload = normalizedFields.map(f => ({
           eventId,
           fieldName: f.fieldName,
           fieldType: f.fieldType,

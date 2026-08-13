@@ -71,6 +71,7 @@ export async function middleware(req: NextRequest) {
       url.pathname.startsWith('/api/v1/auth/') ||
       url.pathname.includes('/status') ||
       url.pathname.match(/^\/api\/v1\/events\/[^\/]+\/register$/) ||
+      url.pathname.match(/^\/api\/v1\/events\/[^\/]+\/qr$/) ||
       url.pathname.match(/^\/api\/v1\/registrations\/[^\/]+\/verify-otp$/) ||
       (url.pathname.match(/^\/api\/v1\/events\/[^\/]+$/) && req.method === 'GET')
     ) {
