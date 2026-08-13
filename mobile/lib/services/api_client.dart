@@ -3,9 +3,7 @@ import 'package:http/http.dart' as http;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 class ApiClient {
-  // Gunakan IP 10.0.2.2 untuk mengakses localhost host dari Android Emulator
-  // Atau localhost jika di Web/iOS Simulator.
-  static const String baseUrl = 'http://10.0.2.2:3000/api'; 
+  static const String baseUrl = 'http://127.0.0.1:3000/api'; 
   final _storage = const FlutterSecureStorage();
 
   Future<Map<String, String>> _getHeaders() async {
@@ -29,5 +27,34 @@ class ApiClient {
       headers: headers,
       body: jsonEncode(body),
     );
+  }
+
+  Future<http.Response> put(String endpoint, Map<String, dynamic> body) async {
+    final headers = await _getHeaders();
+    return await http.put(
+      Uri.parse('$baseUrl$endpoint'),
+      headers: headers,
+      body: jsonEncode(body),
+    );
+  }
+
+  Future<http.StreamedResponse> multipartRequest(
+    String endpoint, 
+    String method, 
+    Map<String, String> fields, 
+    {String? filePath, String? fileField}
+  ) async {
+    final headers = await _getHeaders();
+    headers.remove('Content-Type'); // Let http library set the boundary automatically
+    
+    final request = http.MultipartRequest(method, Uri.parse('$baseUrl$endpoint'));
+    request.headers.addAll(headers);
+    request.fields.addAll(fields);
+    
+    if (filePath != null && fileField != null) {
+      request.files.add(await http.MultipartFile.fromPath(fileField, filePath));
+    }
+    
+    return await request.send();
   }
 }
