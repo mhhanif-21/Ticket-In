@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:mobile/models/event_model.dart';
+import 'package:event_gate_admin/models/event_model.dart';
 
 void main() {
   group('EventModel Tests', () {

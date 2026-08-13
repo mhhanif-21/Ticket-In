@@ -2,7 +2,9 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
+import 'package:go_router/go_router.dart';
 import '../services/event_service.dart';
+import '../widgets/dashed_border_painter.dart';
 
 class CreateEventScreen extends StatefulWidget {
   const CreateEventScreen({Key? key}) : super(key: key);
@@ -19,10 +21,11 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
   final _locationController = TextEditingController();
   final _capacityController = TextEditingController();
   final _descriptionController = TextEditingController(); // Added description
-  
+
   DateTime? _selectedDate;
   File? _posterFile;
   bool _isLoading = false;
+  String _registrationMode = 'Auto-Accept';
 
   Future<void> _pickDate() async {
     final date = await showDatePicker(
@@ -54,8 +57,27 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
     final picker = ImagePicker();
     final picked = await picker.pickImage(source: ImageSource.gallery);
     if (picked != null) {
+      // Client-Side Validation using Magic Bytes
+      final file = File(picked.path);
+      final raf = file.openSync();
+      final bytes = raf.readSync(8);
+      raf.closeSync();
+
+      bool isValid = false;
+      if (bytes.length >= 3 && bytes[0] == 0xFF && bytes[1] == 0xD8 && bytes[2] == 0xFF) {
+        isValid = true; // JPEG
+      } else if (bytes.length >= 8 && bytes[0] == 0x89 && bytes[1] == 0x50 && bytes[2] == 0x4E && bytes[3] == 0x47) {
+        isValid = true; // PNG
+      }
+
+      if (!isValid) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Format file tidak valid, hanya menerima gambar JPG/PNG')));
+        return;
+      }
+
       setState(() {
-        _posterFile = File(picked.path);
+        _posterFile = file;
       });
     }
   }
@@ -66,6 +88,10 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Pilih tanggal acara')));
       return;
     }
+    if (_posterFile == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Poster acara wajib diunggah')));
+      return;
+    }
 
     setState(() => _isLoading = true);
 
@@ -73,16 +99,21 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
       final data = {
         'name': _nameController.text,
         'location': _locationController.text,
-        'capacity': _capacityController.text,
+        // [BUG-066] FIX: Cast ke int di payload, bukan kirim string mentah ke API
+        'capacity': int.tryParse(_capacityController.text) ?? 0,
         'date': _selectedDate!.toIso8601String(),
-        'registration_mode': 'Auto-Accept', // Default for now
+        'description': _descriptionController.text,
+        'registration_mode': _registrationMode,
       };
 
-      await _eventService.createEvent(data, posterPath: _posterFile?.path);
-      
+      final eventId = await _eventService.createEvent(data, posterPath: _posterFile?.path);
+
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Acara berhasil dibuat!')));
-      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Acara berhasil dibuat! Sekarang susun form pendaftaran.')));
+      // [BUG-054] FIX: Redirect ke /form-builder dulu, bukan langsung /access-management
+      // Alur yang benar: Buat Acara → Form Builder → Kelola Akses
+      // extra: 'first_setup' memberi tahu FormBuilderScreen untuk redirect ke access-management setelah simpan
+      context.pushReplacement('/form-builder/$eventId', extra: 'first_setup');
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Gagal membuat acara: $e')));
@@ -159,7 +190,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
     const primaryColor = Color(0xFF41674B);
     const primaryContainerColor = Color(0xFF7EA687);
     const onPrimaryContainerColor = Color(0xFF163B24);
-    
+
     return Scaffold(
       backgroundColor: bgColor,
       appBar: AppBar(
@@ -183,7 +214,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
           ),
         ),
       ),
-      body: _isLoading 
+      body: _isLoading
         ? const Center(child: CircularProgressIndicator(color: primaryColor))
         : SingleChildScrollView(
             padding: const EdgeInsets.only(left: 20, right: 20, top: 20, bottom: 100),
@@ -195,42 +226,44 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                   // Image Upload Section
                   GestureDetector(
                     onTap: _pickImage,
-                    child: Container(
-                      width: double.infinity,
-                      height: 180, // Aspect ratio approx 16:9
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(
-                          color: primaryContainerColor,
-                          width: 2,
-                          style: BorderStyle.solid, // Flutter doesn't have dashed natively without packages, using solid
-                        ),
+                    child: CustomPaint(
+                      painter: DashedBorderPainter(
+                        color: primaryContainerColor,
+                        strokeWidth: 2,
+                        borderRadius: 10,
                       ),
-                      child: _posterFile != null
-                          ? ClipRRect(
-                              borderRadius: BorderRadius.circular(8),
-                              child: Image.file(_posterFile!, fit: BoxFit.cover),
-                            )
-                          : Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(Icons.add_photo_alternate, size: 40, color: primaryContainerColor),
-                                const SizedBox(height: 8),
-                                const Text(
-                                  'Unggah Poster Acara (16:9)',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w500,
-                                    color: Color(0xFF424842),
+                      child: Container(
+                        width: double.infinity,
+                        height: 180, // Aspect ratio approx 16:9
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: _posterFile != null
+                            ? ClipRRect(
+                                borderRadius: BorderRadius.circular(8),
+                                child: Image.file(_posterFile!, fit: BoxFit.cover),
+                              )
+                            : Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.add_photo_alternate, size: 40, color: primaryContainerColor),
+                                  const SizedBox(height: 8),
+                                  const Text(
+                                    'Unggah Poster Acara (16:9)',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w500,
+                                      color: Color(0xFF424842),
+                                    ),
                                   ),
-                                ),
-                              ],
-                            ),
+                                ],
+                              ),
+                      ),
                     ),
                   ),
                   const SizedBox(height: 24),
-                  
+
                   // Forms
                   _buildTextField(
                     label: 'Nama Acara',
@@ -239,7 +272,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                     validator: (v) => v!.isEmpty ? 'Harus diisi' : null,
                   ),
                   const SizedBox(height: 16),
-                  
+
                   _buildTextField(
                     label: 'Lokasi',
                     hint: 'Lokasi acara...',
@@ -248,17 +281,24 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                     validator: (v) => v!.isEmpty ? 'Harus diisi' : null,
                   ),
                   const SizedBox(height: 16),
-                  
+
                   _buildTextField(
                     label: 'Batas Kuota',
-                    hint: '0',
+                    hint: '100',
                     icon: Icons.group,
                     keyboardType: TextInputType.number,
                     controller: _capacityController,
-                    validator: (v) => v!.isEmpty ? 'Harus diisi' : null,
+                    // [BUG-066] FIX: Validasi harus angka positif, bukan hanya tidak kosong
+                    validator: (v) {
+                      if (v == null || v.isEmpty) return 'Harus diisi';
+                      final parsed = int.tryParse(v);
+                      if (parsed == null) return 'Harus berupa angka (misal: 100)';
+                      if (parsed <= 0) return 'Kuota harus lebih dari 0';
+                      return null;
+                    },
                   ),
                   const SizedBox(height: 16),
-                  
+
                   _buildTextField(
                     label: 'Tanggal',
                     hint: _selectedDate == null ? 'Pilih Tanggal Acara' : DateFormat('dd MMM yyyy').format(_selectedDate!),
@@ -269,12 +309,51 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                     validator: (v) => _selectedDate == null ? 'Harus diisi' : null,
                   ),
                   const SizedBox(height: 16),
-                  
+
                   _buildTextField(
                     label: 'Deskripsi Tambahan',
                     hint: 'Detail tambahan acara...',
                     controller: _descriptionController,
                     maxLines: 3,
+                  ),
+                  const SizedBox(height: 16),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Padding(
+                        padding: EdgeInsets.only(left: 4, bottom: 4),
+                        child: Text(
+                          'Mode Pendaftaran',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                            color: Color(0xFF424842),
+                          ),
+                        ),
+                      ),
+                      DropdownButtonFormField<String>(
+                        value: _registrationMode,
+                        items: ['Auto-Accept', 'Manual Review'].map((mode) => DropdownMenuItem(value: mode, child: Text(mode, style: const TextStyle(fontSize: 14)))).toList(),
+                        onChanged: (val) {
+                          if (val != null) {
+                            setState(() => _registrationMode = val);
+                          }
+                        },
+                        decoration: InputDecoration(
+                          filled: true,
+                          fillColor: const Color(0xFFFFFFFF),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide: const BorderSide(color: Color(0xFFDFE3DE)),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide: const BorderSide(color: Color(0xFF7EA687)),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),

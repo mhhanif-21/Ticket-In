@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../models/event_model.dart';
 import '../services/event_service.dart';
+import '../services/api_client.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class AccessManagementScreen extends StatefulWidget {
   final String eventId;
@@ -103,7 +105,8 @@ class _AccessManagementScreenState extends State<AccessManagementScreen> {
     }
 
     final regUrl = _event!.publicRegistrationUrl ?? 'Belum ada tautan';
-    final scanUrl = 'eventgate.com/scan/${_event!.slug}';
+    // [BUG-060] FIX: Format scanUrl disesuaikan dengan arsitektur Next.js -> /[slug]/checkin
+    final scanUrl = '${ApiClient.baseUrl.replaceAll('/api', '')}/${_event!.slug}/checkin';
 
     return Scaffold(
       backgroundColor: bgColor,
@@ -209,8 +212,15 @@ class _AccessManagementScreenState extends State<AccessManagementScreen> {
                               side: const BorderSide(color: primaryColor),
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                             ),
-                            onPressed: () {
-                              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Mendownload QR...')));
+                            onPressed: () async {
+                              // [BUG-069] FIX: Implementasi download/buka QR di browser via url_launcher
+                              final url = _event!.publicQrCodeUrl;
+                              if (url != null && await canLaunchUrl(Uri.parse(url))) {
+                                await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+                                if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Membuka browser untuk mengunduh QR...')));
+                              } else {
+                                if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Gagal membuka tautan QR')));
+                              }
                             },
                           ),
                         ),
@@ -275,22 +285,52 @@ class _AccessManagementScreenState extends State<AccessManagementScreen> {
                   const SizedBox(height: 16),
                   Container(
                     width: double.infinity,
-                    padding: const EdgeInsets.symmetric(vertical: 24),
+                    padding: const EdgeInsets.symmetric(vertical: 32),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF7EA687).withOpacity(0.2), // primary-container/20
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: const Color(0xFF7EA687).withOpacity(0.3)),
+                      color: const Color(0xFFF3F5F2),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: const Color(0xFFDFE3DE)),
                     ),
-                    child: Center(
-                      child: Text(
-                        _newPin ?? '------',
-                        style: const TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 6.0,
-                          color: primaryColor,
+                    child: Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        Positioned(
+                          right: -30,
+                          top: -30,
+                          child: Icon(
+                            Icons.lock_outline,
+                            size: 140,
+                            color: const Color(0xFF7EA687).withOpacity(0.1),
+                          ),
                         ),
-                      ),
+                        Center(
+                          child: Column(
+                            children: [
+                              Text(
+                                // [BUG-068] FIX: Tampilkan "***" jika PIN sudah ada di DB namun tidak bisa di-decrypt
+                                _newPin ?? '***',
+                                style: TextStyle(
+                                  fontSize: _newPin == null ? 48 : 48,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: _newPin == null ? 8.0 : 12.0,
+                                  color: const Color(0xFF163B24),
+                                  fontFamily: 'monospace',
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                _newPin == null ? 'PIN TERENKRIPSI (AMAN)' : 'PIN AKTIF',
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  letterSpacing: 2.0,
+                                  color: Color(0xFF41674B),
+                                ),
+                              )
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                   const SizedBox(height: 16),

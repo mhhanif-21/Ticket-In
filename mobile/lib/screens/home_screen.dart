@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../models/event_model.dart';
 import '../services/event_service.dart';
+import 'package:intl/intl.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -14,6 +15,9 @@ class _HomeScreenState extends State<HomeScreen> {
   final EventService _eventService = EventService();
   List<EventModel> _events = [];
   bool _isLoading = true;
+  String _searchQuery = '';
+  // [BUG-047] FIX: Tambah state untuk sorting
+  String _sortOrder = 'newest'; // 'newest' | 'oldest'
 
   @override
   void initState() {
@@ -36,60 +40,317 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  // [BUG-048] FIX: Hapus _showEventOptions (Bottom Sheet) — navigasi ke halaman detail
+  void _navigateToEventDetail(EventModel event) {
+    context.push('/event-detail/${event.id}').then((_) => _loadEvents());
+  }
+
   @override
   Widget build(BuildContext context) {
+    const primaryColor = Color(0xFF41674B);
+    const surfaceColor = Color(0xFFF9FAF5);
+    const surfaceContainerColor = Color(0xFFEEEEEA);
+    const outlineVariantColor = Color(0xFFC1C8C0);
+    const outlineColor = Color(0xFF727971);
+    const onSurfaceColor = Color(0xFF1A1C1A);
+    const onSurfaceVariantColor = Color(0xFF424842);
+    const primaryContainerColor = Color(0xFF7EA687);
+    const onPrimaryContainerColor = Color(0xFF163B24);
+    const secondaryColor = Color(0xFF5B5F5B);
+    const errorColor = Color(0xFFBA1A1A);
+
+    // [BUG-047] FIX: Sort list berdasarkan _sortOrder sebelum filter search
+    final sortedEvents = [..._events];
+    sortedEvents.sort((a, b) => _sortOrder == 'newest'
+        ? b.date.compareTo(a.date)
+        : a.date.compareTo(b.date));
+    final filteredEvents = sortedEvents
+        .where((e) => e.name.toLowerCase().contains(_searchQuery.toLowerCase()))
+        .toList();
+
     return Scaffold(
+      // [BUG-042] FIX: Hapus extendBody:true agar Navbar tidak menutupi list event
+      backgroundColor: surfaceColor,
       appBar: AppBar(
-        title: const Text('Event Gate Admin'),
-        actions: [
-          IconButton(icon: const Icon(Icons.refresh), onPressed: _loadEvents),
-        ],
+        backgroundColor: surfaceColor,
+        elevation: 0,
+        centerTitle: false,
+        titleSpacing: 20,
+        title: const Text(
+          'Semua Event',
+          style: TextStyle(
+            color: primaryColor,
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+            letterSpacing: -0.01,
+          ),
+        ),
+        // [BUG-046] FIX: Hapus ikon profil dari AppBar halaman Daftar Acara
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1.0),
+          child: Container(color: outlineVariantColor, height: 1.0),
+        ),
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _events.isEmpty
-              ? const Center(
-                  child: Text('Belum ada acara. Silakan buat baru.'),
-                )
-              : ListView.builder(
-                  itemCount: _events.length,
-                  itemBuilder: (context, index) {
-                    final event = _events[index];
-                    return Card(
-                      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                      child: ListTile(
-                        title: Text(event.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-                        subtitle: Text('Mode: ${event.registrationMode}'),
-                        trailing: PopupMenuButton<String>(
-                          onSelected: (value) async {
-                            if (value == 'edit') {
-                              await context.push('/edit-event/${event.id}');
-                            } else if (value == 'form') {
-                              await context.push('/form-builder/${event.id}');
-                            } else if (value == 'access') {
-                              await context.push('/access-management/${event.id}');
-                            }
-                            _loadEvents();
-                          },
-                          itemBuilder: (context) => [
-                            const PopupMenuItem(value: 'edit', child: Text('Edit Detail Acara')),
-                            const PopupMenuItem(value: 'form', child: Text('Susun Form Pendaftaran')),
-                            const PopupMenuItem(value: 'access', child: Text('Kelola Akses Panitia')),
-                          ],
+          ? const Center(child: CircularProgressIndicator(color: primaryColor))
+          : Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.all(20.0),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Container(
+                          height: 48,
+                          decoration: BoxDecoration(
+                            color: surfaceColor,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: outlineVariantColor),
+                          ),
+                          child: TextField(
+                            onChanged: (val) => setState(() => _searchQuery = val),
+                            decoration: const InputDecoration(
+                              hintText: 'Cari nama event...',
+                              hintStyle: TextStyle(color: outlineColor, fontSize: 14),
+                              prefixIcon: Icon(Icons.search, color: outlineColor),
+                              border: InputBorder.none,
+                              contentPadding: EdgeInsets.symmetric(vertical: 14),
+                            ),
+                          ),
                         ),
                       ),
-                    );
-                  },
+                      const SizedBox(width: 8),
+                      // [BUG-047] FIX: Tombol sort sekarang interaktif — tap untuk toggle Terbaru/Terlama
+                      GestureDetector(
+                        onTap: () {
+                          setState(() {
+                            _sortOrder = _sortOrder == 'newest' ? 'oldest' : 'newest';
+                          });
+                        },
+                        child: Container(
+                          height: 48,
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          decoration: BoxDecoration(
+                            color: surfaceColor,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: outlineVariantColor),
+                          ),
+                          child: Row(
+                            children: [
+                              Text(
+                                _sortOrder == 'newest' ? 'Urutkan: Terbaru' : 'Urutkan: Terlama',
+                                style: const TextStyle(color: secondaryColor, fontSize: 12, fontWeight: FontWeight.w500),
+                              ),
+                              const SizedBox(width: 8),
+                              Icon(
+                                _sortOrder == 'newest' ? Icons.arrow_downward : Icons.arrow_upward,
+                                color: secondaryColor,
+                                size: 18,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () async {
-          await context.push('/create-event');
-          _loadEvents();
-        },
-        child: const Icon(Icons.add),
+                Expanded(
+                  child: filteredEvents.isEmpty
+                      ? const Center(child: Text('Belum ada acara. Silakan buat baru.', style: TextStyle(color: onSurfaceVariantColor)))
+                      : ListView.builder(
+                          padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+                          itemCount: filteredEvents.length,
+                          itemBuilder: (context, index) {
+                            final event = filteredEvents[index];
+                            final dateStr = DateFormat('dd MMM yyyy').format(event.date);
+
+                            Color badgeBgColor = primaryColor.withOpacity(0.1);
+                            Color badgeTextColor = primaryColor;
+                            String badgeText = 'Confirmed';
+
+                            if (event.registrationMode == 'Manual Review') {
+                              badgeBgColor = errorColor.withOpacity(0.1);
+                              badgeTextColor = errorColor;
+                              badgeText = 'Review';
+                            }
+
+                            return InkWell(
+                              // [BUG-048] FIX: Navigate ke halaman detail, bukan buka Bottom Sheet
+                              onTap: () => _navigateToEventDetail(event),
+                              borderRadius: BorderRadius.circular(12),
+                              child: Container(
+                                margin: const EdgeInsets.only(bottom: 8),
+                                padding: const EdgeInsets.all(16),
+                                decoration: BoxDecoration(
+                                  color: surfaceColor,
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(color: outlineVariantColor),
+                                ),
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Container(
+                                      width: 80,
+                                      height: 96,
+                                      decoration: BoxDecoration(
+                                        color: surfaceContainerColor,
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: event.posterUrl != null
+                                        ? ClipRRect(
+                                            borderRadius: BorderRadius.circular(8),
+                                            child: Image.network(event.posterUrl!, fit: BoxFit.cover),
+                                          )
+                                        : const Icon(Icons.image, color: outlineVariantColor),
+                                    ),
+                                    const SizedBox(width: 16),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            event.name,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: const TextStyle(
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.w600,
+                                              color: onSurfaceColor,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Row(
+                                            children: [
+                                              const Icon(Icons.calendar_today, size: 14, color: onSurfaceVariantColor),
+                                              const SizedBox(width: 4),
+                                              Text(dateStr, style: const TextStyle(fontSize: 14, color: onSurfaceVariantColor)),
+                                            ],
+                                          ),
+                                          const SizedBox(height: 2),
+                                          Row(
+                                            children: [
+                                              const Icon(Icons.location_on, size: 14, color: onSurfaceVariantColor),
+                                              const SizedBox(width: 4),
+                                              Expanded(
+                                                child: Text(
+                                                  event.location,
+                                                  maxLines: 1,
+                                                  overflow: TextOverflow.ellipsis,
+                                                  style: const TextStyle(fontSize: 14, color: onSurfaceVariantColor),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                          const SizedBox(height: 8),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                            decoration: BoxDecoration(
+                                              color: badgeBgColor,
+                                              borderRadius: BorderRadius.circular(4),
+                                            ),
+                                            child: Text(
+                                              badgeText,
+                                              style: TextStyle(
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.w600,
+                                                color: badgeTextColor,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                ),
+              ],
+            ),
+      floatingActionButton: Padding(
+        padding: const EdgeInsets.only(bottom: 24.0),
+        child: FloatingActionButton(
+          backgroundColor: primaryContainerColor,
+          foregroundColor: onPrimaryContainerColor,
+          elevation: 4,
+          onPressed: () async {
+            await context.push('/create-event');
+            _loadEvents();
+          },
+          child: const Icon(Icons.add),
+        ),
+      ),
+      // [BUG-042] FIX: Navbar sekarang full-block menempel di bawah (bukan floating pill)
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          color: surfaceColor,
+          border: const Border(
+            top: BorderSide(color: outlineVariantColor, width: 1.0),
+          ),
+        ),
+        child: SafeArea(
+          child: SizedBox(
+            height: 64,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                // [BUG-044] FIX: Dari Dashboard, gunakan context.go bukan context.push
+                _buildNavItem(Icons.dashboard, 'Dashboard', false, () => context.go('/admin-dashboard')),
+                _buildNavItem(Icons.calendar_today, 'Event', true, () {}),
+                // [BUG-043] FIX: Settings menampilkan SnackBar "Segera Hadir"
+                _buildNavItem(Icons.settings, 'Settings', false, () {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('⚙️ Pengaturan — Segera Hadir'),
+                      duration: Duration(seconds: 2),
+                    ),
+                  );
+                }),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNavItem(IconData icon, String label, bool isActive, VoidCallback onTap) {
+    const primaryContainerColor = Color(0xFF7EA687);
+    const onPrimaryContainerColor = Color(0xFF163B24);
+    const onSurfaceVariantColor = Color(0xFF424842);
+
+    return InkWell(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+        decoration: isActive
+            ? BoxDecoration(
+                color: primaryContainerColor,
+                borderRadius: BorderRadius.circular(12),
+              )
+            : null,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              color: isActive ? onPrimaryContainerColor : onSurfaceVariantColor,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                color: isActive ? onPrimaryContainerColor : onSurfaceVariantColor,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 }
-
 

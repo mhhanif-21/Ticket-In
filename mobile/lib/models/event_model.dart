@@ -40,6 +40,7 @@ class EventModel {
   final String slug;
   final int capacity;
   final String location;
+  final String? description;
   final DateTime date;
   final String status;
   final String registrationMode;
@@ -54,6 +55,7 @@ class EventModel {
     required this.slug,
     required this.capacity,
     required this.location,
+    this.description,
     required this.date,
     required this.status,
     required this.registrationMode,
@@ -77,6 +79,7 @@ class EventModel {
       slug: json['slug'] ?? '',
       capacity: json['capacity'] ?? 0,
       location: json['location'] ?? '',
+      description: json['description'],
       date: json['date'] != null ? DateTime.parse(json['date']) : DateTime.now(),
       status: json['status'] ?? 'Draft',
       registrationMode: json['registration_mode'] ?? json['registrationMode'] ?? 'Auto-Accept',
@@ -85,5 +88,23 @@ class EventModel {
       publicQrCodeUrl: json['public_qr_code_url'],
       formFields: formFieldsList,
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'name': name,
+      'slug': slug,
+      'capacity': capacity,
+      'location': location,
+      'description': description,
+      'date': date.toIso8601String(),
+      'status': status,
+      'registration_mode': registrationMode,
+      'poster_url': posterUrl,
+      'public_registration_url': publicRegistrationUrl,
+      'public_qr_code_url': publicQrCodeUrl,
+      'form_fields': formFields.map((field) => field.toJson()).toList(),
+    };
   }
 }

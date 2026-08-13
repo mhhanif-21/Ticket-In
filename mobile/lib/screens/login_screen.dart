@@ -19,6 +19,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   bool _isLoading = false;
   bool _obscurePassword = true;
+  bool _rememberMe = false;
 
   @override
   void dispose() {
@@ -55,7 +56,7 @@ class _LoginScreenState extends State<LoginScreen> {
         await _storage.write(key: 'auth_token', value: token);
         
         if (mounted) {
-          context.go('/home'); // Navigasi ke placeholder
+          context.go('/admin-dashboard'); // [BUG-045] FIX: Arahkan ke Dashboard sebagai landing page admin
         }
       } else {
         final body = jsonDecode(response.body);
@@ -211,25 +212,51 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                         const SizedBox(height: 16),
 
-                        // Forgot Password Link
-                        Align(
-                          alignment: Alignment.centerRight,
-                          child: TextButton(
-                            onPressed: () {},
-                            style: TextButton.styleFrom(
-                              padding: EdgeInsets.zero,
-                              minimumSize: Size.zero,
-                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        // Remember Me & Forgot Password
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Row(
+                              children: [
+                                SizedBox(
+                                  width: 24,
+                                  height: 24,
+                                  child: Checkbox(
+                                    value: _rememberMe,
+                                    activeColor: primaryColor,
+                                    side: const BorderSide(color: outlineVariantColor),
+                                    onChanged: (val) {
+                                      setState(() => _rememberMe = val ?? false);
+                                    },
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                const Text(
+                                  'Ingat saya',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: onSurfaceVariantColor,
+                                  ),
+                                ),
+                              ],
                             ),
-                            child: const Text(
-                              'Lupa sandi?',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w500,
-                                color: primaryColor,
+                            TextButton(
+                              onPressed: () {},
+                              style: TextButton.styleFrom(
+                                padding: EdgeInsets.zero,
+                                minimumSize: Size.zero,
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              ),
+                              child: const Text(
+                                'Lupa sandi?',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w500,
+                                  color: primaryColor,
+                                ),
                               ),
                             ),
-                          ),
+                          ],
                         ),
                         const SizedBox(height: 24),
 

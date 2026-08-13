@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:go_router/go_router.dart';
 import 'screens/home_screen.dart';
 import 'theme/app_theme.dart';
@@ -8,6 +9,11 @@ import 'screens/create_event_screen.dart';
 import 'screens/edit_event_screen.dart';
 import 'screens/form_builder_screen.dart';
 import 'screens/access_management_screen.dart';
+import 'screens/detail_event_metrics_screen.dart';
+import 'screens/executive_oversight_screen.dart';
+import 'screens/admin_dashboard_screen.dart';
+import 'screens/participants_screen.dart';
+import 'screens/review_detail_screen.dart';
 
 void main() {
   runApp(
@@ -16,10 +22,80 @@ void main() {
     ),
   );
 }
+// ─────────────────────────────────────────────────────────
+// [BUG-053] FIX: Splash Screen dengan Session Persistence
+// Cek auth_token di SecureStorage saat app dibuka.
+// Jika token ada → langsung masuk Dashboard, skip Login.
+// ─────────────────────────────────────────────────────────
+class SplashScreen extends StatefulWidget {
+  const SplashScreen({super.key});
+
+  @override
+  State<SplashScreen> createState() => _SplashScreenState();
+}
+
+class _SplashScreenState extends State<SplashScreen> {
+  @override
+  void initState() {
+    super.initState();
+    _checkSession();
+  }
+
+  Future<void> _checkSession() async {
+    const storage = FlutterSecureStorage();
+    final token = await storage.read(key: 'auth_token');
+
+    if (!mounted) return;
+
+    if (token != null && token.isNotEmpty) {
+      // Token ditemukan → langsung ke Dashboard
+      context.go('/admin-dashboard');
+    } else {
+      // Tidak ada token → ke halaman Login
+      context.go('/login');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Layar putih bersih dengan loading indicator saat cek token
+    return const Scaffold(
+      backgroundColor: Color(0xFFF9FAF5),
+      body: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.event_available, size: 48, color: Color(0xFF41674B)),
+            SizedBox(height: 16),
+            Text(
+              'Event Gate',
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF41674B),
+                letterSpacing: -0.02,
+              ),
+            ),
+            SizedBox(height: 32),
+            CircularProgressIndicator(
+              color: Color(0xFF41674B),
+              strokeWidth: 2,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
 
 final _router = GoRouter(
-  initialLocation: '/login',
+  // [BUG-053] FIX: initialLocation sekarang ke /splash yang akan redirect secara cerdas
+  initialLocation: '/splash',
   routes: [
+    GoRoute(
+      path: '/splash',
+      builder: (context, state) => const SplashScreen(),
+    ),
     GoRoute(
       path: '/login',
       builder: (context, state) => const LoginScreen(),
@@ -38,11 +114,43 @@ final _router = GoRouter(
     ),
     GoRoute(
       path: '/form-builder/:id',
-      builder: (context, state) => FormBuilderScreen(eventId: state.pathParameters['id']!),
+      // [BUG-054] FIX: isFirstSetup=true jika datang dari create-event
+      // create_event_screen mengirim pushReplacement ke route ini tanpa extra → isFirstSetup=true by default
+      builder: (context, state) => FormBuilderScreen(
+        eventId: state.pathParameters['id']!,
+        isFirstSetup: state.extra == 'first_setup',
+      ),
     ),
     GoRoute(
       path: '/access-management/:id',
       builder: (context, state) => AccessManagementScreen(eventId: state.pathParameters['id']!),
+    ),
+    // [BUG-048] FIX: Route baru untuk halaman detail event menggantikan Bottom Sheet
+    GoRoute(
+      path: '/event-detail/:id',
+      builder: (context, state) => DetailEventMetricsScreen(eventId: state.pathParameters['id']!),
+    ),
+    GoRoute(
+      path: '/detail-metrics/:id',
+      builder: (context, state) {
+        return DetailEventMetricsScreen(eventId: state.pathParameters['id']!);
+      },
+    ),
+    GoRoute(
+      path: '/executive-oversight',
+      builder: (context, state) => const ExecutiveOversightScreen(),
+    ),
+    GoRoute(
+      path: '/admin-dashboard',
+      builder: (context, state) => const AdminDashboardScreen(),
+    ),
+    GoRoute(
+      path: '/participants/:id',
+      builder: (context, state) => ParticipantsScreen(eventId: state.pathParameters['id']!),
+    ),
+    GoRoute(
+      path: '/review-detail',
+      builder: (context, state) => ReviewDetailScreen(participantData: state.extra as Map<String, dynamic>),
     ),
   ],
 );

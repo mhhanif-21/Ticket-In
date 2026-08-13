@@ -1,12 +1,18 @@
 import 'package:flutter/material.dart';
+import 'dart:io';
+import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import '../models/event_model.dart';
 import '../services/event_service.dart';
+import '../services/poster_validation.dart';
+import '../widgets/dashed_border_painter.dart';
 
 class EditEventScreen extends StatefulWidget {
   final String eventId;
+  final EventService? eventService;
+  final Future<File?> Function()? posterPicker;
 
-  const EditEventScreen({Key? key, required this.eventId}) : super(key: key);
+  const EditEventScreen({Key? key, required this.eventId, this.eventService, this.posterPicker}) : super(key: key);
 
   @override
   _EditEventScreenState createState() => _EditEventScreenState();
@@ -14,7 +20,7 @@ class EditEventScreen extends StatefulWidget {
 
 class _EditEventScreenState extends State<EditEventScreen> {
   final _formKey = GlobalKey<FormState>();
-  final EventService _eventService = EventService();
+  late final EventService _eventService;
 
   late TextEditingController _nameController;
   late TextEditingController _locationController;
@@ -25,10 +31,12 @@ class _EditEventScreenState extends State<EditEventScreen> {
   String _selectedMode = 'Auto-Accept';
   bool _isLoading = true;
   EventModel? _event;
+  File? _posterFile;
 
   @override
   void initState() {
     super.initState();
+    _eventService = widget.eventService ?? EventService();
     _loadEvent();
   }
 
@@ -40,6 +48,7 @@ class _EditEventScreenState extends State<EditEventScreen> {
         _nameController = TextEditingController(text: event.name);
         _locationController = TextEditingController(text: event.location);
         _capacityController = TextEditingController(text: event.capacity.toString());
+        _descriptionController.text = event.description ?? '';
         _selectedDate = event.date;
         _selectedMode = event.registrationMode;
         _isLoading = false;
@@ -49,6 +58,26 @@ class _EditEventScreenState extends State<EditEventScreen> {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Gagal memuat acara: $e')));
       Navigator.pop(context);
     }
+  }
+
+  Future<void> _pickImage() async {
+    File? pickedFile;
+    if (widget.posterPicker != null) {
+      pickedFile = await widget.posterPicker!();
+    } else {
+      final picked = await ImagePicker().pickImage(source: ImageSource.gallery);
+      if (picked != null) pickedFile = File(picked.path);
+    }
+    if (pickedFile == null) return;
+
+    if (!await hasSupportedPosterSignature(pickedFile)) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Format file tidak valid, hanya menerima gambar JPG/PNG')));
+      }
+      return;
+    }
+
+    setState(() => _posterFile = pickedFile);
   }
 
   Future<void> _pickDate() async {
@@ -87,10 +116,14 @@ class _EditEventScreenState extends State<EditEventScreen> {
         'location': _locationController.text,
         'capacity': int.parse(_capacityController.text),
         'date': _selectedDate!.toIso8601String(),
+        'description': _descriptionController.text,
         'registration_mode': _selectedMode,
       };
 
       await _eventService.updateEvent(widget.eventId, data);
+      if (_posterFile != null) {
+        await _eventService.uploadEventPoster(widget.eventId, _posterFile!.path);
+      }
       
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Acara berhasil diperbarui!')));
@@ -100,6 +133,15 @@ class _EditEventScreenState extends State<EditEventScreen> {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
       setState(() => _isLoading = false);
     }
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _locationController.dispose();
+    _capacityController.dispose();
+    _descriptionController.dispose();
+    super.dispose();
   }
 
   Widget _buildTextField({
@@ -204,38 +246,49 @@ class _EditEventScreenState extends State<EditEventScreen> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   // Image Section
-                  Container(
-                    width: double.infinity,
-                    height: 180, // Aspect ratio approx 16:9
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
+                  GestureDetector(
+                    key: const ValueKey('edit-poster-picker'),
+                    onTap: _pickImage,
+                    child: CustomPaint(
+                      painter: DashedBorderPainter(
                         color: primaryContainerColor,
-                        width: 2,
-                        style: BorderStyle.solid,
+                        strokeWidth: 2,
+                        borderRadius: 10,
+                      ),
+                      child: Container(
+                      width: double.infinity,
+                      height: 180, // Aspect ratio approx 16:9
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: _posterFile != null
+                          ? ClipRRect(
+                              borderRadius: BorderRadius.circular(8),
+                              child: Image.file(_posterFile!, fit: BoxFit.cover),
+                            )
+                          : _event?.posterUrl != null
+                          ? ClipRRect(
+                              borderRadius: BorderRadius.circular(8),
+                              child: Image.network(_event!.posterUrl!, fit: BoxFit.cover),
+                            )
+                          : Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.add_photo_alternate, size: 40, color: primaryContainerColor),
+                                const SizedBox(height: 8),
+                                const Text(
+                                  'Ubah Poster Acara (16:9)',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w500,
+                                    color: Color(0xFF424842),
+                                  ),
+                                ),
+                              ],
+                            ),
                       ),
                     ),
-                    child: _event?.posterUrl != null
-                        ? ClipRRect(
-                            borderRadius: BorderRadius.circular(8),
-                            child: Image.network(_event!.posterUrl!, fit: BoxFit.cover),
-                          )
-                        : Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(Icons.add_photo_alternate, size: 40, color: primaryContainerColor),
-                              const SizedBox(height: 8),
-                              const Text(
-                                'Ubah Poster Acara (16:9)',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w500,
-                                  color: Color(0xFF424842),
-                                ),
-                              ),
-                            ],
-                          ),
                   ),
                   const SizedBox(height: 24),
                   
@@ -283,6 +336,45 @@ class _EditEventScreenState extends State<EditEventScreen> {
                     hint: 'Detail tambahan acara...',
                     controller: _descriptionController,
                     maxLines: 3,
+                  ),
+                  const SizedBox(height: 16),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Padding(
+                        padding: EdgeInsets.only(left: 4, bottom: 4),
+                        child: Text(
+                          'Mode Pendaftaran',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                            color: Color(0xFF424842),
+                          ),
+                        ),
+                      ),
+                      DropdownButtonFormField<String>(
+                        value: _selectedMode,
+                        items: ['Auto-Accept', 'Manual Review'].map((mode) => DropdownMenuItem(value: mode, child: Text(mode, style: const TextStyle(fontSize: 14)))).toList(),
+                        onChanged: (val) {
+                          if (val != null) {
+                            setState(() => _selectedMode = val);
+                          }
+                        },
+                        decoration: InputDecoration(
+                          filled: true,
+                          fillColor: const Color(0xFFFFFFFF),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide: const BorderSide(color: Color(0xFFDFE3DE)),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide: const BorderSide(color: Color(0xFF7EA687)),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),

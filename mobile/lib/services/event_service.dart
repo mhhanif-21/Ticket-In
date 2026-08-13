@@ -1,10 +1,13 @@
 import 'dart:convert';
-import 'package:http/http.dart' as http;
+import 'dart:io';
 import '../models/event_model.dart';
 import 'api_client.dart';
+import 'poster_validation.dart';
 
 class EventService {
-  final ApiClient _apiClient = ApiClient();
+  final ApiClient _apiClient;
+
+  EventService({ApiClient? apiClient}) : _apiClient = apiClient ?? ApiClient();
 
   Future<List<EventModel>> getEvents() async {
     final response = await _apiClient.get('/v1/events');
@@ -27,26 +30,40 @@ class EventService {
     }
   }
 
-  Future<String> createEvent(Map<String, String> data, {String? posterPath}) async {
-    final response = await _apiClient.multipartRequest(
-      '/v1/events',
+  Future<String> createEvent(Map<String, dynamic> data, {String? posterPath}) async {
+    final createResponse = await _apiClient.post('/v1/events', data);
+
+    if (createResponse.statusCode == 201 || createResponse.statusCode == 200) {
+      final jsonBody = jsonDecode(createResponse.body);
+      final String id = jsonBody['data'] is List
+          ? jsonBody['data'][0]['id'].toString()
+          : jsonBody['data']['id'].toString();
+
+      if (posterPath != null) {
+        await uploadEventPoster(id, posterPath);
+      }
+      return id;
+    } else {
+      throw Exception('Failed to create event: ${createResponse.body}');
+    }
+  }
+
+  Future<void> uploadEventPoster(String id, String posterPath) async {
+    if (!await hasSupportedPosterSignature(File(posterPath))) {
+      throw ArgumentError('Poster must be a valid JPEG or PNG image');
+    }
+
+    final posterResponse = await _apiClient.multipartRequest(
+      '/v1/events/$id/poster',
       'POST',
-      data,
+      {},
       filePath: posterPath,
-      fileField: posterPath != null ? 'poster' : null,
+      fileField: 'poster',
     );
 
-    if (response.statusCode == 201) {
-      final resBody = await response.stream.bytesToString();
-      final jsonBody = jsonDecode(resBody);
-      // Backend returns either an array of objects or an object in 'data'
-      if (jsonBody['data'] is List) {
-        return jsonBody['data'][0]['id'];
-      }
-      return jsonBody['data']['id'];
-    } else {
-      final errorStr = await response.stream.bytesToString();
-      throw Exception('Failed to create event: $errorStr');
+    if (posterResponse.statusCode != 200 && posterResponse.statusCode != 201) {
+      final errorStr = await posterResponse.stream.bytesToString();
+      throw Exception('Failed to upload poster: $errorStr');
     }
   }
 
