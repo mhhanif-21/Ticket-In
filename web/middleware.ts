@@ -31,17 +31,50 @@ export async function middleware(req: NextRequest) {
     }
     
     const token = authHeader.split(' ')[1];
-    
-    // Menggunakan getUser karena lebih aman (berbicara langsung ke server Supabase)
-    const { data, error } = await supabase.auth.getUser(token);
-    
-    if (error || !data.user) {
+    let userId = '';
+    let role = '';
+    let eventId = '';
+
+    try {
+      // Decode tanpa verifikasi dulu untuk cek tipe token
+      const { decodeJwt } = await import('jose');
+      const decoded = decodeJwt(token);
+      
+      if (decoded && decoded.role === 'volunteer') {
+        // Ini adalah token Volunteer buatan kita
+        const { jwtVerify } = await import('jose');
+        const secret = new TextEncoder().encode(process.env.JWT_SECRET || 'super-secret-key');
+        const { payload } = await jwtVerify(token, secret);
+        
+        userId = payload.volunteer_name as string;
+        role = 'volunteer';
+        eventId = payload.event_id as string;
+      } else {
+        // Asumsikan token Supabase (Admin)
+        const { data, error } = await supabase.auth.getUser(token);
+        if (error || !data.user) throw new Error('Supabase token invalid');
+        
+        userId = data.user.id;
+        role = 'admin';
+      }
+    } catch (err) {
       return NextResponse.json({ status: 'error', message: 'Token tidak valid atau kedaluwarsa' }, { status: 401 });
     }
+
+    // Role-based Access Control (RBAC) Sederhana
+    const pathname = url.pathname;
+    if (pathname.startsWith('/api/v1/events') && role !== 'admin') {
+      return NextResponse.json({ status: 'error', message: 'Hanya Admin yang dapat mengakses rute ini' }, { status: 403 });
+    }
+    if (pathname.startsWith('/api/v1/checkin') && role !== 'volunteer') {
+      return NextResponse.json({ status: 'error', message: 'Hanya Volunteer yang dapat mengakses rute ini' }, { status: 403 });
+    }
     
-    // Tambahkan UID ke header internal
+    // Tambahkan info ke header internal
     const requestHeaders = new Headers(req.headers);
-    requestHeaders.set('x-user-id', data.user.id);
+    requestHeaders.set('x-user-id', userId);
+    requestHeaders.set('x-user-role', role);
+    if (eventId) requestHeaders.set('x-event-id', eventId);
 
     return NextResponse.next({
       request: {

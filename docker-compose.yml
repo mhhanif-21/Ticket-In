@@ -17,6 +17,9 @@ services:
       - BREVO_API_KEY=${BREVO_API_KEY:-}
       - QSTASH_TOKEN=${QSTASH_TOKEN:-}
       - QSTASH_URL=${QSTASH_URL:-}
+      - UPSTASH_REDIS_REST_URL=${UPSTASH_REDIS_REST_URL:-}
+      - UPSTASH_REDIS_REST_TOKEN=${UPSTASH_REDIS_REST_TOKEN:-}
+      - JWT_SECRET=${JWT_SECRET:-super-secret-key}
     networks:
       - TiketIn-network
     extra_hosts:

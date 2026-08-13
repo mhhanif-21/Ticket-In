@@ -3,7 +3,7 @@
 Platform B2B bagi Event Organizer untuk mengelola siklus pendaftaran dan check-in acara secara mandiri.
 
 Proyek ini dibangun menggunakan arsitektur monorepo yang menampung dua stack utama:
-1. **Web (Laravel 11)**: Backend API dan antarmuka web untuk publik (pendaftar) serta panitia lapangan (scanner check-in). Kode terdapat di folder `web/`.
+1. **Web (Next.js)**: Backend API (Route Handlers) dan antarmuka web untuk publik (pendaftar) serta panitia lapangan (scanner check-in). Kode terdapat di folder `web/`.
 2. **Mobile Admin (Flutter)**: Aplikasi mobile untuk admin EO mengelola acara. Kode terdapat di folder `mobile/`.
 
 ## Development Environment
