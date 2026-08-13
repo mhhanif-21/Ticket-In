@@ -3,18 +3,18 @@ import { eq, inArray } from 'drizzle-orm';
 import { db } from '../../db';
 import { events, registrations, otps } from '../../db/schema';
 
-const BASE_URL = 'http://localhost:3001';
+const BASE_URL = process.env.TEST_BASE_URL || 'http://localhost:3000';
 let eventId1 = '';
-let eventSlug1 = 'test-race-condition-' + Date.now();
+const eventSlug1 = 'test-race-condition-' + Date.now();
 
 let eventId2 = '';
-let eventSlug2 = 'test-otp-' + Date.now();
+const eventSlug2 = 'test-otp-' + Date.now();
 
 let eventId3 = '';
-let eventSlug3 = 'test-file-' + Date.now();
+const eventSlug3 = 'test-file-' + Date.now();
 
 let eventId4 = '';
-let eventSlug4 = 'test-quota-' + Date.now();
+const eventSlug4 = 'test-quota-' + Date.now();
 
 describe('S4-T2 Registration Integration', () => {
   beforeAll(async () => {

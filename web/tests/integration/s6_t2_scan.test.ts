@@ -4,20 +4,24 @@ import { events, registrations, checkInSessions, checkInLogs } from '../../db/sc
 import { eq, inArray } from 'drizzle-orm';
 import * as jose from 'jose';
 
-const BASE_URL = 'http://localhost:3001';
+const BASE_URL = process.env.TEST_BASE_URL || 'http://localhost:3000';
 
 describe('S6-T2: QR Ticket Scan & Validation', () => {
   let eventId: string;
+  let eventSlug: string;
   let sessionId: string;
   let validTicketRegId: string;
   let pendingTicketRegId: string;
+  let otherEventId: string;
+  let otherEventRegistrationId: string;
   let volunteerToken: string;
 
   beforeAll(async () => {
     // 1. Create Event
+    eventSlug = 'scan-test-event-' + Date.now();
     const [event] = await db.insert(events).values({
       name: 'Scan Test Event',
-      slug: 'scan-test-event-' + Date.now(),
+      slug: eventSlug,
       location: 'Lab',
       date: new Date(),
       capacity: 100,
@@ -38,6 +42,7 @@ describe('S6-T2: QR Ticket Scan & Validation', () => {
     volunteerToken = await new jose.SignJWT({ 
         role: 'volunteer',
         event_id: event.id,
+        event_slug: eventSlug,
         volunteer_name: 'Scanner Bot',
         session_id: sessionId
       })
@@ -65,12 +70,35 @@ describe('S6-T2: QR Ticket Scan & Validation', () => {
       ticketCode: 'PENDN123',
     }).returning();
     pendingTicketRegId = pendingReg.id;
+
+    const [otherEvent] = await db.insert(events).values({
+      name: 'Other Scan Test Event',
+      slug: 'other-scan-test-event-' + Date.now(),
+      location: 'Other Lab',
+      date: new Date(),
+      capacity: 100,
+      registrationMode: 'Auto-Accept',
+      volunteerPinHash: 'hash',
+    }).returning();
+    otherEventId = otherEvent.id;
+
+    const [otherRegistration] = await db.insert(registrations).values({
+      eventId: otherEvent.id,
+      name: 'Peserta Event Lain',
+      email: 'other@test.com',
+      status: 'Accepted',
+      ticketCode: 'OTHER123',
+    }).returning();
+    otherEventRegistrationId = otherRegistration.id;
   });
 
   afterAll(async () => {
     // Cleanup
     if (eventId) {
       await db.delete(events).where(eq(events.id, eventId)); // Cascades everything
+    }
+    if (otherEventId) {
+      await db.delete(events).where(eq(events.id, otherEventId));
     }
   });
 
@@ -108,7 +136,7 @@ describe('S6-T2: QR Ticket Scan & Validation', () => {
     expect(logs[0].checkInSessionId).toBe(sessionId);
   });
 
-  it('TDS-003: should reject duplicate scan and return first scan time', async () => {
+  it('TDS-003: should reject duplicate scan and return first_scanned_at', async () => {
     // Second scan for the same ticket
     const res = await fetch(`${BASE_URL}/api/v1/checkin/scan`, {
       method: 'POST',
@@ -122,7 +150,8 @@ describe('S6-T2: QR Ticket Scan & Validation', () => {
 
     expect(res.status).toBe(409); // Conflict
     expect(data.status).toBe('error');
-    expect(data.data.first_scan_time).toBeDefined();
+    expect(data.data.first_scanned_at).toBeDefined();
+    expect(data.data.first_scanned_at).not.toBeUndefined();
 
     // Verify Duplicate log was appended
     const logs = await db.select().from(checkInLogs).where(eq(checkInLogs.registrationId, validTicketRegId));
@@ -142,11 +171,30 @@ describe('S6-T2: QR Ticket Scan & Validation', () => {
       body: JSON.stringify({ ticket_code: 'PENDN123', event_id: eventId })
     });
     
-    expect(res.status).toBe(400); // Invalid request
+    expect(res.status).toBe(404); // Contract: invalid/unapproved ticket
     
     // Verify Invalid log was recorded
     const logs = await db.select().from(checkInLogs).where(eq(checkInLogs.registrationId, pendingTicketRegId));
     expect(logs.length).toBe(1);
     expect(logs[0].scanStatus).toBe('Invalid');
+  });
+
+  it('should reject an attempt to scan a ticket from another event', async () => {
+    const res = await fetch(`${BASE_URL}/api/v1/checkin/scan`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${volunteerToken}`,
+      },
+      body: JSON.stringify({ ticket_code: 'OTHER123', event_id: otherEventId }),
+    });
+
+    expect(res.status).toBe(403);
+
+    const [registration] = await db
+      .select()
+      .from(registrations)
+      .where(eq(registrations.id, otherEventRegistrationId));
+    expect(registration.presenceStatus).toBe('Absent');
   });
 });

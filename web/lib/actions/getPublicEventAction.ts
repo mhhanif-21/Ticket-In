@@ -5,7 +5,17 @@ import { eq, and, inArray, count } from 'drizzle-orm';
 export async function getPublicEventAction(slug: string) {
   // 1. Dapatkan event berdasarkan slug
   const eventRecords = await db
-    .select()
+    .select({
+      id: events.id,
+      name: events.name,
+      slug: events.slug,
+      description: events.description,
+      location: events.location,
+      date: events.date,
+      posterUrl: events.posterUrl,
+      capacity: events.capacity,
+      registrationMode: events.registrationMode,
+    })
     .from(events)
     .where(eq(events.slug, slug))
     .limit(1);

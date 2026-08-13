@@ -4,10 +4,8 @@ import { supabase } from '@/lib/supabase';
 export const runtime = 'nodejs';
 
 export async function POST(req: Request) {
-  console.log('Login route called!');
   try {
     const body = await req.json();
-    console.log('Login body:', body);
     const { email, password } = body;
 
     if (!email || !password) {
@@ -16,13 +14,10 @@ export async function POST(req: Request) {
         { status: 400 }
       );
     }
-    console.log('Calling Supabase signIn...');
-
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
-    console.log('Supabase result:', data ? 'Success' : 'Error', error);
 
     if (error || !data.session) {
       return NextResponse.json(

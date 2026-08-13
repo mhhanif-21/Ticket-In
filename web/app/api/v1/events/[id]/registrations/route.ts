@@ -5,10 +5,10 @@ import { eq, and, or, ilike, desc, asc, sql } from 'drizzle-orm';
 
 export const runtime = 'nodejs';
 
-export async function GET(request: Request, { params }: { params: { id: string } }) {
+export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { searchParams } = new URL(request.url);
-    const eventId = params.id;
+    const { id: eventId } = await params;
     
     // Extract filters
     const search = searchParams.get('search');

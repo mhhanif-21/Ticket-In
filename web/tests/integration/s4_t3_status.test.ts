@@ -3,9 +3,9 @@ import { db } from '../../db';
 import { events, registrations } from '../../db/schema';
 import { eq } from 'drizzle-orm';
 
-const BASE_URL = 'http://localhost:3001';
+const BASE_URL = process.env.TEST_BASE_URL || 'http://localhost:3000';
 let eventId = '';
-let eventSlug = 'test-status-check-' + Date.now();
+const eventSlug = 'test-status-check-' + Date.now();
 let registrationId1 = '';
 let registrationId2 = '';
 
@@ -50,19 +50,19 @@ describe('S4-T3 Ticket Status Check', () => {
   });
 
   it('TDS-010: should return 404 for wrong email but correct name (prevent enumeration)', async () => {
-    const res = await fetch(`${BASE_URL}/api/v1/registration/status?name=John Doe&email=wrong@email.com`);
+    const res = await fetch(`${BASE_URL}/api/v1/registration/status?event_slug=${eventSlug}&name=John Doe&email=wrong@email.com`);
     expect(res.status).toBe(404);
     const json = await res.json();
     expect(json.message).toBe('Data Tidak Ditemukan');
   });
 
   it('TDS-010: should return 404 for wrong name but correct email', async () => {
-    const res = await fetch(`${BASE_URL}/api/v1/registration/status?name=Wrong Name&email=john@doe.com`);
+    const res = await fetch(`${BASE_URL}/api/v1/registration/status?event_slug=${eventSlug}&name=Wrong Name&email=john@doe.com`);
     expect(res.status).toBe(404);
   });
 
   it('should return registration details on exact match', async () => {
-    const res = await fetch(`${BASE_URL}/api/v1/registration/status?name=John Doe&email=john@doe.com`);
+    const res = await fetch(`${BASE_URL}/api/v1/registration/status?event_slug=${eventSlug}&name=John Doe&email=john@doe.com`);
     expect(res.status).toBe(200);
     const json = await res.json();
     expect(json.data.status).toBe('Accepted');

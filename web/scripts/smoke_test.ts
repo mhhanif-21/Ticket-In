@@ -26,7 +26,7 @@ async function runTest() {
       body: { test: 'hello world from Event Gate smoke test' }
     });
     console.log('✅ QStash: Job published successfully! Check your Upstash logs.');
-    console.log('Job ID:', result.messageId);
+    console.log('Job ID:', 'messageId' in result ? result.messageId : 'unavailable');
   } catch (err: any) {
     console.error('❌ QStash Failed:', err.message);
   }

@@ -2,7 +2,7 @@ import { db } from '@/db';
 import { formFields, events } from '@/db/schema';
 import { eq } from 'drizzle-orm';
 
-export type AllowedFieldType = 'text' | 'number' | 'select' | 'checkbox' | 'file' | 'email' | 'textarea' | 'image';
+export type AllowedFieldType = 'text' | 'number' | 'select' | 'checkbox' | 'radio' | 'file' | 'email' | 'textarea' | 'image';
 
 export interface FormFieldPayload {
   fieldName: string;
@@ -14,7 +14,9 @@ export interface FormFieldPayload {
 
 export class SaveCustomFormAction {
   static readonly MAX_FIELDS = 25;
-  static readonly ALLOWED_TYPES = ['text', 'number', 'select', 'checkbox', 'file', 'email', 'textarea', 'image'];
+  // [BUG-057] FIX: Tambah 'radio' ke ALLOWED_TYPES — Flutter kirim 'radio' untuk Pilihan Ganda (single-select)
+  // 'radio' ≠ 'checkbox': radio = pilih satu, checkbox = pilih banyak
+  static readonly ALLOWED_TYPES = ['text', 'number', 'select', 'checkbox', 'radio', 'file', 'email', 'textarea', 'image'];
 
   static async execute(eventId: string, fields: FormFieldPayload[]) {
     // 1. Validate max fields (TDS-004)
@@ -29,6 +31,11 @@ export class SaveCustomFormAction {
       }
       if (!field.fieldName || field.fieldName.trim() === '') {
         throw new Error('Nama field tidak boleh kosong');
+      }
+      if (['radio', 'checkbox', 'select'].includes(field.fieldType)) {
+        if (!Array.isArray(field.options) || field.options.length === 0 || field.options.some((option) => typeof option !== 'string' || option.trim() === '')) {
+          throw new Error(`Field ${field.fieldName} memerlukan minimal satu pilihan yang valid`);
+        }
       }
     }
 

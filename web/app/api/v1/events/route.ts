@@ -30,7 +30,7 @@ export async function POST(req: Request) {
     }
 
     // Generate slug
-    let baseSlug = generateSlug(name);
+    const baseSlug = generateSlug(name);
     let slug = baseSlug;
     let counter = 1;
     
@@ -83,7 +83,7 @@ export async function GET(req: Request) {
       const allEvents = await db.select().from(events);
       return NextResponse.json({ status: 'success', data: allEvents });
     } else if (role === 'volunteer') {
-      const eventId = req.headers.get('x-volunteer-event-id');
+      const eventId = req.headers.get('x-event-id');
       if (!eventId) {
         return NextResponse.json({ status: 'error', message: 'Event ID missing for volunteer' }, { status: 400 });
       }

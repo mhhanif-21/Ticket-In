@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { db } from '../../../../../db';
 import { registrations, events } from '../../../../../db/schema';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, ilike } from 'drizzle-orm';
 
 export const runtime = 'nodejs';
 
@@ -10,9 +10,23 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const name = searchParams.get('name');
     const email = searchParams.get('email');
+    const eventSlug = searchParams.get('event_slug');
 
-    if (!name || !email) {
-      return NextResponse.json({ status: 'error', message: 'Parameter name dan email wajib diisi' }, { status: 400 });
+    if (!name || !email || !eventSlug) {
+      return NextResponse.json({ status: 'error', message: 'Parameter event_slug, name, dan email wajib diisi' }, { status: 400 });
+    }
+
+    const cleanName = name.trim();
+    const cleanEmail = email.trim();
+
+    const [event] = await db.select({ id: events.id })
+      .from(events)
+      .where(eq(events.slug, eventSlug.trim()))
+      .limit(1);
+
+    // TDS-010: use the same not-found response for an unknown event and participant.
+    if (!event) {
+      return NextResponse.json({ status: 'error', message: 'Data Tidak Ditemukan' }, { status: 404 });
     }
 
     const regRecords = await db
@@ -26,7 +40,11 @@ export async function GET(request: Request) {
         email: registrations.email
       })
       .from(registrations)
-      .where(and(eq(registrations.name, name), eq(registrations.email, email)))
+      .where(and(
+        eq(registrations.eventId, event.id),
+        ilike(registrations.name, cleanName),
+        ilike(registrations.email, cleanEmail)
+      ))
       .limit(1);
 
     if (regRecords.length === 0) {

@@ -5,8 +5,7 @@ import { eq } from 'drizzle-orm';
 import bcrypt from 'bcryptjs';
 import * as jose from 'jose';
 
-// Define the environment variables needed for jose if not set
-process.env.JWT_SECRET = 'test-secret';
+const BASE_URL = process.env.TEST_BASE_URL || 'http://localhost:3000';
 
 describe('S6-T1: Check-in Session Entry', () => {
   let testEvent: any;
@@ -36,7 +35,7 @@ describe('S6-T1: Check-in Session Entry', () => {
   });
 
   it('should successfully login and create a check-in session', async () => {
-    const res = await fetch('http://localhost:3001/api/v1/auth/volunteer/login', {
+    const res = await fetch(`${BASE_URL}/api/v1/auth/volunteer/login`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -54,6 +53,8 @@ describe('S6-T1: Check-in Session Entry', () => {
     expect(data.status).toBe('success');
     expect(data.data.access_token).toBeDefined();
     expect(data.data.user.session_id).toBeDefined();
+    expect(res.headers.get('set-cookie')).toContain('volunteer_token=');
+    expect(res.headers.get('set-cookie')).toContain('HttpOnly');
 
     const sessionId = data.data.user.session_id;
 
@@ -69,16 +70,17 @@ describe('S6-T1: Check-in Session Entry', () => {
     expect(payload.session_id).toBe(sessionId);
     expect(payload.role).toBe('volunteer');
     expect(payload.event_id).toBe(testEventId);
+    expect(payload.event_slug).toBe('test-event-checkin-s6');
   });
 
   it('should handle multiple concurrent logins creating separate sessions', async () => {
-    const req1 = fetch('http://localhost:3001/api/v1/auth/volunteer/login', {
+    const req1 = fetch(`${BASE_URL}/api/v1/auth/volunteer/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ event_slug: 'test-event-checkin-s6', pin: '123456', volunteer_name: 'Panitia A' })
     });
     
-    const req2 = fetch('http://localhost:3001/api/v1/auth/volunteer/login', {
+    const req2 = fetch(`${BASE_URL}/api/v1/auth/volunteer/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ event_slug: 'test-event-checkin-s6', pin: '123456', volunteer_name: 'Panitia B' })

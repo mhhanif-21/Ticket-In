@@ -5,7 +5,7 @@ import { eq, inArray } from 'drizzle-orm';
 import { getPublicEventAction } from '../../lib/actions/getPublicEventAction';
 
 let eventId = '';
-let slug = 'test-landing-page-' + Date.now();
+const slug = 'test-landing-page-' + Date.now();
 
 describe('S4-T1 Public Event Landing Page Action', () => {
   beforeAll(async () => {

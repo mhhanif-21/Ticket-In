@@ -2,13 +2,17 @@ import { NextResponse } from 'next/server';
 import { db } from '../../../../../../db';
 import { registrations } from '../../../../../../db/schema';
 import { eq, and } from 'drizzle-orm';
-import { publishJob } from '../../../../../../lib/services/qstash';
+import {
+  ensureTicketGenerationJobTx,
+  getTicketGenerationJob,
+  publishTicketGenerationJob,
+} from '../../../../../../lib/actions/ticketGenerationJob';
 
 export const runtime = 'nodejs';
 
-export async function POST(request: Request, { params }: { params: { id: string } }) {
+export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const id = params.id;
+    const { id } = await params;
     const body = await request.json();
     const { action } = body;
 
@@ -17,32 +21,64 @@ export async function POST(request: Request, { params }: { params: { id: string 
     }
 
     if (action === 'Reject') {
-      await db.update(registrations).set({ status: 'Rejected' }).where(eq(registrations.id, id));
+      const rejection = await db.update(registrations)
+        .set({ status: 'Rejected' })
+        .where(and(eq(registrations.id, id), eq(registrations.status, 'Pending')))
+        .returning({ id: registrations.id });
+
+      if (rejection.length === 0) {
+        return NextResponse.json({ status: 'error', message: 'Registrasi tidak ditemukan atau bukan berstatus Pending' }, { status: 409 });
+      }
+
       return NextResponse.json({ status: 'success', message: 'Pendaftaran ditolak' });
     }
 
     if (action === 'Approve') {
-      const updateResult = await db.update(registrations)
-        .set({ status: 'Accepted' })
-        .where(and(eq(registrations.id, id), eq(registrations.status, 'Pending')))
-        .returning({ id: registrations.id });
+      const transition = await db.transaction(async (tx) => {
+        const [updated] = await tx.update(registrations)
+          .set({ status: 'Accepted' })
+          .where(and(eq(registrations.id, id), eq(registrations.status, 'Pending')))
+          .returning({ id: registrations.id });
 
-      if (updateResult.length === 0) {
-        return NextResponse.json({ status: 'error', message: 'Registrasi tidak ditemukan atau bukan berstatus Pending' }, { status: 404 });
-      }
+        if (!updated) {
+          const [existing] = await tx
+            .select({ status: registrations.status })
+            .from(registrations)
+            .where(eq(registrations.id, id))
+            .limit(1);
+          if (!existing || existing.status !== 'Accepted') {
+            return null;
+          }
+        }
 
-      // Publish to QStash asynchronously (S5-T1 requirements)
-      await publishJob({
-        url: `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/v1/worker/process-ticket`,
-        body: { registration_id: id }
-      }).catch(err => {
-        console.error('Failed to publish to QStash:', err);
-        // Continue even if QStash fails in this scope? Yes, but usually we throw.
-        // Actually, for resilient systems we should log it, but let's throw to fail the transaction if we were using one.
+        // The acceptance transition and durable job creation commit together.
+        const job = await ensureTicketGenerationJobTx(tx, id);
+        return { jobId: job.id, jobStatus: job.status };
       });
 
-      return NextResponse.json({ status: 'success', message: 'Pendaftaran disetujui' });
+      if (!transition) {
+        return NextResponse.json({ status: 'error', message: 'Registrasi tidak ditemukan atau bukan berstatus Pending' }, { status: 409 });
+      }
+
+      try {
+        const job = await publishTicketGenerationJob(id);
+        return NextResponse.json({
+          status: 'success',
+          message: 'Pendaftaran disetujui',
+          data: { registrationId: id, jobId: job.id, jobStatus: job.status },
+        });
+      } catch (publishError) {
+        console.error('Review ticket publish failed:', publishError);
+        const job = await getTicketGenerationJob(id);
+        return NextResponse.json({
+          status: 'error',
+          message: 'Pendaftaran diterima, tetapi pekerjaan penerbitan tiket gagal dikirim dan dapat dicoba ulang.',
+          data: { registrationId: id, jobId: job?.id || transition.jobId, jobStatus: job?.status || 'failed', retryable: true },
+        }, { status: 503 });
+      }
     }
+
+    return NextResponse.json({ status: 'error', message: 'Aksi tidak valid.' }, { status: 400 });
 
   } catch (error) {
     console.error('Review Registration Error:', error);

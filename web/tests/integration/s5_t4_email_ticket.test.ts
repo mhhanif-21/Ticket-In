@@ -15,11 +15,11 @@ import { registrations, events } from '../../db/schema';
 import { eq } from 'drizzle-orm';
 
 describe('S5-T4 Email Ticket Delivery', () => {
-  let manualReviewEventId = '22222222-2222-2222-2222-222222222222';
-  let autoAcceptEventId = '33333333-3333-3333-3333-333333333333';
+  const manualReviewEventId = '22222222-2222-2222-2222-222222222222';
+  const autoAcceptEventId = '33333333-3333-3333-3333-333333333333';
   let manualRegId: string;
   let autoRegId: string;
-  let originalFetch = global.fetch;
+  const originalFetch = global.fetch;
 
   beforeEach(async () => {
     vi.clearAllMocks();
@@ -34,7 +34,6 @@ describe('S5-T4 Email Ticket Delivery', () => {
       capacity: 100,
       registrationMode: 'Manual Review',
       volunteerPinHash: 'hashedpin',
-      status: 'Published'
     }).onConflictDoNothing();
 
     // Create 'Auto-Accept' event
@@ -47,7 +46,6 @@ describe('S5-T4 Email Ticket Delivery', () => {
       capacity: 100,
       registrationMode: 'Auto-Accept',
       volunteerPinHash: 'hashedpin',
-      status: 'Published'
     }).onConflictDoNothing();
 
     // Create Registration for Manual Review

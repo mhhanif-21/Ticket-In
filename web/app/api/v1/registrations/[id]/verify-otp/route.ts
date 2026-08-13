@@ -3,9 +3,9 @@ import { verifyOtpAction } from '@/lib/actions/processRegistrationAction';
 
 export const runtime = 'nodejs';
 
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const registrationId = params.id;
+    const { id: registrationId } = await params;
     const body = await req.json();
     const otpCode = body.otp_code;
 

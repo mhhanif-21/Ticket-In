@@ -32,6 +32,24 @@ async function setupStorage() {
   } else {
     console.log('Bucket "posters" already exists.');
   }
+
+  const ticketBucketExists = buckets.some(b => b.name === 'tickets');
+  if (!ticketBucketExists) {
+    console.log('Bucket "tickets" not found. Creating...');
+    const { error: createError } = await supabaseAdmin.storage.createBucket('tickets', {
+      public: true, // Make it public so users can download it
+      allowedMimeTypes: ['image/png'],
+      fileSizeLimit: 5242880, // 5MB
+    });
+
+    if (createError) {
+      console.error('Failed to create bucket:', createError);
+      process.exit(1);
+    }
+    console.log('Bucket "tickets" created successfully.');
+  } else {
+    console.log('Bucket "tickets" already exists.');
+  }
 }
 
 setupStorage().catch(console.error);

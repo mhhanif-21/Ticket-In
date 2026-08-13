@@ -35,9 +35,9 @@ describe('S5-T1 Admin Participant Review', () => {
 
     const [r2] = await db.insert(registrations).values({
       eventId,
-      name: 'Bob Draft',
+      name: 'Bob Pending',
       email: 'bob@test.com',
-      status: 'Draft'
+      status: 'Pending'
     }).returning({ id: registrations.id });
     registrationIdDraft = r2.id;
   });
@@ -52,7 +52,7 @@ describe('S5-T1 Admin Participant Review', () => {
     it('should return 400 when mutually exclusive filters are combined', async () => {
       // Combining status and attendance
       const req = new NextRequest(`http://localhost:3000/api/v1/events/${eventId}/registrations?status=Pending&attendance=true`);
-      const res = await GET(req as any, { params: { id: eventId } });
+      const res = await GET(req as any, { params: Promise.resolve({ id: eventId }) });
       expect(res.status).toBe(400);
       const json = await res.json();
       expect(json.message).toContain('Hanya satu jenis filter');
@@ -60,7 +60,7 @@ describe('S5-T1 Admin Participant Review', () => {
 
     it('should return results when using single search filter', async () => {
       const req = new NextRequest(`http://localhost:3000/api/v1/events/${eventId}/registrations?search=Alice`);
-      const res = await GET(req as any, { params: { id: eventId } });
+      const res = await GET(req as any, { params: Promise.resolve({ id: eventId }) });
       expect(res.status).toBe(200);
       const json = await res.json();
       expect(json.data.length).toBe(1);
@@ -69,12 +69,12 @@ describe('S5-T1 Admin Participant Review', () => {
   });
 
   describe('POST /review (Approve/Reject)', () => {
-    it('should reject a registration', async () => {
+    it('should reject a Pending registration', async () => {
       const req = new NextRequest(`http://localhost:3000/api/v1/registrations/${registrationIdDraft}/review`, {
         method: 'POST',
         body: JSON.stringify({ action: 'Reject' })
       });
-      const res = await POST(req as any, { params: { id: registrationIdDraft } });
+      const res = await POST(req as any, { params: Promise.resolve({ id: registrationIdDraft }) });
       expect(res.status).toBe(200);
       
       const dbCheck = await db.select().from(registrations).where(eq(registrations.id, registrationIdDraft));
@@ -82,13 +82,13 @@ describe('S5-T1 Admin Participant Review', () => {
     });
 
     it('should approve a pending registration and trigger QStash', async () => {
-      const qstashMock = vi.spyOn(qstash, 'publishJob').mockResolvedValue({ messageId: 'msg-123' });
+      const qstashMock = vi.spyOn(qstash, 'publishJob').mockResolvedValue({ messageId: 'msg-123', url: 'https://qstash.test/message' });
 
       const req = new NextRequest(`http://localhost:3000/api/v1/registrations/${registrationIdPending}/review`, {
         method: 'POST',
         body: JSON.stringify({ action: 'Approve' })
       });
-      const res = await POST(req as any, { params: { id: registrationIdPending } });
+      const res = await POST(req as any, { params: Promise.resolve({ id: registrationIdPending }) });
       expect(res.status).toBe(200);
 
       const dbCheck = await db.select().from(registrations).where(eq(registrations.id, registrationIdPending));

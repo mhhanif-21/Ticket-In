@@ -5,6 +5,8 @@ import { eq, and } from 'drizzle-orm';
 
 export const runtime = 'nodejs';
 
+const INVALID_TICKET_MESSAGE = 'Tiket tidak terdaftar di sistem atau pendaftaran belum disetujui.';
+
 export async function POST(req: Request) {
   try {
     // 1. Dapatkan role, session, dan event_id dari middleware headers
@@ -20,10 +22,19 @@ export async function POST(req: Request) {
     }
 
     const body = await req.json();
-    let { ticket_code, scan_method = 'Camera' } = body;
-    const event_id = body.event_id || eventIdFromHeader;
+    let ticket_code = body.ticket_code;
+    const scan_method = body.scan_method ?? 'Camera';
 
-    if (!ticket_code || !event_id) {
+    if (body.event_id && body.event_id !== eventIdFromHeader) {
+      return NextResponse.json(
+        { status: 'error', message: 'Event pada tiket tidak sesuai dengan akses panitia' },
+        { status: 403 }
+      );
+    }
+
+    const event_id = eventIdFromHeader;
+
+    if (typeof ticket_code !== 'string' || !event_id) {
       return NextResponse.json(
         { status: 'error', message: 'ticket_code dan event_id wajib diisi' },
         { status: 400 }
@@ -45,7 +56,8 @@ export async function POST(req: Request) {
             eq(registrations.eventId, event_id)
           )
         )
-        .limit(1);
+        .limit(1)
+        .for('update');
 
       const reg = regRecords[0];
 
@@ -61,8 +73,8 @@ export async function POST(req: Request) {
         });
         
         return NextResponse.json(
-          { status: 'error', message: 'Tiket Tidak Sah' },
-          { status: 400 }
+          { status: 'error', message: INVALID_TICKET_MESSAGE },
+          { status: 404 }
         );
       }
 
@@ -81,7 +93,7 @@ export async function POST(req: Request) {
           .orderBy(checkInLogs.createdAt)
           .limit(1);
 
-        const firstScanTime = successLogs.length > 0 ? successLogs[0].createdAt : null;
+        const firstScannedAt = successLogs.length > 0 ? successLogs[0].createdAt : null;
 
         // Catat kejadian Duplicate ini
         await tx.insert(checkInLogs).values({
@@ -96,7 +108,10 @@ export async function POST(req: Request) {
           { 
             status: 'error', 
             message: 'Tiket Sudah Digunakan!', 
-            data: { first_scan_time: firstScanTime } 
+            data: {
+              first_scanned_at: firstScannedAt,
+              scanned_by_role: 'volunteer',
+            }
           },
           { status: 409 }
         );
@@ -104,10 +119,11 @@ export async function POST(req: Request) {
 
       // 2d. Kondisi Sukses
       // Update registration status
+      const attendanceTime = new Date();
       await tx
         .update(registrations)
-        .set({ presenceStatus: 'Present', updatedAt: new Date() })
-        .where(eq(registrations.id, reg.id));
+        .set({ presenceStatus: 'Present', updatedAt: attendanceTime })
+        .where(and(eq(registrations.id, reg.id), eq(registrations.presenceStatus, 'Absent')));
 
       // Catat log Success
       await tx.insert(checkInLogs).values({
@@ -125,6 +141,7 @@ export async function POST(req: Request) {
           data: {
             participant_name: reg.name,
             ticket_code: reg.ticketCode,
+            attendance_time: attendanceTime,
           }
         },
         { status: 200 }

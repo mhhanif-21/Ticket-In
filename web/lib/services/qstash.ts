@@ -9,21 +9,21 @@ let qstashClient: Client | null = null;
 export function getQStashClient(): Client {
   if (!qstashClient) {
     const token = process.env.QSTASH_TOKEN;
-    const url = process.env.QSTASH_URL;
     if (!token) {
       throw new Error('QStash token is not defined in environment variables');
     }
-    // Jika user mengaktifkan region spesifik (mis. US), QSTASH_URL perlu diset
-    qstashClient = new Client({ token, baseUrl: url });
+    // We omit baseUrl so it defaults to the global endpoint
+    // to prevent region mismatch errors.
+    qstashClient = new Client({ token });
   }
   return qstashClient;
 }
 
 export interface JobPayload {
   url: string; // Target webhook URL
-  body: any;
+  body: unknown;
   retries?: number;
-  delay?: string; // e.g. "10s", "1m"
+  delay?: `${bigint}s` | `${bigint}m` | `${bigint}h` | `${bigint}d`; // e.g. "10s", "1m"
 }
 
 export async function publishJob(payload: JobPayload) {

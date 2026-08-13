@@ -4,19 +4,21 @@ import { events, registrations, checkInSessions, checkInLogs } from '../../db/sc
 import { eq, and } from 'drizzle-orm';
 import * as jose from 'jose';
 
-const BASE_URL = 'http://localhost:3001';
+const BASE_URL = process.env.TEST_BASE_URL || 'http://localhost:3000';
 
 describe('S6-T3: Manual Ticket Code Input', () => {
   let eventId: string;
+  let eventSlug: string;
   let sessionId: string;
   let validTicketRegId: string;
   let volunteerToken: string;
 
   beforeAll(async () => {
     // 1. Create Event
+    eventSlug = 'manual-scan-test-' + Date.now();
     const [event] = await db.insert(events).values({
       name: 'Manual Scan Test Event',
-      slug: 'manual-scan-test-' + Date.now(),
+      slug: eventSlug,
       location: 'HQ',
       date: new Date(),
       capacity: 100,
@@ -37,6 +39,7 @@ describe('S6-T3: Manual Ticket Code Input', () => {
     volunteerToken = await new jose.SignJWT({ 
         role: 'volunteer',
         event_id: event.id,
+        event_slug: eventSlug,
         volunteer_name: 'Manual Bot',
         session_id: sessionId
       })

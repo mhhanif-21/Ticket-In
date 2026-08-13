@@ -17,7 +17,7 @@ import { supabaseAdmin } from '../../lib/supabase';
 import * as ticketUtils from '../../lib/utils/ticketUtils';
 
 describe('S5-T3 GenerateTicketAction', () => {
-  let eventId = '11111111-1111-1111-1111-111111111111';
+  const eventId = '11111111-1111-1111-1111-111111111111';
   let pendingRegId: string;
   let acceptedRegId: string;
   let alreadyGeneratedRegId: string;

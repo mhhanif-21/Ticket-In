@@ -1,40 +1,60 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/db';
-import { events } from '@/db/schema';
-import { eq } from 'drizzle-orm';
+import { events, formFields } from '@/db/schema';
+import { asc, eq } from 'drizzle-orm';
+
+const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const role = req.headers.get('x-user-role');
-    if (role !== 'admin' && role !== 'volunteer') {
-      return NextResponse.json({ status: 'error', message: 'Unauthorized' }, { status: 403 });
-    }
-
     const { id } = await params;
-    const event = await db.query.events.findFirst({
-      where: eq(events.id, id),
-      with: {
-        formFields: {
-          orderBy: (fields, { asc }) => [asc(fields.order)],
-        }
-      }
-    });
+
+    const [event] = await db
+      .select({
+        id: events.id,
+        name: events.name,
+        slug: events.slug,
+        description: events.description,
+        location: events.location,
+        date: events.date,
+        posterUrl: events.posterUrl,
+        capacity: events.capacity,
+        registrationMode: events.registrationMode,
+      })
+      .from(events)
+      .where(uuidRegex.test(id) ? eq(events.id, id) : eq(events.slug, id))
+      .limit(1);
 
     if (!event) {
       return NextResponse.json({ status: 'error', message: 'Event tidak ditemukan' }, { status: 404 });
     }
 
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
-    const publicUrl = `${baseUrl}/r/${event.slug}`;
-    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(publicUrl)}`;
+    const publicFormFields = await db
+      .select({
+        id: formFields.id,
+        fieldName: formFields.fieldName,
+        fieldType: formFields.fieldType,
+        isRequired: formFields.isRequired,
+        options: formFields.options,
+        order: formFields.order,
+      })
+      .from(formFields)
+      .where(eq(formFields.eventId, event.id))
+      .orderBy(asc(formFields.order));
 
-    const eventWithUrls = {
-      ...event,
-      public_registration_url: publicUrl,
-      public_qr_code_url: qrUrl
+    const publicEvent = {
+      name: event.name,
+      slug: event.slug,
+      description: event.description,
+      location: event.location,
+      date: event.date,
+      posterUrl: event.posterUrl,
+      capacity: event.capacity,
+      registrationMode: event.registrationMode,
+      formFields: publicFormFields,
     };
 
-    return NextResponse.json({ status: 'success', data: eventWithUrls });
+    return NextResponse.json({ status: 'success', data: publicEvent });
   } catch (error: any) {
     console.error('Error fetching event details:', error);
     return NextResponse.json(
@@ -53,7 +73,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
 
     const { id } = await params;
     const body = await req.json();
-    
+
     const [existing] = await db.select().from(events).where(eq(events.id, id));
     if (!existing) {
       return NextResponse.json({ status: 'error', message: 'Event tidak ditemukan' }, { status: 404 });
@@ -71,7 +91,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       }
       updateData.registrationMode = body.registration_mode;
     }
-    
+
     updateData.updatedAt = new Date();
 
     const [updatedEvent] = await db

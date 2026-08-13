@@ -1,6 +1,6 @@
 import { db } from '../../db';
 import { registrations } from '../../db/schema';
-import { eq } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import { generateRandomTicketCode, generateQrCodeWithText } from '../utils/ticketUtils';
 import { supabaseAdmin } from '../supabase';
 
@@ -56,12 +56,19 @@ export async function triggerTicketEmailDelivery(registrationId: string) {
  */
 export async function GenerateTicketAction(registrationId: string) {
   // 1. Fetch registration
-  const result = await db.select().from(registrations).where(eq(registrations.id, registrationId));
+  const result = await db.select({
+    registration: registrations,
+    event: events,
+  })
+  .from(registrations)
+  .innerJoin(events, eq(registrations.eventId, events.id))
+  .where(eq(registrations.id, registrationId));
+
   if (result.length === 0) {
     throw new Error('Registration not found');
   }
 
-  const registration = result[0];
+  const { registration, event } = result[0];
 
   // 2. Validate status (BIZ-003)
   if (registration.status !== 'Accepted') {
@@ -88,7 +95,7 @@ export async function GenerateTicketAction(registrationId: string) {
       const ticketCode = generateRandomTicketCode();
 
       // 5. Render QR Code (FR-REG-11)
-      const qrBuffer = await generateQrCodeWithText(ticketCode);
+      const qrBuffer = await generateQrCodeWithText(ticketCode, registration.name, event.name);
 
       // 6. Upload to Supabase Storage (bucket: tickets)
       const fileName = `${registrationId}-${ticketCode}.png`;
@@ -108,15 +115,34 @@ export async function GenerateTicketAction(registrationId: string) {
       const publicUrl = publicUrlData.publicUrl;
 
       // 7. Update DB in transaction
-      await db.transaction(async (tx) => {
+      const [updatedRegistration] = await db.transaction(async (tx) => {
         // Will throw if ticket_code is not unique
-        await tx.update(registrations)
+        return tx.update(registrations)
           .set({
             ticketCode,
             qrCodeUrl: publicUrl
           })
-          .where(eq(registrations.id, registrationId));
+          .where(and(
+            eq(registrations.id, registrationId),
+            isNull(registrations.ticketCode),
+            isNull(registrations.qrCodeUrl),
+          ))
+          .returning({ id: registrations.id });
       });
+
+      if (!updatedRegistration) {
+        const [existingRegistration] = await db
+          .select({ ticketCode: registrations.ticketCode, qrCodeUrl: registrations.qrCodeUrl })
+          .from(registrations)
+          .where(eq(registrations.id, registrationId))
+          .limit(1);
+        if (existingRegistration?.ticketCode && existingRegistration.qrCodeUrl) {
+          finalTicketCode = existingRegistration.ticketCode;
+          finalQrCodeUrl = existingRegistration.qrCodeUrl;
+          break;
+        }
+        throw new Error('Ticket generation lost its registration update race');
+      }
 
       finalTicketCode = ticketCode;
       finalQrCodeUrl = publicUrl;

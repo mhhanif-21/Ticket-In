@@ -22,6 +22,27 @@
       "when": 1784626913673,
       "tag": "0002_loving_master_mold",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1786456065112,
+      "tag": "0003_easy_chimera",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1786520497033,
+      "tag": "0004_ticket-generation-jobs",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1786535551069,
+      "tag": "0005_resubmit-tokens-one-time",
+      "breakpoints": true
     }
   ]
 }

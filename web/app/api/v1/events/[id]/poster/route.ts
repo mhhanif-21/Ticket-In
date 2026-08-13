@@ -12,7 +12,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     }
 
     const { id } = await params;
-    
+
     // Check if event exists
     const [existing] = await db.select().from(events).where(eq(events.id, id));
     if (!existing) {
@@ -26,23 +26,29 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       return NextResponse.json({ status: 'error', message: 'File poster tidak ditemukan' }, { status: 400 });
     }
 
-    // Validate type
-    if (!file.type.startsWith('image/')) {
-      return NextResponse.json({ status: 'error', message: 'File harus berupa gambar' }, { status: 400 });
-    }
-
     // Convert File to ArrayBuffer to Buffer for supabase
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
-    
-    const fileExt = file.name.split('.').pop();
-    const fileName = `${id}-${Date.now()}.${fileExt}`;
+
+    // Validate using Magic Bytes (File Signatures) for high security
+    const isJPEG = buffer.length > 2 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff;
+    const isPNG = buffer.length > 7 && buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4e && buffer[3] === 0x47 && buffer[4] === 0x0d && buffer[5] === 0x0a && buffer[6] === 0x1a && buffer[7] === 0x0a;
+
+    if (!isJPEG && !isPNG) {
+      return NextResponse.json({ status: 'error', message: 'Format file tidak valid, hanya menerima gambar JPG/PNG' }, { status: 400 });
+    }
+
+    // Set proper extension and content type based on true file signature
+    const detectedExt = isJPEG ? 'jpg' : 'png';
+    const detectedMime = isJPEG ? 'image/jpeg' : 'image/png';
+
+    const fileName = `${id}-${Date.now()}.${detectedExt}`;
     const filePath = `${fileName}`;
 
     const { data: uploadData, error: uploadError } = await supabaseAdmin.storage
-      .from('posters')
+      .from('event_posters')
       .upload(filePath, buffer, {
-        contentType: file.type,
+        contentType: detectedMime,
         upsert: true,
       });
 
@@ -53,7 +59,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
     // Get public URL
     const { data: publicUrlData } = supabaseAdmin.storage
-      .from('posters')
+      .from('event_posters')
       .getPublicUrl(filePath);
 
     const publicUrl = publicUrlData.publicUrl;
@@ -64,10 +70,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       updatedAt: new Date()
     }).where(eq(events.id, id)).returning();
 
-    return NextResponse.json({ 
-      status: 'success', 
-      message: 'Poster berhasil diunggah', 
-      data: updatedEvent 
+    return NextResponse.json({
+      status: 'success',
+      message: 'Poster berhasil diunggah',
+      data: updatedEvent
     }, { status: 200 });
 
   } catch (error: any) {
