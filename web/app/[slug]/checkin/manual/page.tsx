@@ -1,13 +1,12 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import { Keyboard, ArrowLeft, Send, CheckCircle2, XCircle, Loader2, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
 
 export default function ManualCheckInPage() {
   const params = useParams();
-  const router = useRouter();
   const eventSlug = params.slug as string;
 
   const [ticketCode, setTicketCode] = useState('');
@@ -35,17 +34,12 @@ export default function ManualCheckInPage() {
     setScanResult({ status: 'idle', message: '' });
 
     try {
-      const token = localStorage.getItem('volunteer_token');
-      if (!token) {
-        throw new Error('Sesi Anda telah berakhir, silakan login kembali.');
-      }
-
       const res = await fetch('/api/v1/checkin/scan', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
         },
+        credentials: 'same-origin',
         body: JSON.stringify({
           ticket_code: ticketCode,
           scan_method: 'Manual'
@@ -61,7 +55,7 @@ export default function ManualCheckInPage() {
           details: `${data.data.participant_name} - ${data.data.ticket_code}`
         });
       } else if (res.status === 409) {
-        const firstScan = new Date(data.data.first_scan_time).toLocaleString('id-ID');
+        const firstScan = new Date(data.data.first_scanned_at).toLocaleString('id-ID');
         setScanResult({
           status: 'duplicate',
           message: 'Tiket Sudah Digunakan!',
