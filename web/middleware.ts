@@ -63,7 +63,7 @@ export async function middleware(req: NextRequest) {
 
     // Role-based Access Control (RBAC) Sederhana
     const pathname = url.pathname;
-    if (pathname.startsWith('/api/v1/events') && role !== 'admin') {
+    if ((pathname.startsWith('/api/v1/events') || pathname.startsWith('/api/v1/registrations')) && role !== 'admin') {
       return NextResponse.json({ status: 'error', message: 'Hanya Admin yang dapat mengakses rute ini' }, { status: 403 });
     }
     if (pathname.startsWith('/api/v1/checkin') && role !== 'volunteer') {
