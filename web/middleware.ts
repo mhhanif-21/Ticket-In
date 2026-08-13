@@ -2,13 +2,8 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-
-// Client khusus untuk edge runtime middleware
-const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-  auth: { persistSession: false },
-});
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 
 export async function middleware(req: NextRequest) {
   const url = req.nextUrl;
@@ -34,6 +29,7 @@ export async function middleware(req: NextRequest) {
     let userId = '';
     let role = '';
     let eventId = '';
+    let sessionId = '';
 
     try {
       // Decode tanpa verifikasi dulu untuk cek tipe token
@@ -49,8 +45,17 @@ export async function middleware(req: NextRequest) {
         userId = payload.volunteer_name as string;
         role = 'volunteer';
         eventId = payload.event_id as string;
+        sessionId = payload.session_id as string;
       } else {
         // Asumsikan token Supabase (Admin)
+        if (!supabaseUrl || !supabaseAnonKey) {
+          throw new Error('Supabase credentials missing');
+        }
+        
+        const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+          auth: { persistSession: false },
+        });
+
         const { data, error } = await supabase.auth.getUser(token);
         if (error || !data.user) throw new Error('Supabase token invalid');
         
@@ -75,6 +80,7 @@ export async function middleware(req: NextRequest) {
     requestHeaders.set('x-user-id', userId);
     requestHeaders.set('x-user-role', role);
     if (eventId) requestHeaders.set('x-event-id', eventId);
+    if (sessionId) requestHeaders.set('x-session-id', sessionId);
 
     return NextResponse.next({
       request: {

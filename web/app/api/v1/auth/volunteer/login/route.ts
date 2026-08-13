@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/db';
-import { events } from '@/db/schema';
+import { events, checkInSessions } from '@/db/schema';
 import { eq } from 'drizzle-orm';
 import { Ratelimit } from '@upstash/ratelimit';
 import { Redis } from '@upstash/redis';
@@ -74,14 +74,21 @@ export async function POST(req: Request) {
       );
     }
 
-    // 3. Terbitkan JWT Token menggunakan jose
+    // 3. Create check-in session record
+    const [sessionRecord] = await db.insert(checkInSessions).values({
+      eventId: event.id,
+      volunteerName: volunteer_name,
+    }).returning();
+
+    // 4. Terbitkan JWT Token menggunakan jose
     const secret = new TextEncoder().encode(process.env.JWT_SECRET || 'super-secret-key');
     const alg = 'HS256';
 
     const jwt = await new jose.SignJWT({ 
         role: 'volunteer',
         event_id: event.id,
-        volunteer_name: volunteer_name
+        volunteer_name: volunteer_name,
+        session_id: sessionRecord.id
       })
       .setProtectedHeader({ alg })
       .setIssuedAt()
@@ -97,6 +104,7 @@ export async function POST(req: Request) {
           user: {
             volunteer_name: volunteer_name,
             event_id: event.id,
+            session_id: sessionRecord.id,
           },
         },
       },
