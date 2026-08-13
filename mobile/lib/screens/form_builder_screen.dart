@@ -60,6 +60,7 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
+      useSafeArea: true,
       // [BUG-056] FIX: isScrollControlled agar Bottom Sheet bisa scroll dan tidak overflow
       isScrollControlled: true,
       builder: (context) {
@@ -376,30 +377,6 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
           'Susun Form Pendaftaran',
           style: TextStyle(color: Color(0xFF1A1C1A), fontSize: 16, fontWeight: FontWeight.w600),
         ),
-        actions: [
-          SizedBox(
-            width: 88,
-            height: 48,
-            child: ElevatedButton(
-              onPressed: _isLoading ? null : _saveFields,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: primaryColor,
-                foregroundColor: Colors.white,
-                disabledBackgroundColor: primaryColor.withOpacity(0.35),
-                disabledForegroundColor: Colors.white70,
-                elevation: 0,
-                padding: EdgeInsets.zero,
-                minimumSize: const Size(72, 48),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-              ),
-              child: const Text(
-                'Simpan',
-                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
-        ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(1.0),
           child: Container(color: const Color(0xFFC1C8C0), height: 1.0),
@@ -512,6 +489,45 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
         backgroundColor: const Color(0xFF7EA687),
         foregroundColor: const Color(0xFF163B24),
         child: const Icon(Icons.add),
+      ),
+      bottomNavigationBar: SafeArea(
+        top: false,
+        maintainBottomViewPadding: true,
+        child: Container(
+          key: const ValueKey('form-builder-bottom-action'),
+          padding: const EdgeInsets.all(16),
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            border: Border(top: BorderSide(color: Color(0xFFC1C8C0))),
+          ),
+          child: SizedBox(
+            width: double.infinity,
+            height: 48,
+            child: ElevatedButton(
+              onPressed: _isLoading ? null : _saveFields,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: primaryColor,
+                foregroundColor: Colors.white,
+                disabledBackgroundColor: primaryColor.withOpacity(0.35),
+                disabledForegroundColor: Colors.white70,
+                elevation: 0,
+                padding: EdgeInsets.zero,
+                minimumSize: const Size(72, 48),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              child: _isLoading
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                    )
+                  : const Text(
+                      'Simpan',
+                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                    ),
+            ),
+          ),
+        ),
       ),
     );
   }

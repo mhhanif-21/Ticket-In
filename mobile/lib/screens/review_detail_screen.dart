@@ -146,7 +146,9 @@ class _ReviewDetailScreenState extends State<ReviewDetailScreen> {
         ),
       ),
       bottomNavigationBar: SafeArea(
+        maintainBottomViewPadding: true,
         child: Container(
+          key: const ValueKey('review-detail-bottom-action'),
           padding: const EdgeInsets.all(16),
           decoration: const BoxDecoration(
             color: AppColors.surface,

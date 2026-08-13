@@ -361,6 +361,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
           ),
       bottomSheet: SafeArea(
         top: false,
+        maintainBottomViewPadding: true,
         child: Container(
           key: const ValueKey('create-event-bottom-action'),
           padding: const EdgeInsets.all(16),

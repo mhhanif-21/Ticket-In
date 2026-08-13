@@ -24,12 +24,12 @@ dipilih dari UI juga harus diterima.
 
 ## Evidence / root cause
 
-- `mobile/lib/models/event_model.dart:26-33` mengirim key `field_name`, `field_type`,
-  `is_required`, `options`, `order`.
-- `web/lib/actions/SaveCustomFormAction.ts:7-12` mendefinisikan payload dengan key
-  `fieldName`, `fieldType`, `isRequired`.
-- `web/lib/actions/SaveCustomFormAction.ts:29` membaca `field.fieldType`; key snake_case
-  dari mobile tidak dipetakan sehingga nilainya `undefined` dan ditolak.
+- `FormBuilderScreen._saveFields()` meneruskan `FormFieldModel` ke
+  `EventService.saveFormFields()`.
+- `EventService` mengirim `fields.map((field) => field.toJson())` ke
+  `POST /api/v1/events/{id}/fields` melalui `ApiClient`.
+- `FormFieldModel.toJson()` dan boundary backend menggunakan contract canonical
+  `field_name`, `field_type`, `is_required`, `options`, `order`.
 
 Root cause sementara: kontrak serialisasi JSON mobile/backend tidak sama.
 
@@ -48,13 +48,26 @@ Root cause sementara: kontrak serialisasi JSON mobile/backend tidak sama.
 - [x] Save berhasil untuk seluruh tipe field yang tersedia di UI.
 - [x] Regression test memakai payload aktual dari mobile dan gagal pada baseline.
 - [x] Evidence Docker/Compose dan construction log tersedia.
+- [x] HTTP integration test melewati route `POST /api/v1/events/{id}/fields`.
+- [x] APK rebuild memakai `API_BASE_URL=http://10.0.2.2:3000/api`.
 
 ## Verification
 
-`Fixed` — menunggu recheck QA; construction tidak memberikan status `Verified`.
+`Fixed` — runtime `web-app` di-force-recreate dari source terbaru dan HTTP route test menerima
+payload snake_case lengkap tanpa `undefined`. APK debug juga dibangun dari source terbaru dengan
+API base URL emulator Android yang eksplisit. Construction tidak memberikan status `Verified`.
 
 ## Construction evidence
 
 - Regression baseline: `docker compose exec web-app ... npx vitest run tests/integration/s7_bug001_form-save-payload-contract.test.ts` — exit code 1; gagal dengan `Tipe field tidak diizinkan: undefined`.
-- Regression after fix: `docker compose exec -e TEST_BASE_URL=http://web-app:3000 web-app ...` — image `node:20-alpine`, service `web-app`, exit code 0; 1/1 test pass.
+- Regression after fix: `docker compose exec -T -e TEST_BASE_URL=http://web-app:3000 web-app sh -c 'npx vitest run tests/integration/s7_bug001_form-save-payload-contract.test.ts'` — image `node:20-alpine`, service `web-app` hasil `--force-recreate`, exit code 0; 1/1 test pass melalui HTTP route.
+- Flutter trace: `flutter test test/form_builder_screen_test.dart test/event_service_contract_test.dart` — pinned Flutter image, exit code 0; runtime field map sampai ApiClient mempertahankan `field_type`.
+- APK: `flutter build apk --debug --dart-define=API_BASE_URL=http://10.0.2.2:3000/api` — pinned Flutter image, exit code 0; artifact tersimpan sebagai `Ticket-In-debug-qa-recheck.apk`.
 - Fixture event dibuat dengan slug unik berbasis timestamp dan dihapus pada `afterAll`; tidak memakai secret.
+
+## Corrective construction evidence
+
+- Baseline corrective widget test gagal karena tombol masih berada di `AppBar` dan bottom
+  action Form Builder belum tersedia.
+- HTTP request aktual diuji melalui route protected dengan fixture admin dan event terisolasi;
+  tidak ada secret yang dicetak.

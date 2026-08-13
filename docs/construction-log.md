@@ -135,3 +135,19 @@ set `Verified`.
 | CDR-001 | Form payload canonical `snake_case` | Flutter payload and backend boundary aligned |
 | CDR-002 | Export canonical asynchronous POST + `job_id` | API design, backend, client, and tests aligned |
 | CDR-003 | Registration URL `/{slug}/register`; QR endpoint internal | Minimal events expose stable public access |
+
+### Sprint 7 QA Recheck Corrective Pass — QA-BUG-001, QA-BUG-002, QA-BUG-003
+
+- **Status:** Construction Fixed; QA physical recheck remains open and must not be marked `Verified` by Construction.
+- **QA-BUG-001:** Traced `FormBuilderScreen → EventService → ApiClient → POST /api/v1/events/{id}/fields`. Added widget/service trace tests and changed the regression test to exercise the real HTTP route. Runtime `web-app` was force-recreated from the current working tree before the HTTP test. Payload key evidence is limited to key names; no secret logging was added.
+- **QA-BUG-002:** Moved Form Builder `Simpan` from `AppBar.actions` to a `bottomNavigationBar` with SafeArea, `maintainBottomViewPadding`, 48 px minimum height, disabled state, and loading indicator.
+- **QA-BUG-003:** Audited all `bottomSheet`/`bottomNavigationBar` occurrences in mobile screens. Create, Edit, Form Builder, Home, Dashboard, Review Detail, and modal sheets now use inset-safe handling.
+
+| Scope | Docker command | Image/service | Exit code | Result |
+|---|---|---|---:|---|
+| Corrective HTTP route | `docker compose exec -T -e TEST_BASE_URL=http://web-app:3000 web-app sh -c 'npx vitest run tests/integration/s7_bug001_form-save-payload-contract.test.ts'` | `node:20-alpine` / force-recreated `web-app` | 0 | 1/1 HTTP test pass |
+| Corrective Flutter regression | `docker compose exec -T mobile-admin-build sh -c 'flutter test test/form_builder_screen_test.dart test/android_navigation_inset_test.dart test/bottom_navigation_inset_audit_test.dart test/event_service_contract_test.dart'` | pinned Flutter image / `mobile-admin-build` | 0 | 13 tests pass |
+| API base URL check | `docker compose exec -T mobile-admin-build sh -c 'flutter test test/api_client_config_test.dart --dart-define=API_BASE_URL=http://10.0.2.2:3000/api'` | pinned Flutter image / `mobile-admin-build` | 0 | emulator API URL asserted |
+| APK rebuild | `docker compose exec -T mobile-admin-build sh -c 'flutter build apk --debug --dart-define=API_BASE_URL=http://10.0.2.2:3000/api'` | pinned Flutter image / `mobile-admin-build` | 0 | `Ticket-In-debug-qa-recheck.apk` |
+
+No host Flutter/npm tooling was used. Fixtures use isolated timestamp identifiers and cleanup hooks. No secret values were logged or committed.

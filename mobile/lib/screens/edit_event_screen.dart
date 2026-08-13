@@ -382,6 +382,7 @@ class _EditEventScreenState extends State<EditEventScreen> {
           ),
       bottomSheet: _isLoading ? null : SafeArea(
         top: false,
+        maintainBottomViewPadding: true,
         child: Container(
           key: const ValueKey('edit-event-bottom-action'),
           padding: const EdgeInsets.all(16),

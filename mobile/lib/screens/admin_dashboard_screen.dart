@@ -81,7 +81,9 @@ class AdminDashboardScreen extends ConsumerWidget {
           ),
         ),
         child: SafeArea(
+          maintainBottomViewPadding: true,
           child: SizedBox(
+            key: const ValueKey('admin-dashboard-bottom-navigation'),
             height: 64,
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,

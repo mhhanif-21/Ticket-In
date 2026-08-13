@@ -37,6 +37,20 @@ class RecordingMultipartApiClient extends ApiClient {
   }
 }
 
+class RecordingFormApiClient extends ApiClient {
+  String? endpoint;
+  Map<String, dynamic>? capturedBody;
+
+  RecordingFormApiClient() : super(baseUrl: 'https://api.example.test/api');
+
+  @override
+  Future<http.Response> post(String endpoint, Map<String, dynamic> body) async {
+    this.endpoint = endpoint;
+    capturedBody = body;
+    return http.Response('{"status":"success"}', 200);
+  }
+}
+
 class ReloadableEventService extends EventService {
   String? posterUrl;
 
@@ -75,6 +89,22 @@ void main() {
 
     expect(apiClient.capturedBody?['capacity'], 120);
     expect(apiClient.capturedBody?['capacity'], isA<int>());
+  });
+
+  test('save form fields sends the canonical field_type payload to the HTTP client', () async {
+    final apiClient = RecordingFormApiClient();
+    final service = EventService(apiClient: apiClient);
+
+    await service.saveFormFields('event-1', [
+      FormFieldModel(fieldName: 'Nama', fieldType: 'text', isRequired: true, order: 0),
+      FormFieldModel(fieldName: 'Email', fieldType: 'email', isRequired: true, order: 1),
+    ]);
+
+    expect(apiClient.endpoint, '/v1/events/event-1/fields');
+    final fields = apiClient.capturedBody?['fields'] as List;
+    expect(fields.map((field) => field['field_type']), ['text', 'email']);
+    expect(fields.every((field) => field.containsKey('field_type')), isTrue);
+    expect(fields.any((field) => field.containsKey('fieldType')), isFalse);
   });
 
   test('poster replacement accepts JPEG and PNG, rejects invalid files, and uploads valid files', () async {

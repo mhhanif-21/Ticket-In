@@ -291,7 +291,9 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
         child: SafeArea(
+          maintainBottomViewPadding: true,
           child: SizedBox(
+            key: const ValueKey('home-bottom-navigation'),
             height: 64,
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
@@ -353,4 +355,3 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 }
-
