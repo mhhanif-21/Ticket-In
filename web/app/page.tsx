@@ -2,6 +2,11 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { getPublicEventsAction } from '@/lib/actions/getPublicEventsAction';
 
+// The event catalog depends on the Preview/production database and must not
+// query the local fallback database during `next build`.
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 export default async function Home() {
   const events = await getPublicEventsAction();
 
