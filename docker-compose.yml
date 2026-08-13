@@ -1,5 +1,23 @@
 services:
-  # Node.js backend container configuration will be added here in the future.
+  web-app:
+    image: node:20-alpine
+    container_name: ticketin-web-app
+    working_dir: /app
+    volumes:
+      - ./web:/app
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      # Database URL mengarah ke Supabase lokal via network bridge
+      - DATABASE_URL=postgresql://postgres:postgres@host.docker.internal:15432/postgres
+      - NEXT_PUBLIC_SUPABASE_URL=http://host.docker.internal:15431
+      - NEXT_PUBLIC_SUPABASE_ANON_KEY=
+    networks:
+      - TiketIn-network
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    command: sh -c "npm install && npm run dev"
 
   mobile-admin-build:
     image: ghcr.io/cirruslabs/flutter:latest
