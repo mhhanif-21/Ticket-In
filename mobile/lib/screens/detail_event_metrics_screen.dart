@@ -156,6 +156,8 @@ class DetailEventMetricsScreen extends ConsumerWidget {
                   const SizedBox(height: 12),
                   Text(
                     title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       color: Colors.white,
                       fontSize: 26,
@@ -190,13 +192,13 @@ class DetailEventMetricsScreen extends ConsumerWidget {
     final int present = data['present'] ?? 0;
     final int totalReg = pending + accepted;
 
-    return GridView.count(
-      crossAxisCount: 2,
+    return GridView.extent(
       crossAxisSpacing: 16,
       mainAxisSpacing: 16,
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      childAspectRatio: 1.1,
+      maxCrossAxisExtent: 220,
+      mainAxisExtent: 220,
       children: [
         _buildMetricCard(
           title: 'Total Pendaftar',
@@ -258,8 +260,9 @@ class DetailEventMetricsScreen extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          Wrap(
+            alignment: WrapAlignment.spaceBetween,
+            runSpacing: 4,
             children: [
               Container(
                 padding: const EdgeInsets.all(8),
@@ -291,6 +294,8 @@ class DetailEventMetricsScreen extends ConsumerWidget {
           const SizedBox(height: 2),
           Text(
             title,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
             style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.onSurfaceVariant),
           ),
           const SizedBox(height: 2),
@@ -346,6 +351,8 @@ class DetailEventMetricsScreen extends ConsumerWidget {
           const SizedBox(height: 2),
           Text(
             title,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
             style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.onSurfaceVariant),
           ),
           const SizedBox(height: 8),

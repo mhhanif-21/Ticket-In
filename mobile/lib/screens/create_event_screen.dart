@@ -359,30 +359,34 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
               ),
             ),
           ),
-      bottomSheet: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          border: Border(top: BorderSide(color: Color(0xFFC1C8C0))),
-        ),
-        child: SizedBox(
-          width: double.infinity,
-          height: 48,
-          child: ElevatedButton(
-            onPressed: _isLoading ? null : _submit,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: primaryContainerColor,
-              foregroundColor: onPrimaryContainerColor,
-              elevation: 0,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
+      bottomSheet: SafeArea(
+        top: false,
+        child: Container(
+          key: const ValueKey('create-event-bottom-action'),
+          padding: const EdgeInsets.all(16),
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            border: Border(top: BorderSide(color: Color(0xFFC1C8C0))),
+          ),
+          child: SizedBox(
+            width: double.infinity,
+            height: 48,
+            child: ElevatedButton(
+              onPressed: _isLoading ? null : _submit,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: primaryContainerColor,
+                foregroundColor: onPrimaryContainerColor,
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
               ),
-            ),
-            child: const Text(
-              'Simpan Acara',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
+              child: const Text(
+                'Simpan Acara',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
           ),
@@ -391,4 +395,3 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
     );
   }
 }
-

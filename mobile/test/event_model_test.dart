@@ -51,5 +51,39 @@ void main() {
       expect(json['status'], 'Draft');
       expect(json['registration_mode'], 'Auto-Accept');
     });
+
+    test('fromJson should preserve public registration and QR URLs', () {
+      final event = EventModel.fromJson({
+        'id': 'evt_123',
+        'name': 'Minimal Event',
+        'slug': 'minimal-event',
+        'capacity': 10,
+        'location': 'Jakarta',
+        'date': '2026-10-10T09:00:00Z',
+        'registration_mode': 'Auto-Accept',
+        'public_registration_url': 'https://event.test/minimal-event/register',
+        'public_qr_code_url': 'https://event.test/api/v1/events/minimal-event/qr',
+      });
+
+      expect(event.publicRegistrationUrl, 'https://event.test/minimal-event/register');
+      expect(event.publicQrCodeUrl, 'https://event.test/api/v1/events/minimal-event/qr');
+    });
+
+    test('form field should serialize the canonical snake_case payload', () {
+      final field = FormFieldModel(
+        fieldName: 'Nama',
+        fieldType: 'text',
+        isRequired: true,
+        order: 0,
+      );
+
+      expect(field.toJson(), {
+        'field_name': 'Nama',
+        'field_type': 'text',
+        'is_required': true,
+        'options': null,
+        'order': 0,
+      });
+    });
   });
 }

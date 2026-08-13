@@ -380,30 +380,34 @@ class _EditEventScreenState extends State<EditEventScreen> {
               ),
             ),
           ),
-      bottomSheet: _isLoading ? null : Container(
-        padding: const EdgeInsets.all(16),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          border: Border(top: BorderSide(color: Color(0xFFC1C8C0))),
-        ),
-        child: SizedBox(
-          width: double.infinity,
-          height: 48,
-          child: ElevatedButton(
-            onPressed: _submit,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: primaryContainerColor,
-              foregroundColor: onPrimaryContainerColor,
-              elevation: 0,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
+      bottomSheet: _isLoading ? null : SafeArea(
+        top: false,
+        child: Container(
+          key: const ValueKey('edit-event-bottom-action'),
+          padding: const EdgeInsets.all(16),
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            border: Border(top: BorderSide(color: Color(0xFFC1C8C0))),
+          ),
+          child: SizedBox(
+            width: double.infinity,
+            height: 48,
+            child: ElevatedButton(
+              onPressed: _submit,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: primaryContainerColor,
+                foregroundColor: onPrimaryContainerColor,
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
               ),
-            ),
-            child: const Text(
-              'Simpan Perubahan',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
+              child: const Text(
+                'Simpan Perubahan',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
           ),

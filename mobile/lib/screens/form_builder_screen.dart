@@ -5,17 +5,18 @@ import '../services/event_service.dart';
 
 class FormBuilderScreen extends StatefulWidget {
   final String eventId;
+  final EventService? eventService;
   // [BUG-054] Flag untuk tahu apakah ini pertama kali dari create event
   final bool isFirstSetup;
 
-  const FormBuilderScreen({Key? key, required this.eventId, this.isFirstSetup = false}) : super(key: key);
+  const FormBuilderScreen({Key? key, required this.eventId, this.eventService, this.isFirstSetup = false}) : super(key: key);
 
   @override
   _FormBuilderScreenState createState() => _FormBuilderScreenState();
 }
 
 class _FormBuilderScreenState extends State<FormBuilderScreen> {
-  final EventService _eventService = EventService();
+  late final EventService _eventService;
   bool _isLoading = true;
   List<FormFieldModel> _fields = [];
 
@@ -28,6 +29,7 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
   @override
   void initState() {
     super.initState();
+    _eventService = widget.eventService ?? EventService();
     _loadFields();
   }
 
@@ -375,11 +377,25 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
           style: TextStyle(color: Color(0xFF1A1C1A), fontSize: 16, fontWeight: FontWeight.w600),
         ),
         actions: [
-          TextButton(
-            onPressed: _isLoading ? null : _saveFields,
-            child: const Text(
-              'Simpan',
-              style: TextStyle(color: primaryColor, fontSize: 12, fontWeight: FontWeight.w500),
+          SizedBox(
+            width: 88,
+            height: 48,
+            child: ElevatedButton(
+              onPressed: _isLoading ? null : _saveFields,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: primaryColor,
+                foregroundColor: Colors.white,
+                disabledBackgroundColor: primaryColor.withOpacity(0.35),
+                disabledForegroundColor: Colors.white70,
+                elevation: 0,
+                padding: EdgeInsets.zero,
+                minimumSize: const Size(72, 48),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              child: const Text(
+                'Simpan',
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+              ),
             ),
           ),
           const SizedBox(width: 8),
