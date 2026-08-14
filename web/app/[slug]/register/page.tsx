@@ -121,7 +121,7 @@ export default function RegisterPage() {
           <h2 className="font-display-lg-mobile md:font-display-lg text-display-lg-mobile md:text-display-lg text-primary mb-stack-sm">Isi Data Pendaftaran</h2>
           <p className="font-description text-description text-secondary">Silakan lengkapi formulir di bawah ini untuk mengonfirmasi pendaftaran Anda.</p>
         </div>
-        <div className="bg-surface-container-lowest rounded-[16px] shadow-[0_4px_12px_rgba(0,0,0,0.05)] p-margin-mobile md:p-margin-desktop">
+        <div className="bg-surface-container-lowest dark:bg-[#1a2e1f] rounded-[16px] shadow-[0_4px_12px_rgba(0,0,0,0.05)] p-margin-mobile md:p-margin-desktop">
           {error && (
             <div className="p-4 mb-6 bg-error-container text-on-error-container rounded-lg font-medium text-sm">
               {error}
@@ -130,23 +130,23 @@ export default function RegisterPage() {
           <form onSubmit={handleSubmit} className="flex flex-col gap-stack-md">
             {/* Field Statis / Default */}
             <div className="flex flex-col gap-stack-sm">
-              <label className="font-label-caps text-label-caps text-primary uppercase">Nama Lengkap <span className="text-primary">*</span></label>
+              <label className="font-label-caps text-label-caps text-primary dark:text-white/80 uppercase">Nama Lengkap <span className="text-primary dark:text-white">*</span></label>
               <input
                 type="text"
                 name="name"
                 required
-                className="w-full h-[48px] px-4 bg-transparent border border-outline-variant rounded-DEFAULT font-body-md text-primary placeholder-on-surface-variant focus:outline-none input-border focus:border-primary"
+                className="w-full h-[48px] px-4 bg-transparent dark:bg-white/5 border border-outline-variant dark:border-white/20 rounded-DEFAULT font-body-md text-primary dark:text-white placeholder-on-surface-variant dark:placeholder-white/40 focus:outline-none input-border focus:border-primary dark:focus:border-white/60"
                 placeholder="Nama lengkap Anda"
               />
             </div>
 
             <div className="flex flex-col gap-stack-sm">
-              <label className="font-label-caps text-label-caps text-primary uppercase">Email Aktif <span className="text-primary">*</span></label>
+              <label className="font-label-caps text-label-caps text-primary dark:text-white/80 uppercase">Email Aktif <span className="text-primary dark:text-white">*</span></label>
               <input
                 type="email"
                 name="email"
                 required
-                className="w-full h-[48px] px-4 bg-transparent border border-outline-variant rounded-DEFAULT font-body-md text-primary placeholder-on-surface-variant focus:outline-none input-border focus:border-primary"
+                className="w-full h-[48px] px-4 bg-transparent dark:bg-white/5 border border-outline-variant dark:border-white/20 rounded-DEFAULT font-body-md text-primary dark:text-white placeholder-on-surface-variant dark:placeholder-white/40 focus:outline-none input-border focus:border-primary dark:focus:border-white/60"
                 placeholder="alamat@email.com"
               />
             </div>

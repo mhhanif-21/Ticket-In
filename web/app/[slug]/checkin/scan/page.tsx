@@ -179,7 +179,7 @@ export default function WebScannerPage() {
   };
 
   return (
-    <div className="w-full flex-grow flex flex-col font-body-md antialiased transition-colors bg-background text-on-background dark:bg-primary dark:text-on-primary">
+    <div className="w-full flex-grow flex flex-col font-body-md antialiased transition-colors bg-background text-on-background dark:bg-[#0d1f14] dark:text-white">
 
       <style>{`
         @keyframes scan {
@@ -197,6 +197,20 @@ export default function WebScannerPage() {
         .flash-error { animation: flash-red 0.3s ease-out; }
         @keyframes flash-green { 0% { background-color: rgba(22, 163, 74, 0.4); } 100% { background-color: transparent; } }
         @keyframes flash-red { 0% { background-color: rgba(186, 26, 26, 0.4); } 100% { background-color: transparent; } }
+        /* BUG-G FIX: Force html5-qrcode video to fill container — library injects inline styles */
+        #qr-reader video {
+          width: 100% !important;
+          height: 100% !important;
+          object-fit: cover !important;
+          position: absolute !important;
+          top: 0 !important;
+          left: 0 !important;
+        }
+        /* BUG-G FIX: Hide the default html5-qrcode anchor/header UI */
+        #qr-reader__scan_region > img,
+        #qr-reader__dashboard {
+          display: none !important;
+        }
       `}</style>
 
       {/* Main Scanner Area */}
@@ -206,7 +220,7 @@ export default function WebScannerPage() {
         <div
           id="viewfinder"
           className={`relative w-full max-w-md aspect-[3/4] rounded-xl overflow-hidden shadow-[0_4px_12px_rgba(0,0,0,0.5)] flex items-center justify-center
-            bg-surface-variant dark:bg-primary border dark:border-on-primary/20
+            bg-surface-variant dark:bg-[#1a3326] border border-outline-variant dark:border-white/10
             ${scanResult?.status === 'success' ? 'flash-success' : scanResult ? 'flash-error' : ''}`}
         >
           {/* Always render qr-reader for Html5Qrcode to bind to, but hide if no camera */}
@@ -259,7 +273,7 @@ export default function WebScannerPage() {
 
         {/* Manual Input Form */}
         <form onSubmit={handleManualSubmit} className="mt-stack-lg w-full max-w-md flex flex-col gap-2">
-          <label className="font-label-caps text-label-caps" htmlFor="manual-code">Input Kode Manual</label>
+          <label className="font-label-caps text-label-caps text-on-background dark:text-white" htmlFor="manual-code">Input Kode Manual</label>
           <div className="flex gap-2">
             <input
               id="manual-code"
@@ -270,13 +284,13 @@ export default function WebScannerPage() {
               disabled={isProcessing}
               className={`flex-grow border rounded-lg px-4 py-3 focus:outline-none focus:ring-2
                 bg-surface-container-lowest border-outline-variant placeholder-outline focus:ring-primary
-                dark:bg-primary dark:border-on-primary/30 dark:text-on-primary dark:placeholder-on-primary/50 dark:focus:ring-on-primary`}
+                dark:bg-[#1a3326] dark:border-white/20 dark:text-white dark:placeholder-white/40 dark:focus:ring-white/50`}
             />
             <button
               type="submit"
               disabled={isProcessing || !manualCode.trim()}
               className={`px-6 py-3 rounded-lg font-label-caps text-label-caps active:scale-95 transition-transform duration-150 disabled:opacity-50
-                bg-primary text-on-primary dark:bg-on-primary dark:text-primary`}
+                bg-primary text-on-primary dark:bg-white dark:text-primary`}
             >
               Kirim
             </button>
@@ -290,7 +304,7 @@ export default function WebScannerPage() {
         <>
           <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40 transition-opacity" />
           <div className={`fixed bottom-0 left-0 right-0 w-full max-w-md mx-auto rounded-t-3xl p-stack-lg z-50 animate-slide-up shadow-[0_-8px_32px_rgba(0,0,0,0.1)] flex flex-col items-center text-center
-            bg-surface-container-lowest dark:bg-primary dark:border-t dark:border-on-primary/20`}
+            bg-surface-container-lowest dark:bg-[#1a3326] dark:border-t dark:border-white/10`}
           >
             <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-stack-sm
               ${scanResult.status === 'success' ? 'bg-[#16a34a] text-white' : 'bg-[#ba1a1a] text-white'}`}

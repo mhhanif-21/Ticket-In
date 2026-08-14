@@ -67,8 +67,10 @@ class EventModel {
 
   factory EventModel.fromJson(Map<String, dynamic> json) {
     var formFieldsList = <FormFieldModel>[];
-    if (json['form_fields'] != null) {
-      formFieldsList = (json['form_fields'] as List)
+    // BUG-H FIX: Backend (Drizzle) mengembalikan 'formFields' (camelCase), bukan 'form_fields'
+    final rawFields = json['form_fields'] ?? json['formFields'];
+    if (rawFields != null) {
+      formFieldsList = (rawFields as List)
           .map((e) => FormFieldModel.fromJson(e))
           .toList();
     }

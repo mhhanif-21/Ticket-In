@@ -99,6 +99,13 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       }
       updateData.registrationMode = body.registration_mode;
     }
+    // BUG-I FIX: Izinkan update status acara (Active/Cancelled)
+    if (body.status !== undefined) {
+      if (!['Active', 'Cancelled', 'Draft'].includes(body.status)) {
+        return NextResponse.json({ status: 'error', message: 'Status acara tidak valid' }, { status: 400 });
+      }
+      updateData.status = body.status;
+    }
 
     updateData.updatedAt = new Date();
 

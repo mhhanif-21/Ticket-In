@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../theme/app_colors.dart';
 import '../services/admin_service.dart';
+import '../services/event_service.dart';
 
 final adminServiceProvider = Provider((ref) => AdminService());
 
@@ -476,8 +477,49 @@ class DetailEventMetricsScreen extends ConsumerWidget {
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
-              onPressed: () {
-                // Confirm dialog
+              onPressed: () async {
+                // BUG-I FIX: Implementasi dialog konfirmasi + cancel via API
+                final confirm = await showDialog<bool>(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    title: const Text('Batalkan Acara?'),
+                    content: const Text(
+                      'Acara akan dibatalkan dan peserta tidak bisa mendaftar lagi. '
+                      'Tindakan ini tidak dapat diurungkan.',
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(ctx, false),
+                        child: const Text('Tidak'),
+                      ),
+                      ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.red,
+                          foregroundColor: Colors.white,
+                        ),
+                        onPressed: () => Navigator.pop(ctx, true),
+                        child: const Text('Ya, Batalkan'),
+                      ),
+                    ],
+                  ),
+                );
+                if (confirm != true || !context.mounted) return;
+                try {
+                  await EventService().updateEvent(
+                    eventId,
+                    {'status': 'Cancelled'},
+                  );
+                  if (!context.mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Acara berhasil dibatalkan.')),
+                  );
+                  context.go('/');
+                } catch (e) {
+                  if (!context.mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Gagal membatalkan acara: $e')),
+                  );
+                }
               },
               child: const Text('BATALKAN ACARA', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.5)),
             ),

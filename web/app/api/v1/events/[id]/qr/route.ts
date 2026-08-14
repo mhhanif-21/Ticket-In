@@ -16,7 +16,8 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     return NextResponse.json({ status: 'error', message: 'Event tidak ditemukan' }, { status: 404 });
   }
 
-  const registrationUrl = `${publicAppUrl()}/${event.slug}/register`;
+  // BUG-B FIX: QR mengarah ke landing page event, bukan langsung ke form registrasi
+  const registrationUrl = `${publicAppUrl()}/${event.slug}`;
   const image = await QRCode.toBuffer(registrationUrl, { type: 'png', errorCorrectionLevel: 'M' });
 
   return new NextResponse(new Uint8Array(image), {

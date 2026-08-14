@@ -4,8 +4,16 @@ import { usePathname } from 'next/navigation';
 
 export default function HeaderNavigation({ slug }: { slug: string }) {
   const pathname = usePathname();
+
+  // BUG-C FIX: Di halaman landing (/{slug}), tidak perlu tombol back
+  const isLandingPage = pathname === `/${slug}` || pathname === `/${slug}/`;
   const isScannerPage = pathname.endsWith('/scan') || pathname.endsWith('/scan/');
   const backHref = isScannerPage ? `/${slug}/checkin` : `/${slug}`;
+
+  if (isLandingPage) {
+    // Placeholder kosong supaya layout flex tetap seimbang (title tetap di tengah)
+    return <div className="w-10 h-10" />;
+  }
 
   return (
     <Link

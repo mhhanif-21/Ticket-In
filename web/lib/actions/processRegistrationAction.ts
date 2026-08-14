@@ -62,7 +62,12 @@ export async function processRegistrationAction(slug: string, payload: Registrat
       .from(formFields)
       .where(eq(formFields.eventId, event.id));
 
-    validateRegistrationAnswers(eventFormFields, payload.answers || {});
+    // BUG-E FIX: Skip field Nama/Email — dihandle sebagai field statis (name/email),
+    // bukan sebagai field dinamis dengan key field_{id}
+    const dynamicFields = eventFormFields.filter(
+      (f) => !['nama', 'email'].includes(f.fieldName.toLowerCase())
+    );
+    validateRegistrationAnswers(dynamicFields, payload.answers || {});
 
     let registrationId = payload.registrationId;
     const callerSuppliedRegistrationId = Boolean(payload.registrationId);

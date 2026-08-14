@@ -306,27 +306,52 @@ class _AccessManagementScreenState extends State<AccessManagementScreen> {
                         Center(
                           child: Column(
                             children: [
-                              Text(
-                                // [BUG-068] FIX: Tampilkan "***" jika PIN sudah ada di DB namun tidak bisa di-decrypt
-                                _newPin ?? '***',
-                                style: TextStyle(
-                                  fontSize: _newPin == null ? 48 : 48,
-                                  fontWeight: FontWeight.w700,
-                                  letterSpacing: _newPin == null ? 8.0 : 12.0,
-                                  color: const Color(0xFF163B24),
-                                  fontFamily: 'monospace',
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                _newPin == null ? 'PIN TERENKRIPSI (AMAN)' : 'PIN AKTIF',
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                  letterSpacing: 2.0,
+                              // BUG-F FIX: Tampilkan instruksi jelas jika PIN belum di-generate
+                              if (_newPin == null) ...[
+                                const Icon(
+                                  Icons.lock_outline,
+                                  size: 40,
                                   color: Color(0xFF41674B),
                                 ),
-                              )
+                                const SizedBox(height: 12),
+                                const Text(
+                                  'PIN belum dibuat',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                    color: Color(0xFF163B24),
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                const Text(
+                                  'Tap \'Generate PIN Baru\' di bawah',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Color(0xFF41674B),
+                                  ),
+                                ),
+                              ] else ...[
+                                Text(
+                                  _newPin!,
+                                  style: const TextStyle(
+                                    fontSize: 48,
+                                    fontWeight: FontWeight.w700,
+                                    letterSpacing: 12.0,
+                                    color: Color(0xFF163B24),
+                                    fontFamily: 'monospace',
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                const Text(
+                                  'PIN AKTIF',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    letterSpacing: 2.0,
+                                    color: Color(0xFF41674B),
+                                  ),
+                                ),
+                              ],
                             ],
                           ),
                         ),
