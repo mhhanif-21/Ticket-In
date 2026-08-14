@@ -161,7 +161,7 @@ class EventGateAdminApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return MaterialApp.router(
-      title: 'Event Gate Admin',
+      title: 'Ticket-In',
       theme: AppTheme.lightTheme,
       routerConfig: _router,
       debugShowCheckedModeBanner: false,
