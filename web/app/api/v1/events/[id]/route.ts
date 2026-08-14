@@ -3,6 +3,7 @@ import { db } from '@/db';
 import { events, formFields } from '@/db/schema';
 import { asc, eq } from 'drizzle-orm';
 
+export const runtime = 'nodejs';
 const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function publicAppUrl(): string {

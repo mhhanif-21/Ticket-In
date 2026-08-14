@@ -4,6 +4,8 @@ import { events } from '@/db/schema';
 import { eq } from 'drizzle-orm';
 import bcrypt from 'bcryptjs';
 
+export const runtime = 'nodejs';
+
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const role = req.headers.get('x-user-role');

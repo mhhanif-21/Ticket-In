@@ -3,6 +3,8 @@ import { db } from '@/db';
 import { events } from '@/db/schema';
 import { eq } from 'drizzle-orm';
 import { supabaseAdmin } from '@/lib/supabase';
+
+export const runtime = 'nodejs';
 import { STORAGE_BUCKETS } from '@/lib/storage/buckets';
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {

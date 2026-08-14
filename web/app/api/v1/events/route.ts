@@ -4,6 +4,8 @@ import { events } from '@/db/schema';
 import { eq } from 'drizzle-orm';
 import { headers } from 'next/headers';
 
+export const runtime = 'nodejs';
+
 // Helper to generate a slug from name
 function generateSlug(name: string): string {
   return name

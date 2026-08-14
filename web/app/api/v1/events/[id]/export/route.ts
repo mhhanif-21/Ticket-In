@@ -3,6 +3,8 @@ import { db } from '@/db';
 import { exportJobs } from '@/db/schema';
 import { Client } from '@upstash/qstash';
 
+export const runtime = 'nodejs';
+
 const qstashClient = new Client({ token: process.env.QSTASH_TOKEN || 'fake-token' });
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
