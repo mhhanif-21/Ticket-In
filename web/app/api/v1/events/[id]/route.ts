@@ -124,3 +124,33 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     );
   }
 }
+
+// Bug 5 FIX: DELETE endpoint untuk menghapus event beserta semua data terkait
+export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    const role = req.headers.get('x-user-role');
+    if (role !== 'admin') {
+      return NextResponse.json({ status: 'error', message: 'Unauthorized' }, { status: 403 });
+    }
+
+    const { id } = await params;
+
+    const [existing] = await db.select({ id: events.id }).from(events).where(eq(events.id, id));
+    if (!existing) {
+      return NextResponse.json({ status: 'error', message: 'Event tidak ditemukan' }, { status: 404 });
+    }
+
+    // Hapus form fields dulu (foreign key constraint)
+    await db.delete(formFields).where(eq(formFields.eventId, id));
+    // Hapus event
+    await db.delete(events).where(eq(events.id, id));
+
+    return NextResponse.json({ status: 'success', message: 'Event berhasil dihapus' });
+  } catch (error: any) {
+    console.error('Error deleting event:', error);
+    return NextResponse.json(
+      { status: 'error', message: 'Internal server error' },
+      { status: 500 }
+    );
+  }
+}

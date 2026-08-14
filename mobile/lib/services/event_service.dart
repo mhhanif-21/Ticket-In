@@ -74,6 +74,14 @@ class EventService {
     }
   }
 
+  // Bug 5 FIX: Hapus event via DELETE
+  Future<void> deleteEvent(String id) async {
+    final response = await _apiClient.delete('/v1/events/$id');
+    if (response.statusCode != 200) {
+      throw Exception('Failed to delete event: ${response.body}');
+    }
+  }
+
   Future<void> saveFormFields(String id, List<FormFieldModel> fields) async {
     final response = await _apiClient.post('/v1/events/$id/fields', {
       'fields': fields.map((e) => e.toJson()).toList(),

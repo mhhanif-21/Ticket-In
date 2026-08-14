@@ -513,7 +513,7 @@ class DetailEventMetricsScreen extends ConsumerWidget {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(content: Text('Acara berhasil dibatalkan.')),
                   );
-                  context.go('/');
+                  context.go('/home');
                 } catch (e) {
                   if (!context.mounted) return;
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -522,6 +522,60 @@ class DetailEventMetricsScreen extends ConsumerWidget {
                 }
               },
               child: const Text('BATALKAN ACARA', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.5)),
+            ),
+          ),
+          // Bug 5 FIX: Tombol HAPUS EVENT permanen
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              onPressed: () async {
+                final confirm = await showDialog<bool>(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    title: const Text('Hapus Acara?'),
+                    content: const Text(
+                      'Seluruh data acara, form, dan peserta akan DIHAPUS PERMANEN. '
+                      'Tindakan ini tidak dapat dibatalkan.',
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(ctx, false),
+                        child: const Text('Batal'),
+                      ),
+                      ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.red[900],
+                          foregroundColor: Colors.white,
+                        ),
+                        onPressed: () => Navigator.pop(ctx, true),
+                        child: const Text('Ya, Hapus Permanen'),
+                      ),
+                    ],
+                  ),
+                );
+                if (confirm != true || !context.mounted) return;
+                try {
+                  await EventService().deleteEvent(eventId);
+                  if (!context.mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Acara berhasil dihapus.')),
+                  );
+                  context.go('/home');
+                } catch (e) {
+                  if (!context.mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Gagal menghapus acara: $e')),
+                  );
+                }
+              },
+              child: const Text('HAPUS ACARA PERMANEN', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.5)),
             ),
           ),
         ],

@@ -35,7 +35,7 @@ export default async function PublicEventLandingPage(props: { params: Promise<{ 
       {/* Event Details Container */}
       <div className="px-margin-mobile md:px-margin-desktop mt-stack-lg max-w-3xl mx-auto space-y-stack-lg">
         {/* Title & Core Info Card */}
-        <div className="bg-surface-container-lowest rounded-[16px] shadow-[0_4px_12px_rgba(0,0,0,0.05)] p-6 md:p-8 space-y-stack-md relative overflow-hidden">
+        <div className="bg-surface-container-lowest dark:bg-[#1a2e1f] rounded-[16px] shadow-[0_4px_12px_rgba(0,0,0,0.05)] p-6 md:p-8 space-y-stack-md relative overflow-hidden">
           <div className="absolute top-0 left-0 w-1 h-full bg-primary"></div>
           <div className="space-y-stack-sm">
             <div className="inline-flex items-center px-3 py-1 bg-primary text-on-primary font-label-caps text-label-caps rounded-full uppercase tracking-wider mb-2">
@@ -50,15 +50,15 @@ export default async function PublicEventLandingPage(props: { params: Promise<{ 
             <div className="flex items-start gap-3">
               <span className="material-symbols-outlined text-secondary mt-0.5">calendar_today</span>
               <div>
-                <p className="font-label-caps text-label-caps text-secondary uppercase">Tanggal</p>
-                <p className="font-body-md text-body-md text-on-surface font-medium mt-1">{dateStr}</p>
+                <p className="font-label-caps text-label-caps text-secondary dark:text-white/60 uppercase">Tanggal</p>
+                <p className="font-body-md text-body-md text-on-surface dark:text-white font-medium mt-1">{dateStr}</p>
               </div>
             </div>
             <div className="flex items-start gap-3">
               <span className="material-symbols-outlined text-secondary mt-0.5">group</span>
               <div>
-                <p className="font-label-caps text-label-caps text-secondary uppercase">Kuota</p>
-                <p className="font-body-md text-body-md text-on-surface font-medium mt-1">
+                <p className="font-label-caps text-label-caps text-secondary dark:text-white/60 uppercase">Kuota</p>
+                <p className="font-body-md text-body-md text-on-surface dark:text-white font-medium mt-1">
                    Tersisa {Math.max(0, event.capacity - event.currentCount)} / {event.capacity}
                 </p>
               </div>
@@ -66,17 +66,17 @@ export default async function PublicEventLandingPage(props: { params: Promise<{ 
             <div className="flex items-start gap-3 md:col-span-2">
               <span className="material-symbols-outlined text-secondary mt-0.5">location_on</span>
               <div>
-                <p className="font-label-caps text-label-caps text-secondary uppercase">Lokasi</p>
-                <p className="font-body-md text-body-md text-on-surface font-medium mt-1">{event.location}</p>
+                <p className="font-label-caps text-label-caps text-secondary dark:text-white/60 uppercase">Lokasi</p>
+                <p className="font-body-md text-body-md text-on-surface dark:text-white font-medium mt-1">{event.location}</p>
               </div>
             </div>
           </div>
         </div>
 
         {/* Description Card */}
-        <div className="bg-surface-container-lowest rounded-[16px] shadow-[0_4px_12px_rgba(0,0,0,0.05)] p-6 md:p-8 space-y-stack-sm">
-          <h3 className="font-label-caps text-label-caps text-secondary uppercase tracking-widest border-b border-outline-variant/30 pb-2 mb-4">Tentang Acara</h3>
-          <p className="font-body-lg text-body-lg text-on-surface-variant leading-relaxed whitespace-pre-wrap">
+        <div className="bg-surface-container-lowest dark:bg-[#1a2e1f] rounded-[16px] shadow-[0_4px_12px_rgba(0,0,0,0.05)] p-6 md:p-8 space-y-stack-sm">
+          <h3 className="font-label-caps text-label-caps text-secondary dark:text-white/60 uppercase tracking-widest border-b border-outline-variant/30 dark:border-white/10 pb-2 mb-4">Tentang Acara</h3>
+          <p className="font-body-lg text-body-lg text-on-surface-variant dark:text-white/80 leading-relaxed whitespace-pre-wrap">
             {event.description || 'Tidak ada deskripsi.'}
           </p>
         </div>

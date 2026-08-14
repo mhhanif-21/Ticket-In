@@ -55,8 +55,9 @@ export default function WebScannerPage() {
 
       const config: Html5QrcodeCameraScanConfig = {
         fps: 10,
-        qrbox: { width: 250, height: 250 },
-        aspectRatio: 0.75, // Matches aspect-[3/4]
+        // Bug 8 FIX: Hapus qrbox — library resize container sesuai qrbox sehingga
+        // video hanya cover sebagian. Tanpa qrbox = scan full frame, video fill penuh.
+        aspectRatio: 1.333, // 4:3 portrait
       };
 
       await scannerRef.current.start(
@@ -186,7 +187,7 @@ export default function WebScannerPage() {
           0% { transform: translateY(0); opacity: 0; }
           10% { opacity: 1; }
           90% { opacity: 1; }
-          100% { transform: translateY(192px); opacity: 0; }
+          100% { transform: translateY(250px); opacity: 0; }
         }
         @keyframes slide-up {
           from { transform: translateY(100%); }
@@ -197,7 +198,13 @@ export default function WebScannerPage() {
         .flash-error { animation: flash-red 0.3s ease-out; }
         @keyframes flash-green { 0% { background-color: rgba(22, 163, 74, 0.4); } 100% { background-color: transparent; } }
         @keyframes flash-red { 0% { background-color: rgba(186, 26, 26, 0.4); } 100% { background-color: transparent; } }
-        /* BUG-G FIX: Force html5-qrcode video to fill container — library injects inline styles */
+        /* Bug 8 FIX: Force semua elemen html5-qrcode fill container penuh */
+        #qr-reader {
+          width: 100% !important;
+          height: 100% !important;
+          border: none !important;
+          padding: 0 !important;
+        }
         #qr-reader video {
           width: 100% !important;
           height: 100% !important;
@@ -206,9 +213,17 @@ export default function WebScannerPage() {
           top: 0 !important;
           left: 0 !important;
         }
-        /* BUG-G FIX: Hide the default html5-qrcode anchor/header UI */
+        #qr-reader__scan_region {
+          width: 100% !important;
+          height: 100% !important;
+          position: absolute !important;
+          top: 0 !important;
+          left: 0 !important;
+        }
         #qr-reader__scan_region > img,
-        #qr-reader__dashboard {
+        #qr-reader__dashboard,
+        #qr-reader__header_message,
+        #qr-reader__status_span {
           display: none !important;
         }
       `}</style>

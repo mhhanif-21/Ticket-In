@@ -52,6 +52,12 @@ class ApiClient {
     );
   }
 
+  // Bug 5 FIX: Tambah method delete
+  Future<http.Response> delete(String endpoint) async {
+    final headers = await _getHeaders();
+    return await http.delete(buildUri(endpoint), headers: headers);
+  }
+
   Future<http.StreamedResponse> multipartRequest(
     String endpoint,
     String method,
