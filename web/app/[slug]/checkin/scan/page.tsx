@@ -21,6 +21,7 @@ export default function WebScannerPage() {
   const isComponentMounted = useRef(true);
   const isTransitioningRef = useRef(false);
   const isProcessingRef = useRef(false);
+  const observerRef = useRef<MutationObserver | null>(null);
 
   // Sync ref with state
   useEffect(() => {
@@ -84,6 +85,55 @@ export default function WebScannerPage() {
       isTransitioningRef.current = false;
     }
   }, [facingMode]);
+
+  // Fix kamera: MutationObserver paksa #qr-reader dan children fill container
+  // html5-qrcode inject inline style width/height via JS — CSS !important tidak cukup
+  useEffect(() => {
+    const forceFullSize = () => {
+      const reader = document.getElementById('qr-reader');
+      if (!reader) return;
+      reader.style.setProperty('width', '100%', 'important');
+      reader.style.setProperty('height', '100%', 'important');
+      reader.style.setProperty('padding', '0', 'important');
+      reader.style.setProperty('border', 'none', 'important');
+      const scanRegion = reader.querySelector('#qr-reader__scan_region') as HTMLElement | null;
+      if (scanRegion) {
+        scanRegion.style.setProperty('width', '100%', 'important');
+        scanRegion.style.setProperty('height', '100%', 'important');
+        scanRegion.style.setProperty('position', 'absolute', 'important');
+        scanRegion.style.setProperty('top', '0', 'important');
+        scanRegion.style.setProperty('left', '0', 'important');
+      }
+      const video = reader.querySelector('video') as HTMLVideoElement | null;
+      if (video) {
+        video.style.setProperty('width', '100%', 'important');
+        video.style.setProperty('height', '100%', 'important');
+        video.style.setProperty('object-fit', 'cover', 'important');
+        video.style.setProperty('position', 'absolute', 'important');
+        video.style.setProperty('top', '0', 'important');
+        video.style.setProperty('left', '0', 'important');
+      }
+      // Sembunyikan elemen UI default library
+      const dashboard = reader.querySelector('#qr-reader__dashboard') as HTMLElement | null;
+      if (dashboard) dashboard.style.setProperty('display', 'none', 'important');
+      const headerMsg = reader.querySelector('#qr-reader__header_message') as HTMLElement | null;
+      if (headerMsg) headerMsg.style.setProperty('display', 'none', 'important');
+    };
+
+    if (observerRef.current) observerRef.current.disconnect();
+    observerRef.current = new MutationObserver(forceFullSize);
+    const reader = document.getElementById('qr-reader');
+    if (reader) {
+      observerRef.current.observe(reader, { childList: true, subtree: true, attributes: true, attributeFilter: ['style'] });
+    }
+    // Juga run sekali setelah scanner mulai
+    const t = setTimeout(forceFullSize, 500);
+
+    return () => {
+      clearTimeout(t);
+      observerRef.current?.disconnect();
+    };
+  }, [hasCameras]);
 
   useEffect(() => {
     isComponentMounted.current = true;
@@ -180,7 +230,7 @@ export default function WebScannerPage() {
   };
 
   return (
-    <div className="w-full flex-grow flex flex-col font-body-md antialiased transition-colors bg-background text-on-background dark:bg-[#0d1f14] dark:text-white">
+    <div className="w-full flex-grow flex flex-col font-body-md antialiased transition-colors bg-background text-on-background dark:bg-[#111111] dark:text-white">
 
       <style>{`
         @keyframes scan {
@@ -235,7 +285,7 @@ export default function WebScannerPage() {
         <div
           id="viewfinder"
           className={`relative w-full max-w-md aspect-[3/4] rounded-xl overflow-hidden shadow-[0_4px_12px_rgba(0,0,0,0.5)] flex items-center justify-center
-            bg-surface-variant dark:bg-[#1a3326] border border-outline-variant dark:border-white/10
+            bg-surface-variant dark:bg-[#1e1e1e] border border-outline-variant dark:border-white/10
             ${scanResult?.status === 'success' ? 'flash-success' : scanResult ? 'flash-error' : ''}`}
         >
           {/* Always render qr-reader for Html5Qrcode to bind to, but hide if no camera */}
@@ -299,7 +349,7 @@ export default function WebScannerPage() {
               disabled={isProcessing}
               className={`flex-grow border rounded-lg px-4 py-3 focus:outline-none focus:ring-2
                 bg-surface-container-lowest border-outline-variant placeholder-outline focus:ring-primary
-                dark:bg-[#1a3326] dark:border-white/20 dark:text-white dark:placeholder-white/40 dark:focus:ring-white/50`}
+                dark:bg-[#1e1e1e] dark:border-white/20 dark:text-white dark:placeholder-white/40 dark:focus:ring-white/50`}
             />
             <button
               type="submit"
@@ -319,7 +369,7 @@ export default function WebScannerPage() {
         <>
           <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40 transition-opacity" />
           <div className={`fixed bottom-0 left-0 right-0 w-full max-w-md mx-auto rounded-t-3xl p-stack-lg z-50 animate-slide-up shadow-[0_-8px_32px_rgba(0,0,0,0.1)] flex flex-col items-center text-center
-            bg-surface-container-lowest dark:bg-[#1a3326] dark:border-t dark:border-white/10`}
+            bg-surface-container-lowest dark:bg-[#1e1e1e] dark:border-t dark:border-white/10`}
           >
             <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-stack-sm
               ${scanResult.status === 'success' ? 'bg-[#16a34a] text-white' : 'bg-[#ba1a1a] text-white'}`}

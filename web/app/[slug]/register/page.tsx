@@ -121,7 +121,7 @@ export default function RegisterPage() {
           <h2 className="font-display-lg-mobile md:font-display-lg text-display-lg-mobile md:text-display-lg text-primary mb-stack-sm">Isi Data Pendaftaran</h2>
           <p className="font-description text-description text-secondary">Silakan lengkapi formulir di bawah ini untuk mengonfirmasi pendaftaran Anda.</p>
         </div>
-        <div className="bg-surface-container-lowest dark:bg-[#1a2e1f] rounded-[16px] shadow-[0_4px_12px_rgba(0,0,0,0.05)] p-margin-mobile md:p-margin-desktop">
+        <div className="bg-surface-container-lowest dark:bg-[#1e1e1e] rounded-[16px] shadow-[0_4px_12px_rgba(0,0,0,0.05)] p-margin-mobile md:p-margin-desktop">
           {error && (
             <div className="p-4 mb-6 bg-error-container text-on-error-container rounded-lg font-medium text-sm">
               {error}

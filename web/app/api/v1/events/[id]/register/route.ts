@@ -44,6 +44,12 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
       options: formFields.options,
     }).from(formFields).where(eq(formFields.eventId, event.id));
 
+    // Fix validasi: skip field Nama/Email karena dihandle sebagai static field (name/email),
+    // bukan sebagai field dinamis dengan key field_{id}
+    const dynamicFormFields = eventFormFields.filter(
+      (f) => !['nama', 'email'].includes(f.fieldName.toLowerCase())
+    );
+
     // Validate the untrusted multipart payload before any storage write. The action repeats
     // validation inside its transaction so the backend remains the source of truth.
     const rawAnswers: Record<string, unknown> = {};
@@ -52,7 +58,7 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
       const existing = rawAnswers[key];
       rawAnswers[key] = existing === undefined ? value : Array.isArray(existing) ? [...existing, value] : [existing, value];
     }
-    validateRegistrationAnswers(eventFormFields, rawAnswers);
+    validateRegistrationAnswers(dynamicFormFields, rawAnswers);
 
     // Process files and check size limit (1MB)
     const MAX_FILE_SIZE = 1 * 1024 * 1024; // 1MB

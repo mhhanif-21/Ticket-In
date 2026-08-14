@@ -35,7 +35,7 @@ export default async function PublicEventLandingPage(props: { params: Promise<{ 
       {/* Event Details Container */}
       <div className="px-margin-mobile md:px-margin-desktop mt-stack-lg max-w-3xl mx-auto space-y-stack-lg">
         {/* Title & Core Info Card */}
-        <div className="bg-surface-container-lowest dark:bg-[#1a2e1f] rounded-[16px] shadow-[0_4px_12px_rgba(0,0,0,0.05)] p-6 md:p-8 space-y-stack-md relative overflow-hidden">
+        <div className="bg-surface-container-lowest dark:bg-[#1e1e1e] rounded-[16px] shadow-[0_4px_12px_rgba(0,0,0,0.05)] p-6 md:p-8 space-y-stack-md relative overflow-hidden">
           <div className="absolute top-0 left-0 w-1 h-full bg-primary"></div>
           <div className="space-y-stack-sm">
             <div className="inline-flex items-center px-3 py-1 bg-primary text-on-primary font-label-caps text-label-caps rounded-full uppercase tracking-wider mb-2">
@@ -74,7 +74,7 @@ export default async function PublicEventLandingPage(props: { params: Promise<{ 
         </div>
 
         {/* Description Card */}
-        <div className="bg-surface-container-lowest dark:bg-[#1a2e1f] rounded-[16px] shadow-[0_4px_12px_rgba(0,0,0,0.05)] p-6 md:p-8 space-y-stack-sm">
+        <div className="bg-surface-container-lowest dark:bg-[#1e1e1e] rounded-[16px] shadow-[0_4px_12px_rgba(0,0,0,0.05)] p-6 md:p-8 space-y-stack-sm">
           <h3 className="font-label-caps text-label-caps text-secondary dark:text-white/60 uppercase tracking-widest border-b border-outline-variant/30 dark:border-white/10 pb-2 mb-4">Tentang Acara</h3>
           <p className="font-body-lg text-body-lg text-on-surface-variant dark:text-white/80 leading-relaxed whitespace-pre-wrap">
             {event.description || 'Tidak ada deskripsi.'}
