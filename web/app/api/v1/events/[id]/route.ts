@@ -6,8 +6,13 @@ import { asc, eq } from 'drizzle-orm';
 export const runtime = 'nodejs';
 const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-function publicAppUrl(): string {
-  return (process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000').replace(/\/$/, '');
+function resolveBaseUrl(req: Request): string {
+  // Pakai NEXT_PUBLIC_APP_URL jika di-set, fallback ke Host header dari request
+  const envUrl = process.env.NEXT_PUBLIC_APP_URL;
+  if (envUrl) return envUrl.replace(/\/$/, '');
+  const host = req.headers.get('host') || 'localhost:3000';
+  const proto = req.headers.get('x-forwarded-proto') || 'https';
+  return `${proto}://${host}`;
 }
 
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -58,8 +63,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       capacity: event.capacity,
       registrationMode: event.registrationMode,
       formFields: publicFormFields,
-      public_registration_url: `${publicAppUrl()}/${event.slug}/register`,
-      public_qr_code_url: `${publicAppUrl()}/api/v1/events/${event.slug}/qr`,
+      public_registration_url: `${resolveBaseUrl(req)}/${event.slug}/register`,
+      public_qr_code_url: `${resolveBaseUrl(req)}/api/v1/events/${event.slug}/qr`,
     };
 
     return NextResponse.json({ status: 'success', data: publicEvent });
