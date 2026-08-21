@@ -149,7 +149,10 @@ class ParticipantsNotifier extends Notifier<ParticipantsState> {
   }
 }
 
-final participantsProvider = NotifierProvider.family<ParticipantsNotifier, ParticipantsState, String>(ParticipantsNotifier.new);
+final participantsProvider =
+    NotifierProvider.family<ParticipantsNotifier, ParticipantsState, String>(
+      ParticipantsNotifier.new,
+    );
 
 class ParticipantsScreen extends ConsumerStatefulWidget {
   final String eventId;
@@ -181,7 +184,8 @@ class _ParticipantsScreenState extends ConsumerState<ParticipantsScreen> {
     super.initState();
     // [BUG-065] FIX: Infinite scrolling listener
     _scrollController.addListener(() {
-      if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 200) {
+      if (_scrollController.position.pixels >=
+          _scrollController.position.maxScrollExtent - 200) {
         ref.read(participantsProvider(widget.eventId).notifier).loadMore();
       }
     });
@@ -198,7 +202,9 @@ class _ParticipantsScreenState extends ConsumerState<ParticipantsScreen> {
   void _onSearchChanged(String query) {
     if (_debounce?.isActive ?? false) _debounce!.cancel();
     _debounce = Timer(const Duration(milliseconds: 500), () {
-      ref.read(participantsProvider(widget.eventId).notifier).updateSearch(query);
+      ref
+          .read(participantsProvider(widget.eventId).notifier)
+          .updateSearch(query);
     });
   }
 
@@ -237,7 +243,12 @@ class _ParticipantsScreenState extends ConsumerState<ParticipantsScreen> {
           final fileUrl = exportFileUrl(statusRes);
           if (fileUrl != null && await openUrl(fileUrl)) {
             _setExportFeedback('Membuka browser untuk mengunduh...');
-            if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Membuka browser untuk mengunduh...')));
+            if (mounted)
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Membuka browser untuk mengunduh...'),
+                ),
+              );
           }
           break;
         } else if (statusRes['status'] == 'failed') {
@@ -246,12 +257,23 @@ class _ParticipantsScreenState extends ConsumerState<ParticipantsScreen> {
       }
 
       if (!isReady && mounted) {
-        _setExportFeedback('Waktu tunggu habis. Proses mungkin masih berjalan di background.');
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Waktu tunggu habis. Proses mungkin masih berjalan di background.')));
+        _setExportFeedback(
+          'Waktu tunggu habis. Proses mungkin masih berjalan di background.',
+        );
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Waktu tunggu habis. Proses mungkin masih berjalan di background.',
+            ),
+          ),
+        );
       }
     } catch (e) {
       _setExportFeedback('Gagal: $e');
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Gagal: $e')));
+      if (mounted)
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Gagal: $e')));
     } finally {
       if (mounted) setState(() => _isExporting = false);
     }
@@ -271,110 +293,208 @@ class _ParticipantsScreenState extends ConsumerState<ParticipantsScreen> {
       isScrollControlled: true,
       useSafeArea: true,
       backgroundColor: AppColors.surface,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setSheetState) {
-            return Padding(
-              padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom, left: 24, right: 24, top: 24),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('Filter & Urutkan', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600, color: AppColors.onSurface)),
-                  const SizedBox(height: 8),
-                  const Text('Hanya 1 tipe filter yang dapat aktif bersamaan (Sistem M-E)', style: TextStyle(fontSize: 12, color: Colors.orange)),
-                  const SizedBox(height: 24),
-
-                  // Filter 1: Status Pendaftaran
-                  const Text('Status Tiket', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: AppColors.onSurfaceVariant)),
-                  const SizedBox(height: 12),
-                  Wrap(
-                    spacing: 8, runSpacing: 8,
-                    // [BUG-050] FIX: Tambah 'Draft' ke opsi filter status
-                    children: ['Semua', 'Pending', 'Accepted', 'Rejected', 'Draft'].map((status) {
-                      final isSelected = tempStatus == status;
-                      return ChoiceChip(
-                        label: Text(status),
-                        selected: isSelected,
-                        onSelected: (selected) {
-                          setSheetState(() {
-                            if (selected) {
-                              tempStatus = status;
-                              tempAttendance = 'Semua'; // Reset mutually exclusive filters
-                            }
-                          });
-                        },
-                        selectedColor: AppColors.primaryContainer.withOpacity(0.2),
-                        backgroundColor: AppColors.surfaceContainerLow,
-                        labelStyle: TextStyle(
-                          color: isSelected ? AppColors.onPrimaryContainer : AppColors.secondary,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      );
-                    }).toList(),
+            return SizedBox(
+              height: MediaQuery.sizeOf(context).height * 0.9,
+              child: SafeArea(
+                top: false,
+                child: Padding(
+                  padding: EdgeInsets.only(
+                    bottom: MediaQuery.of(context).viewInsets.bottom,
+                    left: 24,
+                    right: 24,
+                    top: 24,
                   ),
-                  const SizedBox(height: 24),
-
-                  // Filter 2: Kehadiran (Attendance)
-                  const Text('Kehadiran (Check-in)', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: AppColors.onSurfaceVariant)),
-                  const SizedBox(height: 12),
-                  Wrap(
-                    spacing: 8, runSpacing: 8,
-                    children: ['Semua', 'Hadir', 'Tidak Hadir'].map((att) {
-                      final isSelected = tempAttendance == att;
-                      return ChoiceChip(
-                        label: Text(att),
-                        selected: isSelected,
-                        onSelected: (selected) {
-                          setSheetState(() {
-                            if (selected) {
-                              tempAttendance = att;
-                              tempStatus = 'Semua'; // Reset mutually exclusive filters
-                            }
-                          });
-                        },
-                        selectedColor: AppColors.primaryContainer.withOpacity(0.2),
-                        backgroundColor: AppColors.surfaceContainerLow,
-                        labelStyle: TextStyle(
-                          color: isSelected ? AppColors.onPrimaryContainer : AppColors.secondary,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      );
-                    }).toList(),
-                  ),
-                  const SizedBox(height: 24),
-
-                  // Filter 3: Waktu Pendaftaran (Sort)
-                  const Text('Waktu Pendaftaran', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: AppColors.onSurfaceVariant)),
-                  const SizedBox(height: 12),
-                  Wrap(
-                    spacing: 8, runSpacing: 8,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _buildSortChip('Terbaru', 'desc', tempSort, (val) => setSheetState(() => tempSort = val)),
-                      _buildSortChip('Terlama', 'asc', tempSort, (val) => setSheetState(() => tempSort = val)),
+                      const Text(
+                        'Filter & Urutkan',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.onSurface,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'Hanya 1 tipe filter yang dapat aktif bersamaan (Sistem M-E)',
+                        style: TextStyle(fontSize: 12, color: Colors.orange),
+                      ),
+                      const SizedBox(height: 16),
+                      Expanded(
+                        child: SingleChildScrollView(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // Filter 1: Status Pendaftaran
+                              const Text(
+                                'Status Tiket',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                  color: AppColors.onSurfaceVariant,
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 8,
+                                // [BUG-050] FIX: Tambah 'Draft' ke opsi filter status
+                                children:
+                                    [
+                                      'Semua',
+                                      'Pending',
+                                      'Accepted',
+                                      'Rejected',
+                                      'Draft',
+                                    ].map((status) {
+                                      final isSelected = tempStatus == status;
+                                      return ChoiceChip(
+                                        label: Text(status),
+                                        selected: isSelected,
+                                        onSelected: (selected) {
+                                          setSheetState(() {
+                                            if (selected) {
+                                              tempStatus = status;
+                                              tempAttendance =
+                                                  'Semua'; // Reset mutually exclusive filters
+                                            }
+                                          });
+                                        },
+                                        selectedColor: AppColors
+                                            .primaryContainer
+                                            .withOpacity(0.2),
+                                        backgroundColor:
+                                            AppColors.surfaceContainerLow,
+                                        labelStyle: TextStyle(
+                                          color: isSelected
+                                              ? AppColors.onPrimaryContainer
+                                              : AppColors.secondary,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      );
+                                    }).toList(),
+                              ),
+                              const SizedBox(height: 24),
+
+                              // Filter 2: Kehadiran (Attendance)
+                              const Text(
+                                'Kehadiran (Check-in)',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                  color: AppColors.onSurfaceVariant,
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 8,
+                                children: ['Semua', 'Hadir', 'Tidak Hadir'].map((
+                                  att,
+                                ) {
+                                  final isSelected = tempAttendance == att;
+                                  return ChoiceChip(
+                                    label: Text(att),
+                                    selected: isSelected,
+                                    onSelected: (selected) {
+                                      setSheetState(() {
+                                        if (selected) {
+                                          tempAttendance = att;
+                                          tempStatus =
+                                              'Semua'; // Reset mutually exclusive filters
+                                        }
+                                      });
+                                    },
+                                    selectedColor: AppColors.primaryContainer
+                                        .withOpacity(0.2),
+                                    backgroundColor:
+                                        AppColors.surfaceContainerLow,
+                                    labelStyle: TextStyle(
+                                      color: isSelected
+                                          ? AppColors.onPrimaryContainer
+                                          : AppColors.secondary,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  );
+                                }).toList(),
+                              ),
+                              const SizedBox(height: 24),
+
+                              // Filter 3: Waktu Pendaftaran (Sort)
+                              const Text(
+                                'Waktu Pendaftaran',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                  color: AppColors.onSurfaceVariant,
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 8,
+                                children: [
+                                  _buildSortChip(
+                                    'Terbaru',
+                                    'desc',
+                                    tempSort,
+                                    (val) =>
+                                        setSheetState(() => tempSort = val),
+                                  ),
+                                  _buildSortChip(
+                                    'Terlama',
+                                    'asc',
+                                    tempSort,
+                                    (val) =>
+                                        setSheetState(() => tempSort = val),
+                                  ),
+                                ],
+                              ),
+
+                              const SizedBox(height: 24),
+                            ],
+                          ),
+                        ),
+                      ),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 48,
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primary,
+                            foregroundColor: AppColors.onPrimary,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          onPressed: () {
+                            notifier.updateFilters(
+                              status: tempStatus,
+                              attendance: tempAttendance,
+                              sort: tempSort,
+                            );
+                            Navigator.pop(context);
+                          },
+                          child: const Text(
+                            'Terapkan Filter',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
                     ],
                   ),
-
-                  const SizedBox(height: 32),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 48,
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primary,
-                        foregroundColor: AppColors.onPrimary,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      ),
-                      onPressed: () {
-                        notifier.updateFilters(status: tempStatus, attendance: tempAttendance, sort: tempSort);
-                        Navigator.pop(context);
-                      },
-                      child: const Text('Terapkan Filter', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
-                    ),
-                  ),
-                  const SizedBox(height: 32),
-                ],
+                ),
               ),
             );
           },
@@ -383,7 +503,12 @@ class _ParticipantsScreenState extends ConsumerState<ParticipantsScreen> {
     );
   }
 
-  Widget _buildSortChip(String label, String value, String currentVal, Function(String) onSelect) {
+  Widget _buildSortChip(
+    String label,
+    String value,
+    String currentVal,
+    Function(String) onSelect,
+  ) {
     final isSelected = currentVal == value;
     return ChoiceChip(
       label: Text(label),
@@ -408,7 +533,9 @@ class _ParticipantsScreenState extends ConsumerState<ParticipantsScreen> {
     // Handle error UI feedback once
     if (state.error != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(state.error!)));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(state.error!)));
       });
     }
 
@@ -433,8 +560,15 @@ class _ParticipantsScreenState extends ConsumerState<ParticipantsScreen> {
         actions: [
           IconButton(
             icon: _isExporting
-              ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary))
-              : const Icon(Icons.download, color: AppColors.primary),
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: AppColors.primary,
+                    ),
+                  )
+                : const Icon(Icons.download, color: AppColors.primary),
             onPressed: _isExporting ? null : _triggerExport,
           ),
           IconButton(
@@ -466,10 +600,14 @@ class _ParticipantsScreenState extends ConsumerState<ParticipantsScreen> {
                       ),
                       child: TextField(
                         controller: _searchController,
-                        onChanged: _onSearchChanged, // [BUG-052] FIX: Fungsi pencarian sudah dihubungkan dengan API
+                        onChanged:
+                            _onSearchChanged, // [BUG-052] FIX: Fungsi pencarian sudah dihubungkan dengan API
                         decoration: const InputDecoration(
                           hintText: 'Cari nama atau email...',
-                          prefixIcon: Icon(Icons.search, color: AppColors.outline),
+                          prefixIcon: Icon(
+                            Icons.search,
+                            color: AppColors.outline,
+                          ),
                           border: InputBorder.none,
                           contentPadding: EdgeInsets.symmetric(vertical: 12),
                         ),
@@ -487,16 +625,20 @@ class _ParticipantsScreenState extends ConsumerState<ParticipantsScreen> {
                         color: AppColors.surface,
                         borderRadius: BorderRadius.circular(10),
                         border: Border.all(
-                          color: (state.filterStatus != 'Semua' || state.filterAttendance != 'Semua')
+                          color:
+                              (state.filterStatus != 'Semua' ||
+                                  state.filterAttendance != 'Semua')
                               ? AppColors.primary
-                              : AppColors.outlineVariant
+                              : AppColors.outlineVariant,
                         ),
                       ),
                       child: Icon(
                         Icons.tune,
-                        color: (state.filterStatus != 'Semua' || state.filterAttendance != 'Semua')
+                        color:
+                            (state.filterStatus != 'Semua' ||
+                                state.filterAttendance != 'Semua')
                             ? AppColors.primary
-                            : AppColors.secondary
+                            : AppColors.secondary,
                       ),
                     ),
                   ),
@@ -515,17 +657,21 @@ class _ParticipantsScreenState extends ConsumerState<ParticipantsScreen> {
                   ),
                   child: Text(_exportFeedback!),
                 ),
-              // [BUG-064] FIX: Chip filter redundan di bawah search bar TELAH DIHAPUS
 
+              // [BUG-064] FIX: Chip filter redundan di bawah search bar TELAH DIHAPUS
               Expanded(
                 child: state.isLoading && state.participants.isEmpty
-                  ? const Center(child: CircularProgressIndicator())
-                  : state.participants.isEmpty
-                    ? const Center(child: Text('Tidak ada pendaftar ditemukan.'))
+                    ? const Center(child: CircularProgressIndicator())
+                    : state.participants.isEmpty
+                    ? const Center(
+                        child: Text('Tidak ada pendaftar ditemukan.'),
+                      )
                     : ListView.builder(
                         controller: _scrollController,
                         physics: const AlwaysScrollableScrollPhysics(),
-                        itemCount: state.participants.length + (state.isFetchingMore ? 1 : 0),
+                        itemCount:
+                            state.participants.length +
+                            (state.isFetchingMore ? 1 : 0),
                         itemBuilder: (context, index) {
                           if (index == state.participants.length) {
                             return const Padding(
@@ -535,7 +681,9 @@ class _ParticipantsScreenState extends ConsumerState<ParticipantsScreen> {
                           }
                           return Padding(
                             padding: const EdgeInsets.only(bottom: 8.0),
-                            child: _buildParticipantCard(state.participants[index]),
+                            child: _buildParticipantCard(
+                              state.participants[index],
+                            ),
                           );
                         },
                       ),
@@ -549,21 +697,29 @@ class _ParticipantsScreenState extends ConsumerState<ParticipantsScreen> {
 
   Color _getStatusBgColor(String status) {
     switch (status.toLowerCase()) {
-      case 'accepted': return const Color(0xFF41674B).withOpacity(0.1);
-      case 'rejected': return const Color(0xFFBA1A1A).withOpacity(0.1);
+      case 'accepted':
+        return const Color(0xFF41674B).withOpacity(0.1);
+      case 'rejected':
+        return const Color(0xFFBA1A1A).withOpacity(0.1);
       // [BUG-050] FIX: Tambahan warna status Draft
-      case 'draft': return Colors.grey.withOpacity(0.1);
-      default: return Colors.orange.withOpacity(0.1);
+      case 'draft':
+        return Colors.grey.withOpacity(0.1);
+      default:
+        return Colors.orange.withOpacity(0.1);
     }
   }
 
   Color _getStatusTextColor(String status) {
     switch (status.toLowerCase()) {
-      case 'accepted': return const Color(0xFF41674B);
-      case 'rejected': return const Color(0xFFBA1A1A);
+      case 'accepted':
+        return const Color(0xFF41674B);
+      case 'rejected':
+        return const Color(0xFFBA1A1A);
       // [BUG-050] FIX: Tambahan warna teks status Draft
-      case 'draft': return Colors.grey.shade700;
-      default: return Colors.orange.shade800;
+      case 'draft':
+        return Colors.grey.shade700;
+      default:
+        return Colors.orange.shade800;
     }
   }
 
@@ -592,7 +748,8 @@ class _ParticipantsScreenState extends ConsumerState<ParticipantsScreen> {
         child: Row(
           children: [
             Container(
-              width: 48, height: 48,
+              width: 48,
+              height: 48,
               decoration: BoxDecoration(
                 color: AppColors.surfaceVariant,
                 shape: BoxShape.circle,
@@ -601,7 +758,11 @@ class _ParticipantsScreenState extends ConsumerState<ParticipantsScreen> {
               alignment: Alignment.center,
               child: Text(
                 name.isNotEmpty ? name[0].toUpperCase() : '?',
-                style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w600, color: AppColors.secondary),
+                style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.secondary,
+                ),
               ),
             ),
             const SizedBox(width: 16),
@@ -609,15 +770,36 @@ class _ParticipantsScreenState extends ConsumerState<ParticipantsScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(name, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.onSurface)),
+                  Text(
+                    name,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.onSurface,
+                    ),
+                  ),
                   Row(
                     children: [
-                      Expanded(child: Text(organization, style: const TextStyle(fontSize: 12, color: AppColors.secondary), maxLines: 1, overflow: TextOverflow.ellipsis)),
+                      Expanded(
+                        child: Text(
+                          organization,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: AppColors.secondary,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
                       if (attendance == 'Present')
                         const Padding(
                           padding: EdgeInsets.only(left: 8.0),
-                          child: Icon(Icons.check_circle, size: 14, color: Colors.green),
-                        )
+                          child: Icon(
+                            Icons.check_circle,
+                            size: 14,
+                            color: Colors.green,
+                          ),
+                        ),
                     ],
                   ),
                 ],
@@ -632,7 +814,11 @@ class _ParticipantsScreenState extends ConsumerState<ParticipantsScreen> {
               ),
               child: Text(
                 status,
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: _getStatusTextColor(status)),
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                  color: _getStatusTextColor(status),
+                ),
               ),
             ),
           ],
