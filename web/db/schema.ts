@@ -9,8 +9,9 @@ import {
   jsonb,
   uniqueIndex,
   index,
+  check,
 } from 'drizzle-orm/pg-core';
-import { relations } from 'drizzle-orm';
+import { relations, sql } from 'drizzle-orm';
 
 // 1. Table events
 export const events = pgTable(
@@ -213,7 +214,16 @@ export const checkInLogs = pgTable('check_in_logs', {
   scanMethod: varchar('scan_method', { length: 50 }).notNull(), // Camera, Manual
   scanStatus: varchar('scan_status', { length: 50 }).notNull(), // Success, Duplicate, Invalid
   createdAt: timestamp('created_at').defaultNow().notNull(),
-});
+}, (table) => ({
+  scanMethodCheck: check(
+    'check_in_logs_scan_method_check',
+    sql`${table.scanMethod} IN ('Camera', 'Manual')`,
+  ),
+  scanStatusCheck: check(
+    'check_in_logs_scan_status_check',
+    sql`${table.scanStatus} IN ('Success', 'Duplicate', 'Invalid')`,
+  ),
+}));
 
 export const checkInLogsRelations = relations(checkInLogs, ({ one }) => ({
   checkInSession: one(checkInSessions, {

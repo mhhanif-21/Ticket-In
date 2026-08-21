@@ -6,6 +6,7 @@ import { eq, and } from 'drizzle-orm';
 export const runtime = 'nodejs';
 
 const INVALID_TICKET_MESSAGE = 'Tiket tidak terdaftar di sistem atau pendaftaran belum disetujui.';
+const ALLOWED_SCAN_METHODS = new Set(['Camera', 'Manual']);
 
 export async function POST(req: Request) {
   try {
@@ -24,6 +25,13 @@ export async function POST(req: Request) {
     const body = await req.json();
     let ticket_code = body.ticket_code;
     const scan_method = body.scan_method ?? 'Camera';
+
+    if (typeof scan_method !== 'string' || !ALLOWED_SCAN_METHODS.has(scan_method)) {
+      return NextResponse.json(
+        { status: 'error', message: 'scan_method harus bernilai Camera atau Manual' },
+        { status: 400 }
+      );
+    }
 
     if (body.event_id && body.event_id !== eventIdFromHeader) {
       return NextResponse.json(

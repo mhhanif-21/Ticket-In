@@ -1,0 +1,2 @@
+ALTER TABLE "check_in_logs" ADD CONSTRAINT "check_in_logs_scan_method_check" CHECK ("check_in_logs"."scan_method" IN ('Camera', 'Manual'));--> statement-breakpoint
+ALTER TABLE "check_in_logs" ADD CONSTRAINT "check_in_logs_scan_status_check" CHECK ("check_in_logs"."scan_status" IN ('Success', 'Duplicate', 'Invalid'));

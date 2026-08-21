@@ -43,6 +43,13 @@
       "when": 1786535551069,
       "tag": "0005_resubmit-tokens-one-time",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1787151814160,
+      "tag": "0006_check-in-log-constraints",
+      "breakpoints": true
     }
   ]
 }

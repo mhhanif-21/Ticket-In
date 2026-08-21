@@ -54,7 +54,7 @@ export async function POST(req: Request) {
       failedCount = getFailedAttempts(ip);
     }
 
-    if (failedCount >= 6) {
+    if (failedCount >= 5) {
       return NextResponse.json(
         { status: 'error', message: 'Terlalu banyak percobaan gagal, silakan coba lagi nanti' },
         { status: 429 }
