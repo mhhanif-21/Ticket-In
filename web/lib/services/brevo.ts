@@ -3,7 +3,7 @@
  * EHR-002: Strict hard-timeout of 3 seconds.
  */
 
-const BREVO_API_URL = 'https://api.brevo.com/v3/smtp/email';
+const DEFAULT_BREVO_API_URL = 'https://api.brevo.com/v3/smtp/email';
 
 export interface EmailPayload {
   to: { email: string; name?: string }[];
@@ -15,6 +15,7 @@ export interface EmailPayload {
 
 export async function sendEmail(payload: EmailPayload): Promise<void> {
   const apiKey = process.env.BREVO_API_KEY;
+  const apiUrl = process.env.BREVO_API_URL || DEFAULT_BREVO_API_URL;
   if (!apiKey) {
     throw new Error('BREVO_API_KEY is not defined');
   }
@@ -29,7 +30,7 @@ export async function sendEmail(payload: EmailPayload): Promise<void> {
   const timeoutId = setTimeout(() => controller.abort(), 3000);
 
   try {
-    const response = await fetch(BREVO_API_URL, {
+    const response = await fetch(apiUrl, {
       method: 'POST',
       headers: {
         'Accept': 'application/json',

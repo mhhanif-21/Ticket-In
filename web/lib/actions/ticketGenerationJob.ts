@@ -3,7 +3,7 @@ import { db } from '../../db';
 import { registrations, ticketGenerationJobs } from '../../db/schema';
 import { publishJob } from '../services/qstash';
 
-export type TicketGenerationJobStatus = 'queued' | 'publishing' | 'published' | 'failed' | 'completed';
+export type TicketGenerationJobStatus = 'queued' | 'publishing' | 'published' | 'processing' | 'failed' | 'completed';
 
 export interface TicketGenerationJob {
   id: string;
@@ -65,6 +65,36 @@ export async function getTicketGenerationJob(registrationId: string): Promise<Ti
 
 export async function ensureTicketGenerationJob(registrationId: string): Promise<TicketGenerationJob> {
   return db.transaction((tx) => ensureTicketGenerationJobTx(tx, registrationId));
+}
+
+// Mengklaim satu delivery worker sebelum side effect Storage agar duplicate delivery tidak bekerja paralel.
+export async function claimTicketGenerationJob(registrationId: string): Promise<{ job: TicketGenerationJob; claimed: boolean }> {
+  const job = (await getTicketGenerationJob(registrationId)) || await ensureTicketGenerationJob(registrationId);
+  const staleProcessingBefore = new Date(Date.now() - 5 * 60 * 1000);
+  const [claimed] = await db
+    .update(ticketGenerationJobs)
+    .set({
+      status: 'processing',
+      attempts: sql`${ticketGenerationJobs.attempts} + 1`,
+      updatedAt: new Date(),
+    })
+    .where(and(
+      eq(ticketGenerationJobs.id, job.id),
+      or(
+        inArray(ticketGenerationJobs.status, ['queued', 'published', 'failed']),
+        and(eq(ticketGenerationJobs.status, 'processing'), lt(ticketGenerationJobs.updatedAt, staleProcessingBefore)),
+      ),
+    ))
+    .returning({
+      id: ticketGenerationJobs.id,
+      registrationId: ticketGenerationJobs.registrationId,
+      status: ticketGenerationJobs.status,
+      attempts: ticketGenerationJobs.attempts,
+      qstashMessageId: ticketGenerationJobs.qstashMessageId,
+      lastError: ticketGenerationJobs.lastError,
+    });
+
+  return { job: claimed || job, claimed: Boolean(claimed) };
 }
 
 function errorMessage(error: unknown): string {

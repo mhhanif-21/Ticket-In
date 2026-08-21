@@ -1,5 +1,6 @@
 export async function sendOtpEmail(toEmail: string, toName: string, otpCode: string, eventName: string = 'Event Gate') {
   const apiKey = process.env.BREVO_API_KEY;
+  const apiUrl = process.env.BREVO_API_URL || 'https://api.brevo.com/v3/smtp/email';
   const senderEmail = process.env.BREVO_SENDER_EMAIL || 'noreply@eventgate.com';
   const senderName = process.env.BREVO_SENDER_NAME || 'Panitia Event';
 
@@ -28,7 +29,7 @@ export async function sendOtpEmail(toEmail: string, toName: string, otpCode: str
     `
   };
 
-  const response = await fetch('https://api.brevo.com/v3/smtp/email', {
+  const response = await fetch(apiUrl, {
     method: 'POST',
     headers: {
       'Accept': 'application/json',

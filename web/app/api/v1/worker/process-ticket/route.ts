@@ -35,8 +35,8 @@ export async function POST(req: NextRequest) {
     }
 
     // LLD-WRK-001: Panggil orchestrator logic tiket. Duplicate delivery is safe.
-    await GenerateTicketAction(registration_id);
-    if (job) await markTicketGenerationJobCompleted(registration_id);
+    const result = await GenerateTicketAction(registration_id);
+    if (job && result.status !== 'in_progress') await markTicketGenerationJobCompleted(registration_id);
 
     return NextResponse.json({ status: 'success', data: { jobStatus: job ? 'completed' : null } }, { status: 200 });
   } catch (error: any) {

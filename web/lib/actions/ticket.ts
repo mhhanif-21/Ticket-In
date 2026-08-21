@@ -7,6 +7,42 @@ import { STORAGE_BUCKETS } from '../storage/buckets';
 
 import { sendEmail } from '../services/brevo';
 import { events } from '../../db/schema';
+import {
+  claimTicketGenerationJob,
+  markTicketGenerationJobCompleted,
+  markTicketGenerationJobFailed,
+} from './ticketGenerationJob';
+
+// Mengambil binary QR dari bucket tiket milik aplikasi untuk attachment Brevo yang aman.
+async function getTicketQrAttachment(qrCodeUrl: string, ticketCode: string) {
+  const storageBaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  if (!storageBaseUrl) throw new Error('Ticket storage URL is not configured');
+
+  const expectedOrigin = new URL(storageBaseUrl).origin;
+  const ticketUrl = new URL(qrCodeUrl);
+  if (
+    ticketUrl.origin !== expectedOrigin ||
+    !ticketUrl.pathname.startsWith('/storage/v1/object/public/tickets/')
+  ) {
+    throw new Error('Ticket QR URL is outside the trusted storage bucket');
+  }
+
+  const response = await fetch(ticketUrl);
+  if (!response.ok) throw new Error('Ticket QR attachment could not be downloaded');
+
+  const content = Buffer.from(await response.arrayBuffer()).toString('base64');
+  return { content, name: `ticket-${ticketCode}.png` };
+}
+
+// Menghapus object yang baru diunggah hanya jika belum pernah berhasil direferensikan database.
+async function cleanupUnclaimedTicketObject(fileName: string): Promise<void> {
+  try {
+    const bucket = supabaseAdmin.storage.from(STORAGE_BUCKETS.tickets);
+    if (typeof bucket.remove === 'function') await bucket.remove([fileName]);
+  } catch {
+    // Cleanup terbaik tidak boleh menutupi error generation utama; job gagal tetap dapat diretry.
+  }
+}
 
 // Helper stub for S5-T4
 export async function triggerTicketEmailDelivery(registrationId: string) {
@@ -43,10 +79,12 @@ export async function triggerTicketEmailDelivery(registrationId: string) {
   `;
 
   // Brevo wrapper already enforces the 3-second hard timeout
+  const attachment = await getTicketQrAttachment(registration.qrCodeUrl, registration.ticketCode);
   await sendEmail({
     to: [{ email: registration.email, name: registration.name }],
     subject: `Your Ticket for ${event.name}`,
     htmlContent,
+    attachment: [attachment],
   });
   console.log(`Ticket email sent to ${registration.email}`);
 }
@@ -84,10 +122,16 @@ export async function GenerateTicketAction(registrationId: string) {
     return { status: 'already_generated', ticketCode: registration.ticketCode };
   }
 
+  const ticketJobClaim = await claimTicketGenerationJob(registrationId);
+  if (!ticketJobClaim.claimed) {
+    return { status: 'in_progress', ticketCode: null, qrCodeUrl: null };
+  }
+
   const maxRetries = 3;
   let attempt = 0;
   let finalTicketCode = '';
   let finalQrCodeUrl = '';
+  let uploadedFileName: string | null = null;
 
   while (attempt < maxRetries) {
     attempt++;
@@ -100,6 +144,7 @@ export async function GenerateTicketAction(registrationId: string) {
 
       // 6. Upload to Supabase Storage (bucket: tickets)
       const fileName = `${registrationId}-${ticketCode}.png`;
+      uploadedFileName = fileName;
       const { data, error } = await supabaseAdmin.storage
         .from(STORAGE_BUCKETS.tickets)
         .upload(fileName, qrBuffer, {
@@ -132,6 +177,8 @@ export async function GenerateTicketAction(registrationId: string) {
       });
 
       if (!updatedRegistration) {
+        await cleanupUnclaimedTicketObject(fileName);
+        uploadedFileName = null;
         const [existingRegistration] = await db
           .select({ ticketCode: registrations.ticketCode, qrCodeUrl: registrations.qrCodeUrl })
           .from(registrations)
@@ -147,8 +194,13 @@ export async function GenerateTicketAction(registrationId: string) {
 
       finalTicketCode = ticketCode;
       finalQrCodeUrl = publicUrl;
+      uploadedFileName = null;
       break; // Success, exit loop
     } catch (err: any) {
+      if (uploadedFileName) {
+        await cleanupUnclaimedTicketObject(uploadedFileName);
+        uploadedFileName = null;
+      }
       // Check if it's a unique constraint violation (Postgres error code 23505)
       // Drizzle might wrap the error, so check err.code and err.cause.code
       const errString = String(err) + (err.cause ? String(err.cause) : '');
@@ -161,17 +213,26 @@ export async function GenerateTicketAction(registrationId: string) {
       if (isUniqueViolation) {
         console.warn(`Ticket code collision on attempt ${attempt}. Retrying...`);
         if (attempt === maxRetries) {
-          throw new Error('Exceeded max retries for ticket generation due to collisions');
+          const exhaustedError = new Error('Exceeded max retries for ticket generation due to collisions');
+          await markTicketGenerationJobFailed(registrationId, exhaustedError);
+          throw exhaustedError;
         }
         continue;
       }
       // Re-throw other errors (e.g. storage failures, which rollback the transaction implicitly)
+      await markTicketGenerationJobFailed(registrationId, err);
       throw err;
     }
   }
 
   // 8. Trigger S5-T4
-  await triggerTicketEmailDelivery(registrationId);
+  try {
+    await triggerTicketEmailDelivery(registrationId);
+    await markTicketGenerationJobCompleted(registrationId);
+  } catch (error) {
+    await markTicketGenerationJobFailed(registrationId, error);
+    throw error;
+  }
 
   return { 
     status: 'success', 
