@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/db';
 import { registrations, events } from '@/db/schema';
-import { eq, and, ilike } from 'drizzle-orm';
+import { eq, and, sql } from 'drizzle-orm';
 
 export const runtime = 'nodejs';
 
@@ -42,8 +42,8 @@ export async function GET(request: Request) {
       .from(registrations)
       .where(and(
         eq(registrations.eventId, event.id),
-        ilike(registrations.name, cleanName),
-        ilike(registrations.email, cleanEmail)
+        sql`lower(${registrations.name}) = lower(${cleanName})`,
+        sql`lower(${registrations.email}) = lower(${cleanEmail})`
       ))
       .limit(1);
 

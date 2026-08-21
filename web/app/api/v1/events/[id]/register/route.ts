@@ -10,6 +10,25 @@ import { STORAGE_BUCKETS } from '@/lib/storage/buckets';
 
 export const runtime = 'nodejs';
 
+// Memproyeksikan hasil internal registration ke DTO aman untuk pemanggil publik.
+function toPublicRegistrationData(result: {
+  registrationId: string;
+  status: string;
+  reused: boolean;
+  ticketJobId: string | null;
+  ticketJobStatus: string | null;
+  resubmitToken: string | null;
+}) {
+  return {
+    registrationId: result.registrationId,
+    status: result.status,
+    reused: result.reused,
+    ticketJobId: result.ticketJobId,
+    ticketJobStatus: result.ticketJobStatus,
+    resubmitToken: result.resubmitToken,
+  };
+}
+
 export async function POST(req: NextRequest, props: { params: Promise<{ id: string }> }) {
   try {
     const params = await props.params;
@@ -125,9 +144,7 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
           status: 'error',
           message: 'Pendaftaran tersimpan, tetapi OTP belum dapat dikirim. Silakan kirim ulang formulir untuk membuat OTP baru.',
           data: {
-            registrationId: result.registrationId,
-            status: result.status,
-            resubmitToken: result.resubmitToken,
+            ...toPublicRegistrationData(result),
             otp_delivery: 'failed',
             retryable: true,
           },
@@ -145,12 +162,17 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
         return NextResponse.json({
           status: 'error',
           message: 'Pendaftaran diterima, tetapi pekerjaan penerbitan tiket gagal dikirim dan dapat dicoba ulang.',
-          data: { ...result, ticketJobId: job?.id || result.ticketJobId, ticketJobStatus: job?.status || 'failed', retryable: true },
+          data: {
+            ...toPublicRegistrationData(result),
+            ticketJobId: job?.id || result.ticketJobId,
+            ticketJobStatus: job?.status || 'failed',
+            retryable: true,
+          },
         }, { status: 503 });
       }
     }
 
-    return NextResponse.json({ status: 'success', data: result }, { status: 201 });
+    return NextResponse.json({ status: 'success', data: toPublicRegistrationData(result) }, { status: 201 });
   } catch (error: any) {
     if (error.message.includes('QuotaExceededException')) {
       return NextResponse.json({ status: 'error', message: error.message }, { status: 400 });

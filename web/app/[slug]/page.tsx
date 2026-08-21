@@ -23,7 +23,13 @@ export default async function PublicEventLandingPage(props: { params: Promise<{ 
       {/* Hero Event Poster (16:9 Aspect Ratio) */}
       <div className="w-full aspect-[16/9] relative overflow-hidden bg-surface-container-highest shadow-[0_4px_12px_rgba(0,0,0,0.05)]">
         {event.posterUrl ? (
-          <Image src={event.posterUrl} alt={event.name} fill className="object-cover" unoptimized={process.env.NODE_ENV === 'development'} />
+          <Image
+            src={event.posterUrl}
+            alt={event.name}
+            fill
+            className="object-cover"
+            unoptimized
+          />
         ) : (
           <div className="flex items-center justify-center w-full h-full absolute inset-0">
              <span className="text-secondary text-2xl font-bold opacity-80 px-4 text-center">{event.name}</span>

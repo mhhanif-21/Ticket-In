@@ -52,8 +52,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       .where(eq(formFields.eventId, event.id))
       .orderBy(asc(formFields.order));
 
-    const publicEvent = {
-      id: event.id,
+    const eventDetail = {
       name: event.name,
       slug: event.slug,
       description: event.description,
@@ -62,12 +61,19 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       posterUrl: event.posterUrl,
       capacity: event.capacity,
       registrationMode: event.registrationMode,
-      formFields: publicFormFields,
+      formFields: uuidRegex.test(id)
+        ? publicFormFields
+        : publicFormFields.map(({ id: _fieldId, ...field }) => field),
       public_registration_url: `${resolveBaseUrl(req)}/${event.slug}/register`,
       public_qr_code_url: `${resolveBaseUrl(req)}/api/v1/events/${event.slug}/qr`,
     };
 
-    return NextResponse.json({ status: 'success', data: publicEvent });
+    // UUID adalah kontrak detail Admin yang dijaga middleware; slug adalah DTO publik.
+    const responseData = uuidRegex.test(id)
+      ? { id: event.id, ...eventDetail }
+      : eventDetail;
+
+    return NextResponse.json({ status: 'success', data: responseData });
   } catch (error: any) {
     console.error('Error fetching event details:', error);
     return NextResponse.json(

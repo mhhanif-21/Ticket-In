@@ -4,6 +4,15 @@ import { createClient } from '@supabase/supabase-js';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+const uuidPathSegment = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function isPublicEventSlug(segment: string) {
+  try {
+    return !uuidPathSegment.test(decodeURIComponent(segment));
+  } catch {
+    return false;
+  }
+}
 
 export async function middleware(req: NextRequest) {
   const url = req.nextUrl;
@@ -66,14 +75,18 @@ export async function middleware(req: NextRequest) {
       return NextResponse.next();
     }
 
-    // Lewati endpoint autentikasi, status pengecekan (public), dan form registrasi (public)
+    const eventDetailMatch = url.pathname.match(/^\/api\/v1\/events\/([^/]+)$/);
+    const isPublicEventSlugDetail = Boolean(eventDetailMatch && isPublicEventSlug(eventDetailMatch[1]));
+
+    // Lewati endpoint autentikasi, status pengecekan (public), dan form registrasi (public).
+    // Detail event berbasis UUID adalah kontrak Admin; detail berbasis slug adalah DTO publik.
     if (
       url.pathname.startsWith('/api/v1/auth/') ||
       url.pathname.includes('/status') ||
       url.pathname.match(/^\/api\/v1\/events\/[^\/]+\/register$/) ||
       url.pathname.match(/^\/api\/v1\/events\/[^\/]+\/qr$/) ||
       url.pathname.match(/^\/api\/v1\/registrations\/[^\/]+\/verify-otp$/) ||
-      (url.pathname.match(/^\/api\/v1\/events\/[^\/]+$/) && req.method === 'GET')
+      (isPublicEventSlugDetail && req.method === 'GET')
     ) {
       return NextResponse.next();
     }
