@@ -1,16 +1,19 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/db';
 import { exportJobs, registrations } from '@/db/schema';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { readVerifiedQStashBody } from '@/lib/security/qstash';
 
-function toCSV(data: any[]) {
+const STANDARD_HEADERS = ['ID', 'Name', 'Email', 'Status', 'Ticket Code', 'Presence', 'Registered At'];
+
+function toCSV(data: Record<string, unknown>[]) {
   if (data.length === 0) return '';
 
-  // Extract all unique headers including custom ones
-  const headerSet = new Set<string>();
-  data.forEach(row => Object.keys(row).forEach(k => headerSet.add(k)));
-  const headers = Array.from(headerSet);
+  // Menjaga seluruh kolom standar tetap stabil lalu menambahkan custom header terurut.
+  const customHeaders = Array.from(new Set(
+    data.flatMap((row) => Object.keys(row).filter((header) => !STANDARD_HEADERS.includes(header)))
+  )).sort((left, right) => left.localeCompare(right));
+  const headers = [...STANDARD_HEADERS, ...customHeaders];
 
   const rows = data.map(row =>
     headers.map(header => JSON.stringify(row[header] ?? '')).join(',')
@@ -32,8 +35,34 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Missing job_id or event_id' }, { status: 400 });
     }
 
-    // Update job to processing
-    await db.update(exportJobs).set({ status: 'processing' }).where(eq(exportJobs.id, job_id));
+    // Job harus dimiliki event payload sebelum state atau data event mana pun dimutasi.
+    const [job] = await db
+      .select()
+      .from(exportJobs)
+      .where(and(eq(exportJobs.id, job_id), eq(exportJobs.eventId, event_id)))
+      .limit(1);
+
+    if (!job) {
+      return NextResponse.json({ error: 'Export job tidak ditemukan untuk event ini' }, { status: 404 });
+    }
+
+    if (job.status === 'completed') {
+      return NextResponse.json({ status: 'success', data: { job_id, status: job.status } });
+    }
+
+    const [claimedJob] = await db
+      .update(exportJobs)
+      .set({ status: 'processing' })
+      .where(and(
+        eq(exportJobs.id, job_id),
+        eq(exportJobs.eventId, event_id),
+        eq(exportJobs.status, 'pending'),
+      ))
+      .returning({ id: exportJobs.id });
+
+    if (!claimedJob) {
+      return NextResponse.json({ status: 'success', data: { job_id, status: job.status } });
+    }
 
     // Fetch registrations
     const regs = await db.select().from(registrations).where(eq(registrations.eventId, event_id));
@@ -50,9 +79,11 @@ export async function POST(request: Request) {
         'Registered At': reg.createdAt.toISOString()
       };
 
-      let customAnswers = {};
+      const customAnswers: Record<string, unknown> = {};
       if (reg.answers && typeof reg.answers === 'object') {
-        customAnswers = reg.answers;
+        for (const [label, value] of Object.entries(reg.answers as Record<string, unknown>)) {
+          customAnswers[`Custom: ${label}`] = value;
+        }
       }
 
       return { ...base, ...customAnswers };
@@ -68,7 +99,7 @@ export async function POST(request: Request) {
     await db.update(exportJobs).set({
       status: 'completed',
       fileUrl: fileUrl
-    }).where(eq(exportJobs.id, job_id));
+    }).where(and(eq(exportJobs.id, job_id), eq(exportJobs.eventId, event_id), eq(exportJobs.status, 'processing')));
 
     return NextResponse.json({ status: 'success' });
   } catch (error) {
