@@ -62,6 +62,7 @@ export async function POST(req: Request) {
       description: description || null,
       registrationMode: mode,
       volunteerPinHash: '', // Dummy for now, generated in S3-T4
+      status: 'Draft',
     }).returning();
 
     return NextResponse.json(

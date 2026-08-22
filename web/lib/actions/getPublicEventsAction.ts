@@ -1,4 +1,4 @@
-import { asc } from 'drizzle-orm';
+import { asc, eq } from 'drizzle-orm';
 import { db } from '../../db';
 import { events } from '../../db/schema';
 
@@ -19,5 +19,6 @@ export async function getPublicEventsAction() {
       capacity: events.capacity,
     })
     .from(events)
+    .where(eq(events.status, 'Published'))
     .orderBy(asc(events.date));
 }

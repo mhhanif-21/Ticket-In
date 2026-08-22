@@ -50,6 +50,13 @@
       "when": 1787151814160,
       "tag": "0006_check-in-log-constraints",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1787365700555,
+      "tag": "0007_batch4_lifecycle-export-labels",
+      "breakpoints": true
     }
   ]
 }

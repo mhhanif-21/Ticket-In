@@ -1,19 +1,17 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/db';
 import { events, formFields } from '@/db/schema';
-import { asc, eq } from 'drizzle-orm';
+import { and, asc, eq } from 'drizzle-orm';
+import { getCanonicalBaseUrl } from '@/lib/security/url';
+import { getRegistrationFieldKey } from '@/lib/validation/registrationForm';
+import {
+  EventLifecycleError,
+  canTransitionEventStatus,
+  normalizeEventStatus,
+} from '@/lib/events/eventLifecycle';
 
 export const runtime = 'nodejs';
 const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-function resolveBaseUrl(req: Request): string {
-  // Pakai NEXT_PUBLIC_APP_URL jika di-set, fallback ke Host header dari request
-  const envUrl = process.env.NEXT_PUBLIC_APP_URL;
-  if (envUrl) return envUrl.replace(/\/$/, '');
-  const host = req.headers.get('host') || 'localhost:3000';
-  const proto = req.headers.get('x-forwarded-proto') || 'https';
-  return `${proto}://${host}`;
-}
 
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -30,9 +28,12 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
         posterUrl: events.posterUrl,
         capacity: events.capacity,
         registrationMode: events.registrationMode,
+        status: events.status,
       })
       .from(events)
-      .where(uuidRegex.test(id) ? eq(events.id, id) : eq(events.slug, id))
+      .where(uuidRegex.test(id)
+        ? eq(events.id, id)
+        : and(eq(events.slug, id), eq(events.status, 'Published')))
       .limit(1);
 
     if (!event) {
@@ -52,6 +53,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       .where(eq(formFields.eventId, event.id))
       .orderBy(asc(formFields.order));
 
+    const canonicalBaseUrl = getCanonicalBaseUrl(req);
+
     const eventDetail = {
       name: event.name,
       slug: event.slug,
@@ -61,11 +64,19 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       posterUrl: event.posterUrl,
       capacity: event.capacity,
       registrationMode: event.registrationMode,
+      status: event.status,
       formFields: uuidRegex.test(id)
         ? publicFormFields
-        : publicFormFields.map(({ id: _fieldId, ...field }) => field),
-      public_registration_url: `${resolveBaseUrl(req)}/${event.slug}/register`,
-      public_qr_code_url: `${resolveBaseUrl(req)}/api/v1/events/${event.slug}/qr`,
+        : publicFormFields.map((field) => ({
+          fieldName: field.fieldName,
+          fieldType: field.fieldType,
+          isRequired: field.isRequired,
+          options: field.options,
+          order: field.order,
+          fieldKey: getRegistrationFieldKey({ order: field.order }),
+        })),
+      public_registration_url: `${canonicalBaseUrl}/${event.slug}/register`,
+      public_qr_code_url: `${canonicalBaseUrl}/api/v1/events/${event.slug}/qr`,
     };
 
     // UUID adalah kontrak detail Admin yang dijaga middleware; slug adalah DTO publik.
@@ -91,31 +102,42 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     }
 
     const { id } = await params;
-    const body = await req.json();
+    const body = await req.json() as Record<string, unknown>;
 
     const [existing] = await db.select().from(events).where(eq(events.id, id));
     if (!existing) {
       return NextResponse.json({ status: 'error', message: 'Event tidak ditemukan' }, { status: 404 });
     }
 
-    const updateData: any = {};
-    if (body.name !== undefined) updateData.name = body.name;
-    if (body.description !== undefined) updateData.description = body.description;
-    if (body.location !== undefined) updateData.location = body.location;
-    if (body.date !== undefined) updateData.date = new Date(body.date);
-    if (body.capacity !== undefined) updateData.capacity = parseInt(body.capacity, 10);
+    const updateData: Partial<typeof events.$inferInsert> = {};
+    if (typeof body.name === 'string') updateData.name = body.name;
+    if (body.description === null || typeof body.description === 'string') updateData.description = body.description;
+    if (typeof body.location === 'string') updateData.location = body.location;
+    if (typeof body.date === 'string') updateData.date = new Date(body.date);
+    if (body.capacity !== undefined) updateData.capacity = parseInt(String(body.capacity), 10);
     if (body.registration_mode !== undefined) {
       if (body.registration_mode !== 'Auto-Accept' && body.registration_mode !== 'Manual Review') {
         return NextResponse.json({ status: 'error', message: 'Registration mode tidak valid' }, { status: 400 });
       }
-      updateData.registrationMode = body.registration_mode;
+      updateData.registrationMode = body.registration_mode as 'Auto-Accept' | 'Manual Review';
     }
-    // BUG-I FIX: Izinkan update status acara (Active/Cancelled)
     if (body.status !== undefined) {
-      if (!['Active', 'Cancelled', 'Draft'].includes(body.status)) {
-        return NextResponse.json({ status: 'error', message: 'Status acara tidak valid' }, { status: 400 });
+      let nextStatus;
+      try {
+        nextStatus = normalizeEventStatus(body.status);
+      } catch (error) {
+        if (error instanceof EventLifecycleError) {
+          return NextResponse.json({ status: 'error', message: error.message }, { status: 400 });
+        }
+        throw error;
       }
-      updateData.status = body.status;
+      if (!canTransitionEventStatus(existing.status, nextStatus)) {
+        return NextResponse.json({
+          status: 'error',
+          message: `Transisi status acara dari ${existing.status} ke ${nextStatus} tidak diizinkan`,
+        }, { status: 409 });
+      }
+      updateData.status = nextStatus;
     }
 
     updateData.updatedAt = new Date();

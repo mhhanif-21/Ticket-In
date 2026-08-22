@@ -27,11 +27,17 @@ export const events = pgTable(
     capacity: integer('capacity').notNull(),
     registrationMode: varchar('registration_mode', { length: 50 }).notNull(), // Auto-Accept, Manual Review
     volunteerPinHash: varchar('volunteer_pin_hash', { length: 255 }).notNull(),
+    status: varchar('status', { length: 20 }).notNull().default('Draft'), // Draft, Published, Cancelled
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
   },
   (table) => ({
     slugIdx: index('events_slug_idx').on(table.slug),
+    statusIdx: index('events_status_idx').on(table.status),
+    statusCheck: check(
+      'events_status_check',
+      sql`${table.status} IN ('Draft', 'Published', 'Cancelled')`,
+    ),
   })
 );
 
@@ -73,6 +79,7 @@ export const registrations = pgTable(
     name: varchar('name', { length: 255 }).notNull(),
     email: varchar('email', { length: 255 }).notNull(),
     answers: jsonb('answers'), // user's answers to the form fields
+    answerFieldLabels: jsonb('answer_field_labels'), // immutable label snapshot keyed by public field key
     status: varchar('status', { length: 50 }).notNull(), // Draft, Pending, Accepted, Rejected
     ticketCode: varchar('ticket_code', { length: 8 }).unique(),
     qrCodeUrl: text('qr_code_url'),
@@ -242,10 +249,22 @@ export const exportJobs = pgTable('export_jobs', {
   eventId: uuid('event_id')
     .notNull()
     .references(() => events.id, { onDelete: 'cascade' }),
-  status: varchar('status', { length: 50 }).notNull(), // pending, processing, completed, failed
+  status: varchar('status', { length: 50 }).notNull(), // pending, publishing, published, processing, completed, failed
   fileUrl: text('file_url'),
+  attempts: integer('attempts').default(0).notNull(),
+  qstashMessageId: varchar('qstash_message_id', { length: 255 }),
+  lastError: text('last_error'),
+  publishedAt: timestamp('published_at'),
+  completedAt: timestamp('completed_at'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
-});
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  statusIdx: index('export_jobs_status_idx').on(table.status),
+  statusCheck: check(
+    'export_jobs_status_check',
+    sql`${table.status} IN ('pending', 'publishing', 'published', 'processing', 'completed', 'failed')`,
+  ),
+}));
 
 export const exportJobsRelations = relations(exportJobs, ({ one }) => ({
   event: one(events, {

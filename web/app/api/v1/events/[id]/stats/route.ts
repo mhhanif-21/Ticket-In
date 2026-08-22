@@ -16,7 +16,8 @@ export async function GET(request: Request, props: { params: Promise<{ id: strin
       capacity: events.capacity,
       name: events.name,
       date: events.date,
-      posterUrl: events.posterUrl
+      posterUrl: events.posterUrl,
+      status: events.status,
     })
       .from(events)
       .where(eq(events.id, eventId))
@@ -58,6 +59,7 @@ export async function GET(request: Request, props: { params: Promise<{ id: strin
         name: eventData.name,
         date: eventData.date,
         posterUrl: eventData.posterUrl,
+        status: eventData.status,
         total_capacity: eventData.capacity,
         pending: pendingResult[0].value,
         accepted: acceptedResult[0].value,

@@ -15,9 +15,10 @@ export async function getPublicEventAction(slug: string) {
       posterUrl: events.posterUrl,
       capacity: events.capacity,
       registrationMode: events.registrationMode,
+      status: events.status,
     })
     .from(events)
-    .where(eq(events.slug, slug))
+    .where(and(eq(events.slug, slug), eq(events.status, 'Published')))
     .limit(1);
 
   if (eventRecords.length === 0) {
