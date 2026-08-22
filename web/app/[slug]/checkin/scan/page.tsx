@@ -3,6 +3,9 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { Html5Qrcode, Html5QrcodeSupportedFormats, Html5QrcodeCameraScanConfig } from 'html5-qrcode';
 import { RefreshCcw, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
+import { getScanFeedbackDismissMs, type ScanFeedbackStatus } from '@/lib/checkin/scanFeedback';
+
+type ScanTicketHandler = (ticketCode: string, method?: string) => Promise<void>;
 
 export default function WebScannerPage() {
   const [facingMode, setFacingMode] = useState<'environment' | 'user'>('environment');
@@ -21,7 +24,8 @@ export default function WebScannerPage() {
   const isComponentMounted = useRef(true);
   const isTransitioningRef = useRef(false);
   const isProcessingRef = useRef(false);
-  const observerRef = useRef<MutationObserver | null>(null);
+  const dismissTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const handleScannedTicketRef = useRef<ScanTicketHandler | null>(null);
 
   // Sync ref with state
   useEffect(() => {
@@ -50,15 +54,14 @@ export default function WebScannerPage() {
       // Explicitly ask for camera permission first to avoid silent failures
       try {
         await Html5Qrcode.getCameras();
-      } catch (camErr: any) {
+      } catch {
         throw new Error('Permission denied or no cameras found');
       }
 
       const config: Html5QrcodeCameraScanConfig = {
         fps: 10,
-        // Bug 8 FIX: Hapus qrbox — library resize container sesuai qrbox sehingga
-        // video hanya cover sebagian. Tanpa qrbox = scan full frame, video fill penuh.
-        aspectRatio: 1.333, // 4:3 portrait
+        // Do not constrain the camera stream to a second aspect ratio. The
+        // surface owns the display geometry and object-fit: cover fills it.
       };
 
       await scannerRef.current.start(
@@ -66,13 +69,15 @@ export default function WebScannerPage() {
         config,
         async (decodedText) => {
           if (isProcessingRef.current) return;
-          handleScannedTicket(decodedText, 'Camera');
+          void handleScannedTicketRef.current?.(decodedText, 'Camera');
         },
         () => {}
       );
       setHasCameras(true);
-    } catch (err: any) {
-      if (err?.name === 'NotAllowedError' || err?.message?.includes('Permission denied')) {
+    } catch (err) {
+      const errorName = typeof err === 'object' && err !== null && 'name' in err ? String(err.name) : '';
+      const errorMessage = typeof err === 'object' && err !== null && 'message' in err ? String(err.message) : '';
+      if (errorName === 'NotAllowedError' || errorMessage.includes('Permission denied')) {
         setCameraError('Akses kamera ditolak. Mohon izinkan kamera pada browser.');
         setHasCameras(false);
       } else if (facingMode === 'environment') {
@@ -86,55 +91,6 @@ export default function WebScannerPage() {
     }
   }, [facingMode]);
 
-  // Fix kamera: MutationObserver paksa #qr-reader dan children fill container
-  // html5-qrcode inject inline style width/height via JS — CSS !important tidak cukup
-  useEffect(() => {
-    const forceFullSize = () => {
-      const reader = document.getElementById('qr-reader');
-      if (!reader) return;
-      reader.style.setProperty('width', '100%', 'important');
-      reader.style.setProperty('height', '100%', 'important');
-      reader.style.setProperty('padding', '0', 'important');
-      reader.style.setProperty('border', 'none', 'important');
-      const scanRegion = reader.querySelector('#qr-reader__scan_region') as HTMLElement | null;
-      if (scanRegion) {
-        scanRegion.style.setProperty('width', '100%', 'important');
-        scanRegion.style.setProperty('height', '100%', 'important');
-        scanRegion.style.setProperty('position', 'absolute', 'important');
-        scanRegion.style.setProperty('top', '0', 'important');
-        scanRegion.style.setProperty('left', '0', 'important');
-      }
-      const video = reader.querySelector('video') as HTMLVideoElement | null;
-      if (video) {
-        video.style.setProperty('width', '100%', 'important');
-        video.style.setProperty('height', '100%', 'important');
-        video.style.setProperty('object-fit', 'cover', 'important');
-        video.style.setProperty('position', 'absolute', 'important');
-        video.style.setProperty('top', '0', 'important');
-        video.style.setProperty('left', '0', 'important');
-      }
-      // Sembunyikan elemen UI default library
-      const dashboard = reader.querySelector('#qr-reader__dashboard') as HTMLElement | null;
-      if (dashboard) dashboard.style.setProperty('display', 'none', 'important');
-      const headerMsg = reader.querySelector('#qr-reader__header_message') as HTMLElement | null;
-      if (headerMsg) headerMsg.style.setProperty('display', 'none', 'important');
-    };
-
-    if (observerRef.current) observerRef.current.disconnect();
-    observerRef.current = new MutationObserver(forceFullSize);
-    const reader = document.getElementById('qr-reader');
-    if (reader) {
-      observerRef.current.observe(reader, { childList: true, subtree: true, attributes: true, attributeFilter: ['style'] });
-    }
-    // Juga run sekali setelah scanner mulai
-    const t = setTimeout(forceFullSize, 500);
-
-    return () => {
-      clearTimeout(t);
-      observerRef.current?.disconnect();
-    };
-  }, [hasCameras]);
-
   useEffect(() => {
     isComponentMounted.current = true;
 
@@ -147,6 +103,10 @@ export default function WebScannerPage() {
     return () => {
       isComponentMounted.current = false;
       clearTimeout(timer);
+      if (dismissTimerRef.current !== null) {
+        clearTimeout(dismissTimerRef.current);
+        dismissTimerRef.current = null;
+      }
       if (scannerRef.current?.isScanning && !isTransitioningRef.current) {
         isTransitioningRef.current = true;
         scannerRef.current.stop().catch(console.error).finally(() => {
@@ -156,9 +116,15 @@ export default function WebScannerPage() {
     };
   }, [startScanner]);
 
-  const handleScannedTicket = async (ticketCode: string, method: string = 'Manual') => {
+  const handleScannedTicket = useCallback(async (ticketCode: string, method: string = 'Manual') => {
     if (isProcessingRef.current) return;
     setIsProcessing(true);
+
+    let resultStatus: ScanFeedbackStatus = 'invalid';
+    if (dismissTimerRef.current !== null) {
+      clearTimeout(dismissTimerRef.current);
+      dismissTimerRef.current = null;
+    }
 
     try {
       if (scannerRef.current?.isScanning && !isTransitioningRef.current) {
@@ -181,25 +147,28 @@ export default function WebScannerPage() {
       const data = await res.json();
 
       if (res.status === 200) {
+        resultStatus = 'success';
         setScanResult({
           status: 'success',
           title: `${data.data.participant_name || ticketCode} is Present!`,
           subtitle: 'Check-in Sukses'
         });
       } else if (res.status === 409) {
+        resultStatus = 'duplicate';
         setScanResult({
           status: 'duplicate',
           title: 'Gagal: Peserta Sudah Hadir (Duplikat)',
           subtitle: 'Invalid Entry'
         });
       } else {
+        resultStatus = 'invalid';
         setScanResult({
           status: 'invalid',
           title: 'Gagal: Tiket Tidak Ditemukan/Tidak Valid',
           subtitle: 'Invalid Entry'
         });
       }
-    } catch (err: any) {
+    } catch {
       setScanResult({
         status: 'invalid',
         title: 'Terjadi kesalahan jaringan',
@@ -207,7 +176,8 @@ export default function WebScannerPage() {
       });
     }
 
-    setTimeout(() => {
+    dismissTimerRef.current = setTimeout(() => {
+      dismissTimerRef.current = null;
       if (!isComponentMounted.current) return;
       setScanResult(null);
       setIsProcessing(false);
@@ -218,8 +188,16 @@ export default function WebScannerPage() {
       } catch (e) {
         console.error('Failed to resume scanner', e);
       }
-    }, 2000);
-  };
+    }, getScanFeedbackDismissMs(resultStatus));
+  }, []);
+
+  useEffect(() => {
+    handleScannedTicketRef.current = handleScannedTicket;
+
+    return () => {
+      handleScannedTicketRef.current = null;
+    };
+  }, [handleScannedTicket]);
 
   const handleManualSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -248,24 +226,35 @@ export default function WebScannerPage() {
         .flash-error { animation: flash-red 0.3s ease-out; }
         @keyframes flash-green { 0% { background-color: rgba(22, 163, 74, 0.4); } 100% { background-color: transparent; } }
         @keyframes flash-red { 0% { background-color: rgba(186, 26, 26, 0.4); } 100% { background-color: transparent; } }
-        /* Bug 8 FIX: Force semua elemen html5-qrcode fill container penuh */
+        /* Keep the library's generated surface inside one stable full-bleed box. */
         #qr-reader {
+          position: absolute !important;
+          inset: 0 !important;
           width: 100% !important;
           height: 100% !important;
+          max-width: none !important;
           border: none !important;
           padding: 0 !important;
-        }
-        #qr-reader video {
-          width: 100% !important;
-          height: 100% !important;
-          object-fit: cover !important;
-          position: absolute !important;
-          top: 0 !important;
-          left: 0 !important;
+          margin: 0 !important;
+          overflow: hidden !important;
         }
         #qr-reader__scan_region {
+          position: absolute !important;
+          inset: 0 !important;
           width: 100% !important;
           height: 100% !important;
+          max-width: none !important;
+          margin: 0 !important;
+          padding: 0 !important;
+          border: none !important;
+          overflow: hidden !important;
+        }
+        #qr-reader video {
+          display: block !important;
+          width: 100% !important;
+          height: 100% !important;
+          max-width: none !important;
+          object-fit: cover !important;
           position: absolute !important;
           top: 0 !important;
           left: 0 !important;
@@ -284,7 +273,7 @@ export default function WebScannerPage() {
         {/* Viewfinder */}
         <div
           id="viewfinder"
-          className={`relative w-full max-w-md aspect-[3/4] rounded-xl overflow-hidden shadow-[0_4px_12px_rgba(0,0,0,0.5)] flex items-center justify-center
+          className={`relative w-full max-w-md aspect-[3/4] landscape:aspect-[4/3] rounded-xl overflow-hidden shadow-[0_4px_12px_rgba(0,0,0,0.5)] flex items-center justify-center
             bg-surface-variant dark:bg-[#1e1e1e] border border-outline-variant dark:border-white/10
             ${scanResult?.status === 'success' ? 'flash-success' : scanResult ? 'flash-error' : ''}`}
         >

@@ -47,7 +47,7 @@ export default async function PublicEventLandingPage(props: { params: Promise<{ 
             <div className="inline-flex items-center px-3 py-1 bg-primary text-on-primary font-label-caps text-label-caps rounded-full uppercase tracking-wider mb-2">
               Event {event.registrationMode === 'Auto-Accept' ? 'Terbuka' : 'Premium'}
             </div>
-            <h2 className="font-display-lg-mobile md:font-display-lg text-display-lg-mobile md:text-display-lg text-primary leading-tight">
+            <h2 className="font-display-lg-mobile md:font-display-lg text-display-lg-mobile md:text-display-lg text-primary dark:text-white leading-tight">
               {event.name}
             </h2>
           </div>
@@ -90,7 +90,7 @@ export default async function PublicEventLandingPage(props: { params: Promise<{ 
         {/* Call to Action Actions */}
         <div className="flex flex-col gap-stack-md pt-4">
           {event.isFull ? (
-             <div className="w-full bg-surface-container-highest text-on-surface hover:bg-surface-variant rounded-[10px] py-4 px-6 font-body-md text-body-md font-semibold flex items-center justify-center gap-2">
+             <div className="w-full bg-surface-container-highest dark:bg-[#2a2a2a] text-on-surface dark:text-white hover:bg-surface-variant dark:hover:bg-[#333333] rounded-[10px] py-4 px-6 font-body-md text-body-md font-semibold flex items-center justify-center gap-2">
                Pendaftaran Ditutup (Kuota Penuh)
              </div>
           ) : (
@@ -99,7 +99,7 @@ export default async function PublicEventLandingPage(props: { params: Promise<{ 
               <span className="material-symbols-outlined text-[20px]">arrow_forward</span>
             </Link>
           )}
-          <Link href={`/${params.slug}/status`} className="btn-interact w-full bg-transparent text-primary border border-primary hover:bg-surface-container-low rounded-[10px] py-4 px-6 font-body-md text-body-md font-medium flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2">
+          <Link href={`/${params.slug}/status`} className="btn-interact w-full bg-transparent text-primary dark:text-white border border-primary dark:border-white/70 hover:bg-surface-container-low dark:hover:bg-white/10 rounded-[10px] py-4 px-6 font-body-md text-body-md font-medium flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-white focus:ring-offset-2 dark:focus:ring-offset-[#0a0a0a]">
             {event.registrationMode === 'Manual Review' ? 'Cek Status / Belum dapat email OTP?' : 'Sudah Daftar? Cek Tiket'}
           </Link>
         </div>

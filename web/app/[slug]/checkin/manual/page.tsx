@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import { Keyboard, ArrowLeft, Send, CheckCircle2, XCircle, Loader2, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
+import { getScanFeedbackDismissMs, type ScanFeedbackStatus } from '@/lib/checkin/scanFeedback';
 
 export default function ManualCheckInPage() {
   const params = useParams();
@@ -20,11 +21,30 @@ export default function ManualCheckInPage() {
   }>({ status: 'idle', message: '' });
 
   const inputRef = useRef<HTMLInputElement>(null);
+  const dismissTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Focus input on mount and after submission
   useEffect(() => {
     inputRef.current?.focus();
+
+    return () => {
+      if (dismissTimerRef.current !== null) {
+        clearTimeout(dismissTimerRef.current);
+        dismissTimerRef.current = null;
+      }
+    };
   }, []);
+
+  const scheduleDismiss = (status: ScanFeedbackStatus) => {
+    if (dismissTimerRef.current !== null) {
+      clearTimeout(dismissTimerRef.current);
+    }
+
+    dismissTimerRef.current = setTimeout(() => {
+      dismissTimerRef.current = null;
+      setScanResult({ status: 'idle', message: '' });
+    }, getScanFeedbackDismissMs(status));
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -32,6 +52,7 @@ export default function ManualCheckInPage() {
 
     setLoading(true);
     setScanResult({ status: 'idle', message: '' });
+    let resultStatus: ScanFeedbackStatus = 'invalid';
 
     try {
       const res = await fetch('/api/v1/checkin/scan', {
@@ -49,12 +70,14 @@ export default function ManualCheckInPage() {
       const data = await res.json();
 
       if (res.status === 200) {
+        resultStatus = 'success';
         setScanResult({
           status: 'success',
           message: 'Check-in Berhasil',
           details: `${data.data.participant_name} - ${data.data.ticket_code}`
         });
       } else if (res.status === 409) {
+        resultStatus = 'duplicate';
         const firstScan = new Date(data.data.first_scanned_at).toLocaleString('id-ID');
         setScanResult({
           status: 'duplicate',
@@ -62,6 +85,7 @@ export default function ManualCheckInPage() {
           details: `Pertama scan: ${firstScan}`
         });
       } else {
+        resultStatus = 'invalid';
         setScanResult({
           status: 'invalid',
           message: data.message || 'Tiket Tidak Sah',
@@ -70,19 +94,15 @@ export default function ManualCheckInPage() {
 
       setTicketCode('');
       
-      // Auto dismiss
-      setTimeout(() => {
-        setScanResult({ status: 'idle', message: '' });
-      }, 4000);
+      scheduleDismiss(resultStatus);
 
-    } catch (err: any) {
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Terjadi kesalahan jaringan';
       setScanResult({
         status: 'invalid',
-        message: err.message || 'Terjadi kesalahan jaringan'
+        message
       });
-      setTimeout(() => {
-        setScanResult({ status: 'idle', message: '' });
-      }, 4000);
+      scheduleDismiss('invalid');
     } finally {
       setLoading(false);
       inputRef.current?.focus();
