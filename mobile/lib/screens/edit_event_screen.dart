@@ -114,7 +114,8 @@ class _EditEventScreenState extends State<EditEventScreen> {
       final data = {
         'name': _nameController.text,
         'location': _locationController.text,
-        'capacity': int.parse(_capacityController.text),
+        // [MOB-BUG-007] FIX: int.tryParse agar tidak crash FormatException
+        'capacity': int.tryParse(_capacityController.text) ?? 0,
         'date': _selectedDate!.toIso8601String(),
         'description': _descriptionController.text,
         'registration_mode': _selectedMode,
@@ -239,7 +240,7 @@ class _EditEventScreenState extends State<EditEventScreen> {
       body: _isLoading 
         ? const Center(child: CircularProgressIndicator(color: primaryColor))
         : SingleChildScrollView(
-            padding: const EdgeInsets.only(left: 20, right: 20, top: 20, bottom: 100),
+            padding: const EdgeInsets.only(left: 20, right: 20, top: 20, bottom: 20),
             child: Form(
               key: _formKey,
               child: Column(
@@ -316,7 +317,14 @@ class _EditEventScreenState extends State<EditEventScreen> {
                     icon: Icons.group,
                     keyboardType: TextInputType.number,
                     controller: _capacityController,
-                    validator: (v) => v!.isEmpty ? 'Harus diisi' : null,
+                    // [MOB-BUG-007] FIX: Validasi kapasitas komprehensif (seperti di CreateEventScreen)
+                    validator: (v) {
+                      if (v == null || v.isEmpty) return 'Harus diisi';
+                      final parsed = int.tryParse(v);
+                      if (parsed == null) return 'Harus berupa angka (misal: 100)';
+                      if (parsed <= 0) return 'Kuota harus lebih dari 0';
+                      return null;
+                    },
                   ),
                   const SizedBox(height: 16),
                   
@@ -380,34 +388,37 @@ class _EditEventScreenState extends State<EditEventScreen> {
               ),
             ),
           ),
-      bottomSheet: _isLoading ? null : SafeArea(
-        top: false,
-        maintainBottomViewPadding: true,
-        child: Container(
-          key: const ValueKey('edit-event-bottom-action'),
-          padding: const EdgeInsets.all(16),
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            border: Border(top: BorderSide(color: Color(0xFFC1C8C0))),
-          ),
-          child: SizedBox(
-            width: double.infinity,
-            height: 48,
-            child: ElevatedButton(
-              onPressed: _submit,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: primaryContainerColor,
-                foregroundColor: onPrimaryContainerColor,
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
+      // [MOB-BUG-004] FIX: bottomNavigationBar otomatis handle system insets (bukan bottomSheet)
+      // [MOB-BUG-012] FIX: Container di luar SafeArea agar warna solid sampai tepi layar
+      bottomNavigationBar: _isLoading ? null : Container(
+        key: const ValueKey('edit-event-bottom-action'),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          border: Border(top: BorderSide(color: Color(0xFFC1C8C0))),
+        ),
+        child: SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: ElevatedButton(
+                onPressed: _submit,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: primaryContainerColor,
+                  foregroundColor: onPrimaryContainerColor,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
                 ),
-              ),
-              child: const Text(
-                'Simpan Perubahan',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
+                child: const Text(
+                  'Simpan Perubahan',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
             ),

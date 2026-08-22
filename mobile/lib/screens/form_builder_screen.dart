@@ -490,41 +490,43 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
         foregroundColor: const Color(0xFF163B24),
         child: const Icon(Icons.add),
       ),
-      bottomNavigationBar: SafeArea(
-        top: false,
-        maintainBottomViewPadding: true,
-        child: Container(
-          key: const ValueKey('form-builder-bottom-action'),
-          padding: const EdgeInsets.all(16),
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            border: Border(top: BorderSide(color: Color(0xFFC1C8C0))),
-          ),
-          child: SizedBox(
-            width: double.infinity,
-            height: 48,
-            child: ElevatedButton(
-              onPressed: _isLoading ? null : _saveFields,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: primaryColor,
-                foregroundColor: Colors.white,
-                disabledBackgroundColor: primaryColor.withOpacity(0.35),
-                disabledForegroundColor: Colors.white70,
-                elevation: 0,
-                padding: EdgeInsets.zero,
-                minimumSize: const Size(72, 48),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      // [MOB-BUG-012] FIX: Container di luar SafeArea agar warna solid sampai tepi layar
+      bottomNavigationBar: Container(
+        key: const ValueKey('form-builder-bottom-action'),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          border: Border(top: BorderSide(color: Color(0xFFC1C8C0))),
+        ),
+        child: SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: ElevatedButton(
+                onPressed: _isLoading ? null : _saveFields,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: primaryColor,
+                  foregroundColor: Colors.white,
+                  disabledBackgroundColor: primaryColor.withOpacity(0.35),
+                  disabledForegroundColor: Colors.white70,
+                  elevation: 0,
+                  padding: EdgeInsets.zero,
+                  minimumSize: const Size(72, 48),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+                child: _isLoading
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                      )
+                    : const Text(
+                        'Simpan',
+                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                      ),
               ),
-              child: _isLoading
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                    )
-                  : const Text(
-                      'Simpan',
-                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-                    ),
             ),
           ),
         ),

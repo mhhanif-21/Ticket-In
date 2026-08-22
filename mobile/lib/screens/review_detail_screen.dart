@@ -145,45 +145,48 @@ class _ReviewDetailScreenState extends State<ReviewDetailScreen> {
           ],
         ),
       ),
-      bottomNavigationBar: SafeArea(
-        maintainBottomViewPadding: true,
-        child: Container(
-          key: const ValueKey('review-detail-bottom-action'),
-          padding: const EdgeInsets.all(16),
-          decoration: const BoxDecoration(
-            color: AppColors.surface,
-            border: Border(top: BorderSide(color: AppColors.outlineVariant)),
-          ),
-          child: Row(
-            children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: _isProcessing ? null : () => _updateStatus('Rejected'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: AppColors.error,
-                    side: const BorderSide(color: AppColors.error),
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      // [MOB-BUG-012] FIX: Container di luar SafeArea agar warna solid sampai tepi layar
+      bottomNavigationBar: Container(
+        key: const ValueKey('review-detail-bottom-action'),
+        decoration: const BoxDecoration(
+          color: AppColors.surface,
+          border: Border(top: BorderSide(color: AppColors.outlineVariant)),
+        ),
+        child: SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: _isProcessing ? null : () => _updateStatus('Rejected'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.error,
+                      side: const BorderSide(color: AppColors.error),
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    child: const Text('Tolak', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
                   ),
-                  child: const Text('Tolak', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
                 ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: ElevatedButton(
-                  onPressed: _isProcessing ? null : () => _updateStatus('Accepted'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    foregroundColor: AppColors.onPrimary,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: _isProcessing ? null : () => _updateStatus('Accepted'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: AppColors.onPrimary,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    child: _isProcessing
+                      ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: AppColors.onPrimary, strokeWidth: 2))
+                      : const Text('Setujui', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
                   ),
-                  child: _isProcessing
-                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: AppColors.onPrimary, strokeWidth: 2))
-                    : const Text('Setujui', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

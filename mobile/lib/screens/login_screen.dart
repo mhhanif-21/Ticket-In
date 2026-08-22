@@ -19,7 +19,6 @@ class _LoginScreenState extends State<LoginScreen> {
 
   bool _isLoading = false;
   bool _obscurePassword = true;
-  bool _rememberMe = false;
 
   @override
   void dispose() {
@@ -212,52 +211,9 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                         const SizedBox(height: 16),
 
-                        // Remember Me & Forgot Password
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Row(
-                              children: [
-                                SizedBox(
-                                  width: 24,
-                                  height: 24,
-                                  child: Checkbox(
-                                    value: _rememberMe,
-                                    activeColor: primaryColor,
-                                    side: const BorderSide(color: outlineVariantColor),
-                                    onChanged: (val) {
-                                      setState(() => _rememberMe = val ?? false);
-                                    },
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                const Text(
-                                  'Ingat saya',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    color: onSurfaceVariantColor,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            TextButton(
-                              onPressed: () {},
-                              style: TextButton.styleFrom(
-                                padding: EdgeInsets.zero,
-                                minimumSize: Size.zero,
-                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                              ),
-                              child: const Text(
-                                'Lupa sandi?',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w500,
-                                  color: primaryColor,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
+                        // [MOB-BUG-014] FIX: "Ingat saya" dan "Lupa sandi?" dihapus karena belum ada implementasi backend
+                        // Akan ditambahkan kembali saat fitur siap
+                        const SizedBox(height: 8),
                         const SizedBox(height: 24),
 
                         // Submit Button

@@ -27,6 +27,16 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
   bool _isLoading = false;
   String _registrationMode = 'Auto-Accept';
 
+  // [MOB-BUG-005] FIX: Dispose controllers untuk mencegah memory leak
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _locationController.dispose();
+    _capacityController.dispose();
+    _descriptionController.dispose();
+    super.dispose();
+  }
+
   Future<void> _pickDate() async {
     final date = await showDatePicker(
       context: context,
@@ -217,7 +227,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
       body: _isLoading
         ? const Center(child: CircularProgressIndicator(color: primaryColor))
         : SingleChildScrollView(
-            padding: const EdgeInsets.only(left: 20, right: 20, top: 20, bottom: 100),
+            padding: const EdgeInsets.only(left: 20, right: 20, top: 20, bottom: 20),
             child: Form(
               key: _formKey,
               child: Column(
@@ -359,34 +369,37 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
               ),
             ),
           ),
-      bottomSheet: SafeArea(
-        top: false,
-        maintainBottomViewPadding: true,
-        child: Container(
-          key: const ValueKey('create-event-bottom-action'),
-          padding: const EdgeInsets.all(16),
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            border: Border(top: BorderSide(color: Color(0xFFC1C8C0))),
-          ),
-          child: SizedBox(
-            width: double.infinity,
-            height: 48,
-            child: ElevatedButton(
-              onPressed: _isLoading ? null : _submit,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: primaryContainerColor,
-                foregroundColor: onPrimaryContainerColor,
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
+      // [MOB-BUG-004] FIX: bottomNavigationBar otomatis handle system insets (bukan bottomSheet)
+      // [MOB-BUG-012] FIX: Container di luar SafeArea agar warna solid sampai tepi layar
+      bottomNavigationBar: Container(
+        key: const ValueKey('create-event-bottom-action'),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          border: Border(top: BorderSide(color: Color(0xFFC1C8C0))),
+        ),
+        child: SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: ElevatedButton(
+                onPressed: _isLoading ? null : _submit,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: primaryContainerColor,
+                  foregroundColor: onPrimaryContainerColor,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
                 ),
-              ),
-              child: const Text(
-                'Simpan Acara',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
+                child: const Text(
+                  'Simpan Acara',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
             ),
