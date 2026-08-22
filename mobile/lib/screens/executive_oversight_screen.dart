@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../theme/app_colors.dart';
 import '../services/admin_service.dart';
-
-final adminServiceProvider = Provider((ref) => AdminService());
+// [MOB-BUG-013] FIX: Import dari provider terpusat
+import '../providers/admin_providers.dart';
 final executiveStatsProvider = FutureProvider((ref) {
   final service = ref.read(adminServiceProvider);
   return service.getDashboardStats();

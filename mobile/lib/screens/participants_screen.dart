@@ -5,8 +5,8 @@ import 'package:url_launcher/url_launcher.dart';
 import 'dart:async';
 import '../theme/app_colors.dart';
 import '../services/admin_service.dart';
-
-final adminServiceProvider = Provider((ref) => AdminService());
+// [MOB-BUG-013] FIX: Import dari provider terpusat
+import '../providers/admin_providers.dart';
 
 typedef ExportUrlOpener = Future<bool> Function(String url);
 
@@ -63,14 +63,13 @@ class ParticipantsState {
   }
 }
 
-class ParticipantsNotifier extends Notifier<ParticipantsState> {
-  final String eventId;
+class ParticipantsNotifier extends FamilyNotifier<ParticipantsState, String> {
+  late String eventId;
   late final AdminService adminService;
 
-  ParticipantsNotifier(this.eventId);
-
   @override
-  ParticipantsState build() {
+  ParticipantsState build(String eventId) {
+    this.eventId = eventId;
     adminService = ref.read(adminServiceProvider);
     Future.microtask(_loadInitial);
     return ParticipantsState();

@@ -105,8 +105,11 @@ class _AccessManagementScreenState extends State<AccessManagementScreen> {
     }
 
     final regUrl = _event!.publicRegistrationUrl ?? 'Belum ada tautan';
-    // [BUG-060] FIX: Format scanUrl disesuaikan dengan arsitektur Next.js -> /[slug]/checkin
-    final scanUrl = '${ApiClient.baseUrl.replaceAll('/api', '')}/${_event!.slug}/checkin';
+    // [MOB-BUG-009] FIX: Gunakan Uri.parse untuk manipulasi URL yang aman (bukan replaceAll)
+    final baseUri = Uri.parse(ApiClient.baseUrl);
+    final cleanSegments = baseUri.pathSegments.where((s) => s != 'api').toList();
+    final webBase = baseUri.replace(pathSegments: cleanSegments).toString();
+    final scanUrl = '$webBase/${_event!.slug}/checkin';
 
     return Scaffold(
       backgroundColor: bgColor,
