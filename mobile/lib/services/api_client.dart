@@ -14,6 +14,9 @@ class ApiClient {
   final String _baseUrl;
   final _storage = const FlutterSecureStorage();
 
+  // [MOB-BUG-006] FIX: Timeout constant agar tidak infinite loading
+  static const Duration _timeout = Duration(seconds: 15);
+
   ApiClient({String? baseUrl}) : _baseUrl = baseUrl ?? ApiClient.baseUrl;
 
   Uri buildUri(String endpoint) => Uri.parse('$_baseUrl$endpoint');
@@ -29,9 +32,11 @@ class ApiClient {
     };
   }
 
+  // [MOB-BUG-006] FIX: Semua method HTTP sekarang memiliki timeout 15 detik
   Future<http.Response> get(String endpoint) async {
     final headers = await _getHeaders();
-    return await http.get(buildUri(endpoint), headers: headers);
+    return await http.get(buildUri(endpoint), headers: headers)
+        .timeout(_timeout);
   }
 
   Future<http.Response> post(String endpoint, Map<String, dynamic> body) async {
@@ -40,7 +45,7 @@ class ApiClient {
       buildUri(endpoint),
       headers: headers,
       body: jsonEncode(body),
-    );
+    ).timeout(_timeout);
   }
 
   Future<http.Response> put(String endpoint, Map<String, dynamic> body) async {
@@ -49,13 +54,14 @@ class ApiClient {
       buildUri(endpoint),
       headers: headers,
       body: jsonEncode(body),
-    );
+    ).timeout(_timeout);
   }
 
   // Bug 5 FIX: Tambah method delete
   Future<http.Response> delete(String endpoint) async {
     final headers = await _getHeaders();
-    return await http.delete(buildUri(endpoint), headers: headers);
+    return await http.delete(buildUri(endpoint), headers: headers)
+        .timeout(_timeout);
   }
 
   Future<http.StreamedResponse> multipartRequest(
@@ -93,6 +99,6 @@ class ApiClient {
       ));
     }
 
-    return await request.send();
+    return await request.send().timeout(_timeout);
   }
 }
