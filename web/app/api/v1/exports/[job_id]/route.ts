@@ -18,7 +18,11 @@ export async function GET(request: Request, { params }: { params: Promise<{ job_
         id: job.id,
         status: job.status,
         file_url: job.fileUrl,
-        created_at: job.createdAt
+        error: job.lastError,
+        retryable: job.status === 'failed',
+        attempts: job.attempts,
+        created_at: job.createdAt,
+        updated_at: job.updatedAt,
       }
     });
   } catch (error) {

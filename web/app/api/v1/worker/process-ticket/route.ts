@@ -10,6 +10,7 @@ import {
 } from '@/lib/actions/ticketGenerationJob';
 
 export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
 
 export async function POST(req: NextRequest) {
   let registrationId: string | null = null;

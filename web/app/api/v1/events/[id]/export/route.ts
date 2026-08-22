@@ -1,38 +1,30 @@
 import { NextResponse } from 'next/server';
-import { db } from '@/db';
-import { exportJobs } from '@/db/schema';
-import { Client } from '@upstash/qstash';
+import { createExportJob, publishExportJob } from '@/lib/actions/exportJob';
+import { getCanonicalBaseUrl } from '@/lib/security/url';
 
 export const runtime = 'nodejs';
-
-const qstashClient = new Client({ token: process.env.QSTASH_TOKEN || 'fake-token' });
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id: eventId } = await params;
   try {
-    // Create job entry
-    const [job] = await db.insert(exportJobs).values({
-      eventId: eventId,
-      status: 'pending'
-    }).returning();
-
-    // Trigger QStash
+    // In production this throws when no canonical URL is configured instead
+    // of publishing a webhook to an untrusted Host header.
+    const workerUrl = `${getCanonicalBaseUrl(request)}/api/v1/worker/export`;
+    const job = await createExportJob(eventId);
     try {
-      await qstashClient.publishJSON({
-        url: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3001'}/api/v1/worker/export`,
-        body: {
-          job_id: job.id,
-          event_id: eventId
-        }
+      const published = await publishExportJob(job, workerUrl);
+      return NextResponse.json({
+        status: 'success',
+        data: { job_id: published.id, status: published.status },
       });
     } catch (qErr) {
-      console.error('QStash publish error (ignored for local/test):', qErr);
+      console.error(`QStash publish failed for export job ${job.id}:`, qErr);
+      return NextResponse.json({
+        status: 'error',
+        message: 'Export job gagal dikirim ke worker dan dapat dicoba ulang.',
+        data: { job_id: job.id, status: 'failed', retryable: true },
+      }, { status: 503 });
     }
-
-    return NextResponse.json({
-      status: 'success',
-      data: { job_id: job.id }
-    });
   } catch (error) {
     console.error(`Error triggering export for event ${eventId}:`, error);
     return NextResponse.json({ status: 'error', message: 'Internal Server Error' }, { status: 500 });
