@@ -154,10 +154,21 @@ class _HomeScreenState extends State<HomeScreen> {
                     ],
                   ),
                 ),
+                // [MOB-BUG-002] FIX: RefreshIndicator agar admin bisa pull-to-refresh daftar event
                 Expanded(
-                  child: filteredEvents.isEmpty
-                      ? const Center(child: Text('Belum ada acara. Silakan buat baru.', style: TextStyle(color: onSurfaceVariantColor)))
+                  child: RefreshIndicator(
+                    onRefresh: () async => _loadEvents(),
+                    color: primaryColor,
+                    child: filteredEvents.isEmpty
+                      ? ListView(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          children: const [
+                            SizedBox(height: 200),
+                            Center(child: Text('Belum ada acara. Silakan buat baru.', style: TextStyle(color: onSurfaceVariantColor))),
+                          ],
+                        )
                       : ListView.builder(
+                          physics: const AlwaysScrollableScrollPhysics(),
                           padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
                           itemCount: filteredEvents.length,
                           itemBuilder: (context, index) {
@@ -266,6 +277,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             );
                           },
                         ),
+                  ),
                 ),
               ],
             ),

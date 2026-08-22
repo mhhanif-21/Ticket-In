@@ -3,15 +3,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../theme/app_colors.dart';
-import '../services/admin_service.dart';
 import '../services/event_service.dart';
+// [MOB-BUG-013] FIX: Import dari provider terpusat
+import '../providers/admin_providers.dart';
 
-final adminServiceProvider = Provider((ref) => AdminService());
-
-final eventStatsProvider = FutureProvider.family<Map<String, dynamic>, String>((ref, eventId) {
-  final service = ref.read(adminServiceProvider);
-  return service.getEventStats(eventId);
-});
+final eventStatsProvider = FutureProvider.autoDispose
+    .family<Map<String, dynamic>, String>((ref, eventId) {
+      final service = ref.read(adminServiceProvider);
+      return service.getEventStats(eventId);
+    });
 
 class DetailEventMetricsScreen extends ConsumerWidget {
   final String eventId;
@@ -25,16 +25,25 @@ class DetailEventMetricsScreen extends ConsumerWidget {
     return Scaffold(
       backgroundColor: AppColors.background,
       body: statsAsync.when(
-        data: (data) => _buildContent(context, data),
+        // [MOB-BUG-011] FIX: Thread ref ke _buildContent untuk invalidasi provider setelah navigasi
+        data: (data) => _buildContent(context, ref, data),
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (err, stack) => Center(
-          child: Text('Error: $err', style: const TextStyle(color: AppColors.error)),
+          child: Text(
+            'Error: $err',
+            style: const TextStyle(color: AppColors.error),
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildContent(BuildContext context, Map<String, dynamic> data) {
+  // [MOB-BUG-011] FIX: ref diteruskan agar management menu bisa invalidate provider
+  Widget _buildContent(
+    BuildContext context,
+    WidgetRef ref,
+    Map<String, dynamic> data,
+  ) {
     return CustomScrollView(
       slivers: [
         _buildHeroSection(context, data),
@@ -65,10 +74,14 @@ class DetailEventMetricsScreen extends ConsumerWidget {
                   ),
                 ),
                 const SizedBox(height: 16),
-                _buildManagementMenu(context),
+                _buildManagementMenu(context, ref),
 
+                _buildPublicationControl(context, ref, data),
                 const SizedBox(height: 40),
-                _buildDangerZone(context),
+                _buildDangerZone(
+                  context,
+                  data['status']?.toString() ?? 'Draft',
+                ),
                 const SizedBox(height: 40),
               ],
             ),
@@ -92,6 +105,17 @@ class DetailEventMetricsScreen extends ConsumerWidget {
     }
 
     final String? posterUrl = data['posterUrl'];
+    final status = data['status']?.toString() ?? 'Draft';
+    final statusLabel = switch (status) {
+      'Published' => 'PUBLISHED EVENT',
+      'Cancelled' => 'CANCELLED EVENT',
+      _ => 'DRAFT EVENT',
+    };
+    final statusColor = switch (status) {
+      'Published' => Colors.green,
+      'Cancelled' => Colors.red,
+      _ => Colors.orange,
+    };
 
     return SliverAppBar(
       expandedHeight: 280,
@@ -139,13 +163,16 @@ class DetailEventMetricsScreen extends ConsumerWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
-                      color: Colors.green,
+                      color: statusColor,
                       borderRadius: BorderRadius.circular(20),
                     ),
-                    child: const Text(
-                      'ACTIVE EVENT',
+                    child: Text(
+                      statusLabel,
                       style: TextStyle(
                         color: Colors.white,
                         fontSize: 10,
@@ -169,11 +196,18 @@ class DetailEventMetricsScreen extends ConsumerWidget {
                   const SizedBox(height: 6),
                   Row(
                     children: [
-                      const Icon(Icons.calendar_today, color: Colors.white70, size: 14),
+                      const Icon(
+                        Icons.calendar_today,
+                        color: Colors.white70,
+                        size: 14,
+                      ),
                       const SizedBox(width: 6),
                       Text(
                         formattedDate,
-                        style: const TextStyle(color: Colors.white70, fontSize: 14),
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 14,
+                        ),
                       ),
                     ],
                   ),
@@ -255,7 +289,7 @@ class DetailEventMetricsScreen extends ConsumerWidget {
             color: Colors.black.withOpacity(0.03),
             blurRadius: 10,
             offset: const Offset(0, 4),
-          )
+          ),
         ],
       ),
       child: Column(
@@ -275,14 +309,21 @@ class DetailEventMetricsScreen extends ConsumerWidget {
               ),
               if (showActionReq)
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.red.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: const Text(
                     'Action Req.',
-                    style: TextStyle(color: Colors.red, fontSize: 10, fontWeight: FontWeight.bold),
+                    style: TextStyle(
+                      color: Colors.red,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
             ],
@@ -290,14 +331,22 @@ class DetailEventMetricsScreen extends ConsumerWidget {
           const Spacer(),
           Text(
             value,
-            style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: AppColors.onSurface),
+            style: const TextStyle(
+              fontSize: 28,
+              fontWeight: FontWeight.bold,
+              color: AppColors.onSurface,
+            ),
           ),
           const SizedBox(height: 2),
           Text(
             title,
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.onSurfaceVariant),
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: AppColors.onSurfaceVariant,
+            ),
           ),
           const SizedBox(height: 2),
           Text(
@@ -330,7 +379,7 @@ class DetailEventMetricsScreen extends ConsumerWidget {
             color: Colors.black.withOpacity(0.03),
             blurRadius: 10,
             offset: const Offset(0, 4),
-          )
+          ),
         ],
       ),
       child: Column(
@@ -347,14 +396,22 @@ class DetailEventMetricsScreen extends ConsumerWidget {
           const Spacer(),
           Text(
             value,
-            style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: AppColors.onSurface),
+            style: const TextStyle(
+              fontSize: 28,
+              fontWeight: FontWeight.bold,
+              color: AppColors.onSurface,
+            ),
           ),
           const SizedBox(height: 2),
           Text(
             title,
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.onSurfaceVariant),
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: AppColors.onSurfaceVariant,
+            ),
           ),
           const SizedBox(height: 8),
           ClipRRect(
@@ -369,14 +426,19 @@ class DetailEventMetricsScreen extends ConsumerWidget {
           const SizedBox(height: 4),
           Text(
             '${(percentage * 100).toStringAsFixed(1)}%',
-            style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: iconColor),
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.bold,
+              color: iconColor,
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildManagementMenu(BuildContext context) {
+  // [MOB-BUG-011] FIX: ref diterima agar bisa invalidate provider setelah navigasi
+  Widget _buildManagementMenu(BuildContext context, WidgetRef ref) {
     return Column(
       children: [
         _buildMenuTile(
@@ -384,34 +446,119 @@ class DetailEventMetricsScreen extends ConsumerWidget {
           icon: Icons.edit_note,
           title: 'Edit Detail Acara',
           subtitle: 'Ubah informasi dasar, tanggal, dan lokasi',
-          onTap: () => context.push('/edit-event/$eventId'),
+          onTap: () async {
+            await context.push('/edit-event/$eventId');
+            ref.invalidate(eventStatsProvider(eventId));
+          },
         ),
         _buildMenuTile(
           context,
           icon: Icons.dynamic_form,
           title: 'Kelola Form Pendaftaran',
           subtitle: 'Kustomisasi field dan pertanyaan registrasi',
-          onTap: () => context.push('/form-builder/$eventId'),
+          onTap: () async {
+            await context.push('/form-builder/$eventId');
+            ref.invalidate(eventStatsProvider(eventId));
+          },
         ),
         _buildMenuTile(
           context,
           icon: Icons.people_alt,
           title: 'Daftar & Review Peserta',
           subtitle: 'Terima atau tolak pendaftar yang pending',
-          onTap: () => context.push('/participants/$eventId'),
+          onTap: () async {
+            await context.push('/participants/$eventId');
+            ref.invalidate(eventStatsProvider(eventId));
+          },
         ),
         _buildMenuTile(
           context,
           icon: Icons.admin_panel_settings,
           title: 'Kelola Akses Panitia',
           subtitle: 'Atur PIN volunteer untuk check-in',
-          onTap: () => context.push('/access-management/$eventId'),
+          onTap: () async {
+            await context.push('/access-management/$eventId');
+            ref.invalidate(eventStatsProvider(eventId));
+          },
         ),
       ],
     );
   }
 
-  Widget _buildMenuTile(BuildContext context, {required IconData icon, required String title, required String subtitle, required VoidCallback onTap}) {
+  Widget _buildPublicationControl(
+    BuildContext context,
+    WidgetRef ref,
+    Map<String, dynamic> data,
+  ) {
+    if ((data['status']?.toString() ?? 'Draft') != 'Draft') {
+      return const SizedBox.shrink();
+    }
+
+    return Container(
+      key: const ValueKey('publish-event-control'),
+      margin: const EdgeInsets.only(top: 28),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.primaryContainer,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.primary.withOpacity(0.25)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Publikasi Acara',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: AppColors.onBackground,
+            ),
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            'Acara masih berupa draft dan belum terlihat oleh peserta. Publikasikan setelah form pendaftaran siap.',
+            style: TextStyle(fontSize: 12, color: AppColors.onBackground),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              key: const ValueKey('publish-event-button'),
+              icon: const Icon(Icons.public),
+              label: const Text('PUBLIKASIKAN ACARA'),
+              onPressed: () async {
+                try {
+                  await EventService().updateEvent(eventId, {
+                    'status': 'Published',
+                  });
+                  ref.invalidate(eventStatsProvider(eventId));
+                  if (!context.mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Acara berhasil dipublikasikan.'),
+                    ),
+                  );
+                } catch (e) {
+                  if (!context.mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Gagal mempublikasikan acara: $e')),
+                  );
+                }
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMenuTile(
+    BuildContext context, {
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required Function() onTap,
+  }) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
@@ -423,25 +570,30 @@ class DetailEventMetricsScreen extends ConsumerWidget {
         color: Colors.transparent,
         borderRadius: BorderRadius.circular(12),
         child: ListTile(
-        leading: Container(
-          padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(
-            color: AppColors.primaryContainer,
-            borderRadius: BorderRadius.circular(10),
+          leading: Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: AppColors.primaryContainer,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(icon, color: AppColors.primary),
           ),
-          child: Icon(icon, color: AppColors.primary),
-        ),
-        title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
-        subtitle: Text(subtitle, style: const TextStyle(fontSize: 12)),
-        trailing: const Icon(Icons.chevron_right, color: AppColors.outline),
-        onTap: onTap,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          title: Text(
+            title,
+            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+          ),
+          subtitle: Text(subtitle, style: const TextStyle(fontSize: 12)),
+          trailing: const Icon(Icons.chevron_right, color: AppColors.outline),
+          onTap: onTap,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildDangerZone(BuildContext context) {
+  Widget _buildDangerZone(BuildContext context, String status) {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -458,7 +610,11 @@ class DetailEventMetricsScreen extends ConsumerWidget {
               SizedBox(width: 8),
               Text(
                 'Danger Zone',
-                style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 16),
+                style: TextStyle(
+                  color: Colors.red,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
               ),
             ],
           ),
@@ -467,63 +623,75 @@ class DetailEventMetricsScreen extends ConsumerWidget {
             'Tindakan di bawah ini tidak dapat dibatalkan. Berhati-hatilah.',
             style: TextStyle(color: Colors.red, fontSize: 12),
           ),
-          const SizedBox(height: 16),
-          SizedBox(
-            width: double.infinity,
-            child: OutlinedButton(
-              style: OutlinedButton.styleFrom(
-                foregroundColor: Colors.red,
-                side: const BorderSide(color: Colors.red),
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              ),
-              onPressed: () async {
-                // BUG-I FIX: Implementasi dialog konfirmasi + cancel via API
-                final confirm = await showDialog<bool>(
-                  context: context,
-                  builder: (ctx) => AlertDialog(
-                    title: const Text('Batalkan Acara?'),
-                    content: const Text(
-                      'Acara akan dibatalkan dan peserta tidak bisa mendaftar lagi. '
-                      'Tindakan ini tidak dapat diurungkan.',
-                    ),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.pop(ctx, false),
-                        child: const Text('Tidak'),
-                      ),
-                      ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.red,
-                          foregroundColor: Colors.white,
-                        ),
-                        onPressed: () => Navigator.pop(ctx, true),
-                        child: const Text('Ya, Batalkan'),
-                      ),
-                    ],
+          if (status != 'Cancelled') ...[
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton(
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.red,
+                  side: const BorderSide(color: Colors.red),
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                );
-                if (confirm != true || !context.mounted) return;
-                try {
-                  await EventService().updateEvent(
-                    eventId,
-                    {'status': 'Cancelled'},
+                ),
+                onPressed: () async {
+                  // BUG-I FIX: Implementasi dialog konfirmasi + cancel via API
+                  final confirm = await showDialog<bool>(
+                    context: context,
+                    builder: (ctx) => AlertDialog(
+                      title: const Text('Batalkan Acara?'),
+                      content: const Text(
+                        'Acara akan dibatalkan dan peserta tidak bisa mendaftar lagi. '
+                        'Tindakan ini tidak dapat diurungkan.',
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(ctx, false),
+                          child: const Text('Tidak'),
+                        ),
+                        ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.red,
+                            foregroundColor: Colors.white,
+                          ),
+                          onPressed: () => Navigator.pop(ctx, true),
+                          child: const Text('Ya, Batalkan'),
+                        ),
+                      ],
+                    ),
                   );
-                  if (!context.mounted) return;
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Acara berhasil dibatalkan.')),
-                  );
-                  context.go('/home');
-                } catch (e) {
-                  if (!context.mounted) return;
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Gagal membatalkan acara: $e')),
-                  );
-                }
-              },
-              child: const Text('BATALKAN ACARA', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.5)),
+                  if (confirm != true || !context.mounted) return;
+                  try {
+                    await EventService().updateEvent(eventId, {
+                      'status': 'Cancelled',
+                    });
+                    if (!context.mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Acara berhasil dibatalkan.'),
+                      ),
+                    );
+                    // [MOB-BUG-002] FIX: pop agar home_screen .then() callback re-load events
+                    context.pop();
+                  } catch (e) {
+                    if (!context.mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Gagal membatalkan acara: $e')),
+                    );
+                  }
+                },
+                child: const Text(
+                  'BATALKAN ACARA',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 1.5,
+                  ),
+                ),
+              ),
             ),
-          ),
+          ],
           // Bug 5 FIX: Tombol HAPUS EVENT permanen
           const SizedBox(height: 12),
           SizedBox(
@@ -533,7 +701,9 @@ class DetailEventMetricsScreen extends ConsumerWidget {
                 backgroundColor: Colors.red,
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
               ),
               onPressed: () async {
                 final confirm = await showDialog<bool>(
@@ -567,7 +737,8 @@ class DetailEventMetricsScreen extends ConsumerWidget {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(content: Text('Acara berhasil dihapus.')),
                   );
-                  context.go('/home');
+                  // [MOB-BUG-002] FIX: pop agar home_screen .then() callback re-load events
+                  context.pop();
                 } catch (e) {
                   if (!context.mounted) return;
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -575,7 +746,13 @@ class DetailEventMetricsScreen extends ConsumerWidget {
                   );
                 }
               },
-              child: const Text('HAPUS ACARA PERMANEN', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.5)),
+              child: const Text(
+                'HAPUS ACARA PERMANEN',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 1.5,
+                ),
+              ),
             ),
           ),
         ],

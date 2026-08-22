@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../theme/app_colors.dart';
-import '../services/admin_service.dart';
+// [MOB-BUG-013] FIX: Import dari provider terpusat (bukan deklarasi duplikat)
+import '../providers/admin_providers.dart';
 
-final adminServiceProvider = Provider((ref) => AdminService());
-final globalDashboardStatsProvider = FutureProvider((ref) {
+final globalDashboardStatsProvider = FutureProvider.autoDispose((ref) {
   final service = ref.read(adminServiceProvider);
   return service.getDashboardStats();
 });
@@ -25,7 +25,8 @@ class AdminDashboardScreen extends ConsumerWidget {
         elevation: 0,
         centerTitle: false,
         titleSpacing: 20,
-        automaticallyImplyLeading: false, // [BUG-061] FIX: Cegah tombol Back muncul di root screen
+        automaticallyImplyLeading:
+            false, // [BUG-061] FIX: Cegah tombol Back muncul di root screen
         title: const Text(
           'Event Gate',
           style: TextStyle(
@@ -41,35 +42,53 @@ class AdminDashboardScreen extends ConsumerWidget {
           child: Container(color: AppColors.outlineVariant, height: 1.0),
         ),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.only(left: 20, right: 20, top: 24, bottom: 24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Halo, Admin',
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.w600,
-                color: AppColors.onBackground,
+      // [MOB-BUG-001] FIX: RefreshIndicator untuk pull-to-refresh dashboard
+      body: RefreshIndicator(
+        onRefresh: () async {
+          ref.invalidate(globalDashboardStatsProvider);
+        },
+        color: AppColors.primary,
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.only(
+            left: 20,
+            right: 20,
+            top: 24,
+            bottom: 24,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Halo, Admin',
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.onBackground,
+                ),
               ),
-            ),
-            const SizedBox(height: 4),
-            const Text(
-              'Berikut adalah ringkasan operasional hari ini.',
-              style: TextStyle(
-                fontSize: 14,
-                color: AppColors.onSurfaceVariant,
+              const SizedBox(height: 4),
+              const Text(
+                'Berikut adalah ringkasan operasional hari ini.',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: AppColors.onSurfaceVariant,
+                ),
               ),
-            ),
-            const SizedBox(height: 24),
+              const SizedBox(height: 24),
 
-            statsAsync.when(
-              data: (data) => _buildStatsContent(data),
-              loading: () => const Center(child: CircularProgressIndicator(color: AppColors.primary)),
-              error: (err, stack) => Text('Error: $err', style: const TextStyle(color: AppColors.error)),
-            ),
-          ],
+              statsAsync.when(
+                data: (data) => _buildStatsContent(data),
+                loading: () => const Center(
+                  child: CircularProgressIndicator(color: AppColors.primary),
+                ),
+                error: (err, stack) => Text(
+                  'Error: $err',
+                  style: const TextStyle(color: AppColors.error),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
       // [BUG-042] FIX: Navbar sekarang full-block menempel di bawah (bukan floating pill)
@@ -90,7 +109,12 @@ class AdminDashboardScreen extends ConsumerWidget {
               children: [
                 _buildNavItem(Icons.dashboard, 'Dashboard', true, () {}),
                 // [BUG-044] FIX: Route ke /home (Daftar Acara), bukan ke / yang tidak terdefinisi
-                _buildNavItem(Icons.calendar_today, 'Event', false, () => context.go('/home')),
+                _buildNavItem(
+                  Icons.calendar_today,
+                  'Event',
+                  false,
+                  () => context.go('/home'),
+                ),
                 // [BUG-043] FIX: Settings menampilkan SnackBar "Segera Hadir" alih-alih diam
                 _buildNavItem(Icons.settings, 'Settings', false, () {
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -108,7 +132,12 @@ class AdminDashboardScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildNavItem(IconData icon, String label, bool isActive, VoidCallback onTap) {
+  Widget _buildNavItem(
+    IconData icon,
+    String label,
+    bool isActive,
+    VoidCallback onTap,
+  ) {
     return InkWell(
       onTap: onTap,
       child: Container(
@@ -124,7 +153,9 @@ class AdminDashboardScreen extends ConsumerWidget {
           children: [
             Icon(
               icon,
-              color: isActive ? AppColors.onPrimaryContainer : AppColors.onSurfaceVariant,
+              color: isActive
+                  ? AppColors.onPrimaryContainer
+                  : AppColors.onSurfaceVariant,
             ),
             const SizedBox(height: 4),
             Text(
@@ -132,7 +163,9 @@ class AdminDashboardScreen extends ConsumerWidget {
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w500,
-                color: isActive ? AppColors.onPrimaryContainer : AppColors.onSurfaceVariant,
+                color: isActive
+                    ? AppColors.onPrimaryContainer
+                    : AppColors.onSurfaceVariant,
               ),
             ),
           ],
@@ -151,16 +184,28 @@ class AdminDashboardScreen extends ConsumerWidget {
             children: [
               Expanded(
                 flex: 1,
-                child: _buildStatCard('Event\nDibuat', Icons.event_available, data['total_events']?.toString() ?? '0'),
+                child: _buildStatCard(
+                  'Event\nDibuat',
+                  Icons.event_available,
+                  data['total_events']?.toString() ?? '0',
+                ),
               ),
               const SizedBox(width: 8),
               Expanded(
                 flex: 1,
                 child: Column(
                   children: [
-                    _buildStatCard('Pendaftar', Icons.groups, data['total_registrations']?.toString() ?? '0'),
+                    _buildStatCard(
+                      'Pendaftar',
+                      Icons.groups,
+                      data['total_registrations']?.toString() ?? '0',
+                    ),
                     const SizedBox(height: 8),
-                    _buildStatCard('Hadir', Icons.how_to_reg, data['total_present']?.toString() ?? '0'),
+                    _buildStatCard(
+                      'Hadir',
+                      Icons.how_to_reg,
+                      data['total_present']?.toString() ?? '0',
+                    ),
                   ],
                 ),
               ),
@@ -172,7 +217,11 @@ class AdminDashboardScreen extends ConsumerWidget {
         // [BUG-040] FIX: Hapus TextButton "Lihat Semua" — cukup tampilkan judul section
         const Text(
           '5 Event Terakhir',
-          style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600, color: AppColors.onSurface),
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.w600,
+            color: AppColors.onSurface,
+          ),
         ),
         const SizedBox(height: 8),
         ...((data['recent_events'] as List<dynamic>?) ?? []).map((ev) {
@@ -187,7 +236,8 @@ class AdminDashboardScreen extends ConsumerWidget {
             child: Row(
               children: [
                 Container(
-                  width: 48, height: 48,
+                  width: 48,
+                  height: 48,
                   decoration: BoxDecoration(
                     color: AppColors.surfaceVariant,
                     borderRadius: BorderRadius.circular(8),
@@ -199,9 +249,22 @@ class AdminDashboardScreen extends ConsumerWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(ev['name'] ?? '', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16, color: AppColors.onSurface)),
+                      Text(
+                        ev['name'] ?? '',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 16,
+                          color: AppColors.onSurface,
+                        ),
+                      ),
                       const SizedBox(height: 2),
-                      Text('${ev['date']?.substring(0,10) ?? ''} • ${ev['location'] ?? ''}', style: const TextStyle(color: AppColors.onSurfaceVariant, fontSize: 14)),
+                      Text(
+                        '${ev['date']?.substring(0, 10) ?? ''} • ${ev['location'] ?? ''}',
+                        style: const TextStyle(
+                          color: AppColors.onSurfaceVariant,
+                          fontSize: 14,
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -212,9 +275,20 @@ class AdminDashboardScreen extends ConsumerWidget {
                     // capacity = batas kuota, bukan jumlah pendaftar aktual
                     Text(
                       (ev['registrants_count'] ?? 0).toString(),
-                      style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16, color: AppColors.onSurface),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 16,
+                        color: AppColors.onSurface,
+                      ),
                     ),
-                    const Text('PENDAFTAR', style: TextStyle(color: AppColors.onSurfaceVariant, fontSize: 11, fontWeight: FontWeight.w600)),
+                    const Text(
+                      'PENDAFTAR',
+                      style: TextStyle(
+                        color: AppColors.onSurfaceVariant,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                   ],
                 ),
               ],
