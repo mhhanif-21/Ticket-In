@@ -2,6 +2,12 @@
 import { useState, useEffect } from 'react';
 import { useParams, useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
+import {
+  clearRegistrationResubmitState,
+  loadRegistrationResubmitState,
+  saveRegistrationResubmitState,
+  type RegistrationResubmitState,
+} from '@/lib/client/registrationResubmit';
 
 export default function VerifyOtpPage() {
   const params = useParams();
@@ -10,19 +16,30 @@ export default function VerifyOtpPage() {
   const slug = params.slug as string;
 
   const regId = searchParams.get('regId');
-  const email = searchParams.get('email') || '';
-  const name = searchParams.get('name') || '';
 
+  const [resubmitState, setResubmitState] = useState<RegistrationResubmitState | null>(null);
   const [otpCode, setOtpCode] = useState('');
   const [loading, setLoading] = useState(false);
+  const [resending, setResending] = useState(false);
   const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
 
-  // Protect route if no regId is present
   useEffect(() => {
     if (!regId) {
       router.push(`/${slug}`);
+      return;
     }
+
+    const stored = loadRegistrationResubmitState(slug);
+    if (!stored || stored.registrationId !== regId) {
+      router.push(`/${slug}`);
+      return;
+    }
+    setResubmitState(stored);
   }, [regId, slug, router]);
+
+  const email = resubmitState?.email || '';
+  const name = resubmitState?.name || '';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,6 +50,7 @@ export default function VerifyOtpPage() {
 
     setLoading(true);
     setError('');
+    setNotice('');
 
     try {
       const res = await fetch(`/api/v1/registrations/${regId}/verify-otp`, {
@@ -47,6 +65,7 @@ export default function VerifyOtpPage() {
       }
 
       // Success, redirect to status page
+      clearRegistrationResubmitState(slug);
       const statusParams = new URLSearchParams({ email, name, registered: 'true' });
       router.push(`/${slug}/status?${statusParams.toString()}`);
     } catch (err: any) {
@@ -56,7 +75,51 @@ export default function VerifyOtpPage() {
     }
   };
 
-  if (!regId) return null; // Wait for redirect
+  const handleResend = async () => {
+    if (!resubmitState) return;
+
+    setResending(true);
+    setError('');
+    setNotice('');
+    try {
+      const formData = new FormData();
+      formData.set('name', resubmitState.name);
+      formData.set('email', resubmitState.email);
+      formData.set('registration_id', resubmitState.registrationId);
+      formData.set('resubmit_token', resubmitState.resubmitToken);
+      formData.set('retry_only', 'true');
+
+      const res = await fetch(`/api/v1/events/${slug}/register`, {
+        method: 'POST',
+        body: formData,
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        if (data.data?.status === 'Draft' && data.data?.resubmitToken) {
+          const rotatedState = { ...resubmitState, resubmitToken: data.data.resubmitToken };
+          saveRegistrationResubmitState(slug, rotatedState);
+          setResubmitState(rotatedState);
+        }
+        throw new Error(data.message || 'OTP belum dapat dikirim.');
+      }
+
+      if (data.data?.status !== 'Draft' || !data.data?.resubmitToken) {
+        throw new Error('Bukti pengiriman OTP tidak tersedia.');
+      }
+
+      const rotatedState = { ...resubmitState, resubmitToken: data.data.resubmitToken };
+      saveRegistrationResubmitState(slug, rotatedState);
+      setResubmitState(rotatedState);
+      setNotice('OTP baru telah dikirim.');
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setResending(false);
+    }
+  };
+
+  if (!regId || !resubmitState || resubmitState.registrationId !== regId) return null;
 
   return (
     <main className="flex-grow w-full max-w-[1200px] mx-auto px-margin-mobile md:px-margin-desktop py-stack-lg flex flex-col items-center justify-center relative">
@@ -78,6 +141,11 @@ export default function VerifyOtpPage() {
         {error && (
           <div className="p-4 bg-error-container text-on-error-container rounded-lg font-medium text-center">
             {error}
+          </div>
+        )}
+        {notice && (
+          <div className="p-4 bg-primary-container/20 text-primary rounded-lg font-medium text-center">
+            {notice}
           </div>
         )}
 
@@ -105,6 +173,20 @@ export default function VerifyOtpPage() {
             {loading ? 'Memverifikasi...' : 'Verifikasi OTP'}
             {!loading && <span className="material-symbols-outlined ml-2 text-[20px]">check_circle</span>}
           </button>
+          <button
+            type="button"
+            onClick={handleResend}
+            disabled={loading || resending}
+            className="w-full border border-primary text-primary font-body-md text-body-md py-3 rounded-lg hover:bg-primary/10 transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
+          >
+            {resending ? 'Mengirim ulang...' : 'Kirim ulang OTP'}
+          </button>
+          <Link
+            href={`/${slug}/register?correction=1&registration_id=${encodeURIComponent(regId)}`}
+            className="text-center font-body-md text-body-md text-primary hover:underline"
+          >
+            Ubah Email
+          </Link>
           <Link href={`/${slug}`} className="mt-2 text-center font-body-md text-body-md text-secondary hover:text-primary transition-colors duration-150">
             Batalkan Pendaftaran
           </Link>

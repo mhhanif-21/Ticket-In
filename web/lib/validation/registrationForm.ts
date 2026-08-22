@@ -2,7 +2,9 @@ export const CHOICE_FIELD_TYPES = ['radio', 'checkbox', 'select'] as const;
 export type ChoiceFieldType = (typeof CHOICE_FIELD_TYPES)[number];
 
 export interface RegistrationFormField {
-  id: string;
+  id?: string;
+  fieldKey?: string;
+  order?: number;
   fieldName: string;
   fieldType: string;
   isRequired: boolean;
@@ -14,6 +16,34 @@ export class RegistrationFormValidationError extends Error {
     super(message);
     this.name = 'RegistrationFormValidationError';
   }
+}
+
+export const STATIC_REGISTRATION_FIELD_NAMES = new Set(['nama', 'email']);
+
+export function isStaticRegistrationField(fieldName: string): boolean {
+  return STATIC_REGISTRATION_FIELD_NAMES.has(fieldName.trim().toLowerCase());
+}
+
+export function getRegistrationFieldKey(field: Pick<RegistrationFormField, 'id' | 'fieldKey' | 'order'>): string {
+  if (typeof field.fieldKey === 'string' && field.fieldKey.trim() !== '') {
+    return field.fieldKey;
+  }
+
+  if (Number.isInteger(field.order) && (field.order as number) >= 0) {
+    return `field_${field.order}`;
+  }
+
+  if (typeof field.id === 'string' && field.id.trim() !== '') {
+    return `field_${field.id}`;
+  }
+
+  throw new RegistrationFormValidationError('Konfigurasi field pendaftaran tidak memiliki key yang valid');
+}
+
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+export function isValidEmailFormat(value: string): boolean {
+  return EMAIL_PATTERN.test(value.trim());
 }
 
 function isChoiceFieldType(fieldType: string): fieldType is ChoiceFieldType {
@@ -41,7 +71,7 @@ function isStoredFileAnswer(value: unknown): boolean {
 }
 
 export function validateRegistrationAnswers(fields: RegistrationFormField[], answers: Record<string, unknown>) {
-  const fieldsByKey = new Map(fields.map((field) => [`field_${field.id}`, field]));
+  const fieldsByKey = new Map(fields.map((field) => [getRegistrationFieldKey(field), field]));
 
   for (const key of Object.keys(answers)) {
     if (!fieldsByKey.has(key)) {
@@ -50,7 +80,7 @@ export function validateRegistrationAnswers(fields: RegistrationFormField[], ans
   }
 
   for (const field of fields) {
-    const key = `field_${field.id}`;
+    const key = getRegistrationFieldKey(field);
     const value = answers[key];
 
     if (!hasValue(value)) {
@@ -74,9 +104,18 @@ export function validateRegistrationAnswers(fields: RegistrationFormField[], ans
       continue;
     }
 
+    if (field.fieldType === 'email') {
+      if (typeof value !== 'string' || !isValidEmailFormat(value)) {
+        throw new RegistrationFormValidationError(`Field ${field.fieldName} harus berupa email yang valid`);
+      }
+      continue;
+    }
+
     if (isChoiceFieldType(field.fieldType)) {
       const options = optionsFor(field);
-      const values = field.fieldType === 'checkbox' ? value : [value];
+      const values = field.fieldType === 'checkbox'
+        ? (Array.isArray(value) ? value : [value])
+        : [value];
       if (!Array.isArray(values) || values.length === 0 || values.some((answer) => typeof answer !== 'string' || !options.includes(answer))) {
         throw new RegistrationFormValidationError(`Pilihan tidak valid untuk field ${field.fieldName}`);
       }

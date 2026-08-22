@@ -1,9 +1,10 @@
 import { db } from '../../db';
 import { events, formFields, registrations, otps, resubmitTokens } from '../../db/schema';
 import { eq, and, inArray, count, desc, sql, isNull, gt } from 'drizzle-orm';
-import { validateRegistrationAnswers } from '../validation/registrationForm';
+import { getRegistrationFieldKey, isStaticRegistrationField, validateRegistrationAnswers } from '../validation/registrationForm';
 import { getVerifiedResubmitToken, issueResubmitTokenRecord } from '../security/resubmit';
 import { ensureTicketGenerationJobTx } from './ticketGenerationJob';
+import { assertEventIsPublic } from '../events/eventLifecycle';
 
 interface RegistrationPayload {
   name: string;
@@ -11,6 +12,7 @@ interface RegistrationPayload {
   answers?: any;
   registrationId?: string; // Untuk re-submit form / ubah email
   resubmitToken?: string;
+  preserveAnswers?: boolean; // Retry delivery tanpa mengirim ulang file/field
 }
 
 async function invalidateResubmitTokensTx(tx: any, registrationId: string, usedAt = new Date()): Promise<void> {
@@ -50,6 +52,7 @@ export async function processRegistrationAction(slug: string, payload: Registrat
       throw new Error('NotFoundException: Event not found');
     }
     const event = eventRecords[0];
+    assertEventIsPublic(event.status);
 
     const eventFormFields = await tx
       .select({
@@ -58,6 +61,7 @@ export async function processRegistrationAction(slug: string, payload: Registrat
         fieldType: formFields.fieldType,
         isRequired: formFields.isRequired,
         options: formFields.options,
+        order: formFields.order,
       })
       .from(formFields)
       .where(eq(formFields.eventId, event.id));
@@ -65,13 +69,27 @@ export async function processRegistrationAction(slug: string, payload: Registrat
     // BUG-E FIX: Skip field Nama/Email — dihandle sebagai field statis (name/email),
     // bukan sebagai field dinamis dengan key field_{id}
     const dynamicFields = eventFormFields.filter(
-      (f) => !['nama', 'email'].includes(f.fieldName.toLowerCase())
+      (f) => !isStaticRegistrationField(f.fieldName)
+    ).map((field) => ({
+      ...field,
+      fieldKey: getRegistrationFieldKey(field),
+    }));
+    const answerFieldLabels = Object.fromEntries(
+      dynamicFields.map((field) => [field.fieldKey, field.fieldName]),
     );
-    validateRegistrationAnswers(dynamicFields, payload.answers || {});
 
     let registrationId = payload.registrationId;
-    const callerSuppliedRegistrationId = Boolean(payload.registrationId);
-    let reusedDraftRegistration = Boolean(registrationId);
+    if (payload.preserveAnswers && !registrationId) {
+      throw new Error('InvalidRegistrationResubmit: retry proof is required');
+    }
+
+    // Delivery retry deliberately reuses the already-persisted, validated
+    // answers. A normal correction still validates the new multipart payload.
+    if (!payload.preserveAnswers) {
+      validateRegistrationAnswers(dynamicFields, payload.answers || {});
+    }
+
+    const reusedDraftRegistration = Boolean(registrationId);
     const normalizedEmail = payload.email.trim().toLowerCase();
 
     // A delivery retry is idempotent per event and normalized email for both modes.
@@ -107,8 +125,9 @@ export async function processRegistrationAction(slug: string, payload: Registrat
         };
       }
       if (existingRegistration) {
-        registrationId = existingRegistration.id;
-        reusedDraftRegistration = true;
+        // A Draft is mutable only through the one-time proof returned to the
+        // original browser. Matching an email is not an ownership proof.
+        throw new Error('InvalidRegistrationResubmit: valid ownership token is required for this Draft');
       }
     }
 
@@ -141,12 +160,19 @@ export async function processRegistrationAction(slug: string, payload: Registrat
       name: payload.name,
       email: normalizedEmail,
       answers: payload.answers || {},
+      answerFieldLabels,
       status,
     };
 
     if (registrationId) {
       const [existingRegistration] = await tx
-        .select({ eventId: registrations.eventId, status: registrations.status, email: registrations.email })
+        .select({
+          eventId: registrations.eventId,
+          status: registrations.status,
+          email: registrations.email,
+          answers: registrations.answers,
+          answerFieldLabels: registrations.answerFieldLabels,
+        })
         .from(registrations)
         .where(eq(registrations.id, registrationId))
         .for('update')
@@ -160,39 +186,45 @@ export async function processRegistrationAction(slug: string, payload: Registrat
         throw new Error('InvalidRegistrationResubmit: valid ownership token is required for this Draft');
       }
 
-      if (callerSuppliedRegistrationId) {
-        const verifiedToken = getVerifiedResubmitToken(payload.resubmitToken, {
-          registrationId,
-          eventId: event.id,
-          email: existingRegistration.email,
-        });
-        if (!verifiedToken) {
-          throw new Error('InvalidRegistrationResubmit: valid ownership token is required for this Draft');
-        }
-
-        const now = new Date();
-        const [consumedToken] = await tx
-          .update(resubmitTokens)
-          .set({ usedAt: now })
-          .where(and(
-            eq(resubmitTokens.jti, verifiedToken.jti),
-            eq(resubmitTokens.tokenHash, verifiedToken.tokenHash),
-            eq(resubmitTokens.registrationId, registrationId),
-            eq(resubmitTokens.eventId, event.id),
-            eq(resubmitTokens.normalizedEmail, existingRegistration.email.trim().toLowerCase()),
-            isNull(resubmitTokens.usedAt),
-            gt(resubmitTokens.expiresAt, now),
-          ))
-          .returning({ id: resubmitTokens.id });
-
-        if (!consumedToken) {
-          throw new Error('InvalidRegistrationResubmit: token has already been used or expired');
-        }
+      const verifiedToken = getVerifiedResubmitToken(payload.resubmitToken, {
+        registrationId,
+        eventId: event.id,
+        email: existingRegistration.email,
+      });
+      if (!verifiedToken) {
+        throw new Error('InvalidRegistrationResubmit: valid ownership token is required for this Draft');
       }
+
+      const now = new Date();
+      const [consumedToken] = await tx
+        .update(resubmitTokens)
+        .set({ usedAt: now })
+        .where(and(
+          eq(resubmitTokens.jti, verifiedToken.jti),
+          eq(resubmitTokens.tokenHash, verifiedToken.tokenHash),
+          eq(resubmitTokens.registrationId, registrationId),
+          eq(resubmitTokens.eventId, event.id),
+          eq(resubmitTokens.normalizedEmail, existingRegistration.email.trim().toLowerCase()),
+          isNull(resubmitTokens.usedAt),
+          gt(resubmitTokens.expiresAt, now),
+        ))
+        .returning({ id: resubmitTokens.id });
+
+      if (!consumedToken) {
+        throw new Error('InvalidRegistrationResubmit: token has already been used or expired');
+      }
+
+      const updateData = payload.preserveAnswers
+        ? {
+          ...regData,
+          answers: existingRegistration.answers || {},
+          answerFieldLabels: existingRegistration.answerFieldLabels || {},
+        }
+        : regData;
 
       const [updated] = await tx
         .update(registrations)
-        .set(regData)
+        .set(updateData)
         .where(
           and(
             eq(registrations.id, registrationId),
