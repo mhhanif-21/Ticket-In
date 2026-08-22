@@ -86,8 +86,8 @@ class EventModel {
       status: json['status'] ?? 'Draft',
       registrationMode: json['registration_mode'] ?? json['registrationMode'] ?? 'Auto-Accept',
       posterUrl: json['poster_url'] ?? json['posterUrl'],
-      publicRegistrationUrl: json['public_registration_url'],
-      publicQrCodeUrl: json['public_qr_code_url'],
+      publicRegistrationUrl: json['public_registration_url'] ?? json['publicRegistrationUrl'],
+      publicQrCodeUrl: json['public_qr_code_url'] ?? json['publicQrCodeUrl'],
       formFields: formFieldsList,
     );
   }
