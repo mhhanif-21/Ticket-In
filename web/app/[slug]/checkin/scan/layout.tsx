@@ -1,6 +1,6 @@
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
-import * as jose from 'jose';
+import { verifyVolunteerToken } from '@/lib/security/jwt';
 
 export default async function ScannerLayout({
   children,
@@ -17,14 +17,14 @@ export default async function ScannerLayout({
     redirect(`/${resolvedParams.slug}/checkin`);
   }
 
+  let payload;
   try {
-    const secret = new TextEncoder().encode(process.env.JWT_SECRET || 'super-secret-key');
-    const { payload } = await jose.jwtVerify(token, secret);
+    payload = await verifyVolunteerToken(token);
+  } catch {
+    redirect(`/${resolvedParams.slug}/checkin`);
+  }
 
-    if (payload.role !== 'volunteer' || payload.event_slug !== resolvedParams.slug) {
-      redirect(`/${resolvedParams.slug}/checkin`);
-    }
-  } catch (error) {
+  if (payload.role !== 'volunteer' || payload.event_slug !== resolvedParams.slug) {
     redirect(`/${resolvedParams.slug}/checkin`);
   }
 

@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { isAdminUser } from '@/lib/security/auth';
+import { verifyVolunteerToken } from '@/lib/security/jwt';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
@@ -24,26 +26,22 @@ export async function middleware(req: NextRequest) {
       const decoded = decodeJwt(token);
 
       if (decoded && decoded.role === 'volunteer') {
-        const { jwtVerify } = await import('jose');
-        const secret = new TextEncoder().encode(process.env.JWT_SECRET || 'super-secret-key');
-        const { payload } = await jwtVerify(token, secret);
-        if (
-          typeof payload.event_id !== 'string' ||
-          typeof payload.event_slug !== 'string' ||
-          typeof payload.session_id !== 'string' ||
-          typeof payload.volunteer_name !== 'string'
-        ) {
-          throw new Error('Volunteer token claims are incomplete');
-        }
-        return { valid: true, payload, role: 'volunteer' };
+        const payload = await verifyVolunteerToken(token);
+        return { valid: true, payload, role: 'volunteer' as const };
       } else {
         if (!supabaseUrl || !supabaseAnonKey) throw new Error('Supabase credentials missing');
         const supabase = createClient(supabaseUrl, supabaseAnonKey, { auth: { persistSession: false } });
         const { data, error } = await supabase.auth.getUser(token);
         if (error || !data.user) throw new Error('Supabase token invalid');
-        return { valid: true, payload: { id: data.user.id }, role: 'admin' };
+
+        const isAdmin = isAdminUser(data.user);
+        return {
+          valid: true,
+          payload: { id: data.user.id, email: data.user.email },
+          role: isAdmin ? ('admin' as const) : ('user' as const),
+        };
       }
-    } catch (err) {
+    } catch {
       return { valid: false, payload: null, role: null };
     }
   }
@@ -106,11 +104,11 @@ export async function middleware(req: NextRequest) {
     }
 
     const { payload, role } = verification;
-    const userId = role === 'volunteer' ? payload?.volunteer_name as string : payload?.id as string;
-    const eventId = role === 'volunteer' ? payload?.event_id as string : '';
-    const sessionId = role === 'volunteer' ? payload?.session_id as string : '';
+    const userId = role === 'volunteer' ? (payload?.volunteer_name as string) : (payload?.id as string);
+    const eventId = role === 'volunteer' ? (payload?.event_id as string) : '';
+    const sessionId = role === 'volunteer' ? (payload?.session_id as string) : '';
 
-    // Role-based Access Control (RBAC) Sederhana
+    // Role-based Access Control (RBAC)
     const pathname = url.pathname;
     if ((pathname.startsWith('/api/v1/events') || pathname.startsWith('/api/v1/registrations')) && role !== 'admin') {
       return NextResponse.json({ status: 'error', message: 'Hanya Admin yang dapat mengakses rute ini' }, { status: 403 });
