@@ -1,4 +1,23 @@
 services:
+  db-migrate:
+    image: postgres:16-alpine
+    container_name: ticketin-db-migrate
+    volumes:
+      - ./web/supabase/migrations:/migrations:ro
+    environment:
+      # The external Supabase database is reachable through this Compose network.
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/postgres
+    command:
+      - /bin/sh
+      - -ec
+      - |
+        until pg_isready --dbname="$$DATABASE_URL"; do sleep 2; done
+        psql --dbname="$$DATABASE_URL" --set=ON_ERROR_STOP=1 --file=/migrations/0007_batch4_lifecycle-export-labels.sql
+        test "$$(psql --dbname="$$DATABASE_URL" --tuples-only --no-align --command="SELECT count(*) FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'events' AND column_name = 'status'")" = "1"
+    networks:
+      - TiketIn-network
+      - supabase-local
+
   web-app:
     image: node:20-alpine
     container_name: ticketin-web-app
@@ -17,6 +36,9 @@ services:
       timeout: 3s
       retries: 30
       start_period: 20s
+    depends_on:
+      db-migrate:
+        condition: service_completed_successfully
     environment:
       - NODE_ENV=development
       # Database URL mengarah ke Supabase lokal via network bridge

@@ -6,6 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "db:migrate": "tsx scripts/apply_lifecycle_migration.ts",
     "lint": "eslint",
     "typecheck": "next typegen && tsc --project tsconfig.quality.json --noEmit --pretty false",
     "test": "vitest run",
