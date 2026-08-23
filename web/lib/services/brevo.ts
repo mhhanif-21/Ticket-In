@@ -14,8 +14,8 @@ export interface EmailPayload {
 }
 
 export async function sendEmail(payload: EmailPayload): Promise<void> {
-  const apiKey = process.env.BREVO_API_KEY;
-  const apiUrl = process.env.BREVO_API_URL || DEFAULT_BREVO_API_URL;
+  const apiKey = process.env.BREVO_API_KEY?.trim();
+  const apiUrl = process.env.BREVO_API_URL?.trim() || DEFAULT_BREVO_API_URL;
   if (!apiKey) {
     throw new Error('BREVO_API_KEY is not defined');
   }

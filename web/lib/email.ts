@@ -11,11 +11,16 @@ function escapeHtml(value: string): string {
 }
 
 export async function sendOtpEmail(toEmail: string, toName: string, otpCode: string, eventName: string = 'Event Gate') {
-  const apiKey = process.env.BREVO_API_KEY;
-  const senderEmail = process.env.BREVO_SENDER_EMAIL || 'noreply@eventgate.com';
-  const senderName = process.env.BREVO_SENDER_NAME || 'Panitia Event';
+  const apiKey = process.env.BREVO_API_KEY?.trim();
+  const configuredSenderEmail = process.env.BREVO_SENDER_EMAIL?.trim();
+  const senderEmail = configuredSenderEmail || 'noreply@eventgate.com';
+  const senderName = process.env.BREVO_SENDER_NAME?.trim() || 'Panitia Event';
 
   if (!apiKey) {
+    console.error('OTP email configuration missing', {
+      apiKeyConfigured: false,
+      senderEmailConfigured: Boolean(configuredSenderEmail),
+    });
     throw new Error('OTP email service is not configured');
   }
 
@@ -44,7 +49,12 @@ export async function sendOtpEmail(toEmail: string, toName: string, otpCode: str
     // sendEmail owns the bounded 3-second provider timeout. Do not expose the
     // provider response or OTP in an exception returned to the registration API.
     await sendEmail(payload);
-  } catch {
+  } catch (error) {
+    console.error('OTP email delivery failed', {
+      apiKeyConfigured: true,
+      senderEmailConfigured: Boolean(configuredSenderEmail),
+      error: error instanceof Error ? error.message : 'Unknown Brevo email error',
+    });
     throw new Error('OTP email delivery failed');
   }
 }
