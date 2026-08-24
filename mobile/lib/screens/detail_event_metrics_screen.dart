@@ -112,7 +112,7 @@ class DetailEventMetricsScreen extends ConsumerWidget {
       _ => 'DRAFT EVENT',
     };
     final statusColor = switch (status) {
-      'Published' => Colors.green,
+      'Published' => AppColors.primary,
       'Cancelled' => Colors.red,
       _ => Colors.orange,
     };
@@ -254,7 +254,7 @@ class DetailEventMetricsScreen extends ConsumerWidget {
           title: 'Diterima',
           value: accepted.toString(),
           icon: Icons.check_circle,
-          iconColor: Colors.green,
+          iconColor: AppColors.primary,
           current: accepted,
           total: totalReg > 0 ? totalReg : 1,
         ),

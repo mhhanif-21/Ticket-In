@@ -39,7 +39,7 @@ class _ReviewDetailScreenState extends State<ReviewDetailScreen> {
 
   Color _getStatusBgColor(String status) {
     switch (status) {
-      case 'Accepted': return const Color(0xFF41674B).withOpacity(0.1);
+      case 'Accepted': return const Color(0xFF000000).withOpacity(0.1);
       case 'Rejected': return const Color(0xFFBA1A1A).withOpacity(0.1);
       default: return Colors.orange.withOpacity(0.1);
     }
@@ -47,7 +47,7 @@ class _ReviewDetailScreenState extends State<ReviewDetailScreen> {
 
   Color _getStatusTextColor(String status) {
     switch (status) {
-      case 'Accepted': return const Color(0xFF41674B);
+      case 'Accepted': return const Color(0xFF000000);
       case 'Rejected': return const Color(0xFFBA1A1A);
       default: return Colors.orange.shade800;
     }

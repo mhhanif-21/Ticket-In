@@ -83,14 +83,13 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
-    const primaryColor = Color(0xFF41674B);
-    const surfaceColor = Color(0xFFF9FAF5);
+    const primaryColor = Color(0xFF000000);
+    const surfaceColor = Color(0xFFF9F9F9);
     const surfaceContainerLowestColor = Color(0xFFFFFFFF);
-    const outlineVariantColor = Color(0xFFC1C8C0);
-    const onSurfaceColor = Color(0xFF1A1C1A);
-    const onSurfaceVariantColor = Color(0xFF424842);
-    const primaryContainerColor = Color(0xFF7EA687);
-    const onPrimaryContainerColor = Color(0xFF163B24);
+    const outlineVariantColor = Color(0xFFC4C7C7);
+    const onSurfaceColor = Color(0xFF1A1C1C);
+    const onSurfaceVariantColor = Color(0xFF444748);
+    const onPrimaryContainerColor = Color(0xFF1C1B1B);
 
     return Scaffold(
       backgroundColor: surfaceColor,
@@ -220,8 +219,8 @@ class _LoginScreenState extends State<LoginScreen> {
                         ElevatedButton(
                           onPressed: _isLoading ? null : _handleLogin,
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: primaryContainerColor,
-                            foregroundColor: onPrimaryContainerColor,
+                            backgroundColor: primaryColor,
+                            foregroundColor: Colors.white,
                             padding: const EdgeInsets.symmetric(vertical: 16),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(10),
@@ -261,11 +260,11 @@ class _LoginScreenState extends State<LoginScreen> {
                   const Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Text('Bantuan', style: TextStyle(fontSize: 12, color: Color(0xFF727971))),
+                      Text('Bantuan', style: TextStyle(fontSize: 12, color: Color(0xFF747878))),
                       SizedBox(width: 16),
                       Text('•', style: TextStyle(color: outlineVariantColor)),
                       SizedBox(width: 16),
-                      Text('Privasi', style: TextStyle(fontSize: 12, color: Color(0xFF727971))),
+                      Text('Privasi', style: TextStyle(fontSize: 12, color: Color(0xFF747878))),
                     ],
                   ),
                 ],

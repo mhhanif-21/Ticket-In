@@ -697,7 +697,7 @@ class _ParticipantsScreenState extends ConsumerState<ParticipantsScreen> {
   Color _getStatusBgColor(String status) {
     switch (status.toLowerCase()) {
       case 'accepted':
-        return const Color(0xFF41674B).withOpacity(0.1);
+        return const Color(0xFF000000).withOpacity(0.1);
       case 'rejected':
         return const Color(0xFFBA1A1A).withOpacity(0.1);
       // [BUG-050] FIX: Tambahan warna status Draft
@@ -711,7 +711,7 @@ class _ParticipantsScreenState extends ConsumerState<ParticipantsScreen> {
   Color _getStatusTextColor(String status) {
     switch (status.toLowerCase()) {
       case 'accepted':
-        return const Color(0xFF41674B);
+        return const Color(0xFF000000);
       case 'rejected':
         return const Color(0xFFBA1A1A);
       // [BUG-050] FIX: Tambahan warna teks status Draft
@@ -796,7 +796,7 @@ class _ParticipantsScreenState extends ConsumerState<ParticipantsScreen> {
                           child: Icon(
                             Icons.check_circle,
                             size: 14,
-                            color: Colors.green,
+                            color: AppColors.primary,
                           ),
                         ),
                     ],

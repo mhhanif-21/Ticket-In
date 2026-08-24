@@ -80,13 +80,13 @@ class _AccessManagementScreenState extends State<AccessManagementScreen> {
 
   @override
   Widget build(BuildContext context) {
-    const bgColor = Color(0xFFF9FAF5);
-    const primaryColor = Color(0xFF41674B);
-    const onSurface = Color(0xFF1A1C1A);
-    const onSurfaceVariant = Color(0xFF424842);
-    const outlineVariant = Color(0xFFC1C8C0);
+    const bgColor = Color(0xFFF9F9F9);
+    const primaryColor = Color(0xFF000000);
+    const onSurface = Color(0xFF1A1C1C);
+    const onSurfaceVariant = Color(0xFF444748);
+    const outlineVariant = Color(0xFFC4C7C7);
     const surfaceContainerLowest = Color(0xFFFFFFFF);
-    const surfaceContainerLow = Color(0xFFF4F4F0);
+    const surfaceContainerLow = Color(0xFFF3F3F3);
     
     if (_isLoading) {
       return Scaffold(
@@ -290,9 +290,9 @@ class _AccessManagementScreenState extends State<AccessManagementScreen> {
                     width: double.infinity,
                     padding: const EdgeInsets.symmetric(vertical: 32),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFF3F5F2),
+                      color: const Color(0xFFF3F3F3),
                       borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: const Color(0xFFDFE3DE)),
+                      border: Border.all(color: const Color(0xFFC4C7C7)),
                     ),
                     child: Stack(
                       clipBehavior: Clip.none,
@@ -303,7 +303,7 @@ class _AccessManagementScreenState extends State<AccessManagementScreen> {
                           child: Icon(
                             Icons.lock_outline,
                             size: 140,
-                            color: const Color(0xFF7EA687).withOpacity(0.1),
+                            color: const Color(0xFFE5E2E1).withOpacity(0.1),
                           ),
                         ),
                         Center(
@@ -314,7 +314,7 @@ class _AccessManagementScreenState extends State<AccessManagementScreen> {
                                 const Icon(
                                   Icons.lock_outline,
                                   size: 40,
-                                  color: Color(0xFF41674B),
+                                  color: Color(0xFF000000),
                                 ),
                                 const SizedBox(height: 12),
                                 const Text(
@@ -322,7 +322,7 @@ class _AccessManagementScreenState extends State<AccessManagementScreen> {
                                   style: TextStyle(
                                     fontSize: 16,
                                     fontWeight: FontWeight.w600,
-                                    color: Color(0xFF163B24),
+                                    color: Color(0xFF1C1B1B),
                                   ),
                                 ),
                                 const SizedBox(height: 4),
@@ -330,7 +330,7 @@ class _AccessManagementScreenState extends State<AccessManagementScreen> {
                                   'Tap \'Generate PIN Baru\' di bawah',
                                   style: TextStyle(
                                     fontSize: 12,
-                                    color: Color(0xFF41674B),
+                                    color: Color(0xFF000000),
                                   ),
                                 ),
                               ] else ...[
@@ -340,7 +340,7 @@ class _AccessManagementScreenState extends State<AccessManagementScreen> {
                                     fontSize: 48,
                                     fontWeight: FontWeight.w700,
                                     letterSpacing: 12.0,
-                                    color: Color(0xFF163B24),
+                                    color: Color(0xFF1C1B1B),
                                     fontFamily: 'monospace',
                                   ),
                                 ),
@@ -351,7 +351,7 @@ class _AccessManagementScreenState extends State<AccessManagementScreen> {
                                     fontSize: 12,
                                     fontWeight: FontWeight.w600,
                                     letterSpacing: 2.0,
-                                    color: Color(0xFF41674B),
+                                    color: Color(0xFF000000),
                                   ),
                                 ),
                               ],

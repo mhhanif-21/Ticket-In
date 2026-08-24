@@ -81,7 +81,7 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
                 width: 48,
                 height: 6,
                 decoration: BoxDecoration(
-                  color: const Color(0xFFC1C8C0),
+                  color: const Color(0xFFC4C7C7),
                   borderRadius: BorderRadius.circular(10),
                 ),
               ),
@@ -93,10 +93,10 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
                   children: [
                     const Text(
                       'Pilih Tipe Pertanyaan',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Color(0xFF1A1C1A)),
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Color(0xFF1A1C1C)),
                     ),
                     IconButton(
-                      icon: const Icon(Icons.close, color: Color(0xFF424842)),
+                      icon: const Icon(Icons.close, color: Color(0xFF444748)),
                       onPressed: () => Navigator.pop(context),
                     )
                   ],
@@ -140,18 +140,18 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
       borderRadius: BorderRadius.circular(8),
       child: Container(
         decoration: BoxDecoration(
-          color: const Color(0xFFEEEEEA),
+          color: const Color(0xFFEEEEEE),
           borderRadius: BorderRadius.circular(8),
           border: Border.all(color: Colors.transparent),
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, color: const Color(0xFF41674B), size: 32),
+            Icon(icon, color: const Color(0xFF000000), size: 32),
             const SizedBox(height: 8),
             Text(
               label,
-              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: Color(0xFF1A1C1A)),
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: Color(0xFF1A1C1C)),
             ),
           ],
         ),
@@ -203,7 +203,7 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
                       const SizedBox(height: 16),
                       const Text(
                         'Opsi Jawaban',
-                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF424842)),
+                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF444748)),
                       ),
                       const SizedBox(height: 8),
                       ...optionControllers.asMap().entries.map((entry) {
@@ -245,8 +245,8 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
                             optionControllers.add(TextEditingController());
                           });
                         },
-                        icon: const Icon(Icons.add, size: 18, color: Color(0xFF41674B)),
-                        label: const Text('Tambah Opsi', style: TextStyle(color: Color(0xFF41674B), fontWeight: FontWeight.w500)),
+                        icon: const Icon(Icons.add, size: 18, color: Color(0xFF000000)),
+                        label: const Text('Tambah Opsi', style: TextStyle(color: Color(0xFF000000), fontWeight: FontWeight.w500)),
                       ),
                     ],
                   ],
@@ -255,11 +255,11 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(context),
-                  child: const Text('Batal', style: TextStyle(color: Color(0xFF424842))),
+                  child: const Text('Batal', style: TextStyle(color: Color(0xFF444748))),
                 ),
                 ElevatedButton(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF41674B),
+                    backgroundColor: const Color(0xFF000000),
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                   ),
@@ -361,25 +361,25 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
 
   @override
   Widget build(BuildContext context) {
-    const bgColor = Color(0xFFF9FAF5);
-    const primaryColor = Color(0xFF41674B);
-    const lockedBg = Color(0xFFF3F5F2);
-    const lockedBorder = Color(0xFFDFE3DE);
+    const bgColor = Color(0xFFF9F9F9);
+    const primaryColor = Color(0xFF000000);
+    const lockedBg = Color(0xFFF3F3F3);
+    const lockedBorder = Color(0xFFC4C7C7);
 
     return Scaffold(
       backgroundColor: bgColor,
       appBar: AppBar(
-        backgroundColor: const Color(0xFFF9FAF5),
+        backgroundColor: const Color(0xFFF9F9F9),
         elevation: 0,
         centerTitle: false,
         iconTheme: const IconThemeData(color: primaryColor),
         title: const Text(
           'Susun Form Pendaftaran',
-          style: TextStyle(color: Color(0xFF1A1C1A), fontSize: 16, fontWeight: FontWeight.w600),
+          style: TextStyle(color: Color(0xFF1A1C1C), fontSize: 16, fontWeight: FontWeight.w600),
         ),
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(1.0),
-          child: Container(color: const Color(0xFFC1C8C0), height: 1.0),
+          child: Container(color: const Color(0xFFC4C7C7), height: 1.0),
         ),
       ),
       body: _isLoading
@@ -399,12 +399,12 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
                       ),
                       child: const Row(
                         children: [
-                          Icon(Icons.info_outline, color: Color(0xFF41674B), size: 18),
+                          Icon(Icons.info_outline, color: Color(0xFF000000), size: 18),
                           SizedBox(width: 8),
                           Expanded(
                             child: Text(
                               'Susun form pendaftaran acara Anda. Field Nama & Email sudah otomatis terkunci.',
-                              style: TextStyle(fontSize: 12, color: Color(0xFF41674B)),
+                              style: TextStyle(fontSize: 12, color: Color(0xFF000000)),
                             ),
                           ),
                         ],
@@ -418,11 +418,11 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
                     padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
                     child: Row(
                       children: [
-                        const Icon(Icons.lock, size: 14, color: Color(0xFF727971)),
+                        const Icon(Icons.lock, size: 14, color: Color(0xFF747878)),
                         const SizedBox(width: 6),
                         const Text(
                           'Field Wajib (Tidak dapat dihapus)',
-                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF727971)),
+                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF747878)),
                         ),
                       ],
                     ),
@@ -440,11 +440,11 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
                     padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
                     child: Row(
                       children: [
-                        const Icon(Icons.tune, size: 14, color: Color(0xFF424842)),
+                        const Icon(Icons.tune, size: 14, color: Color(0xFF444748)),
                         const SizedBox(width: 6),
                         Text(
                           'Field Kustom (${_fields.length} / 23)',
-                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF424842)),
+                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF444748)),
                         ),
                       ],
                     ),
@@ -486,8 +486,8 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
             ),
       floatingActionButton: FloatingActionButton(
         onPressed: _showAddFieldSheet,
-        backgroundColor: const Color(0xFF7EA687),
-        foregroundColor: const Color(0xFF163B24),
+        backgroundColor: const Color(0xFF000000),
+        foregroundColor: Colors.white,
         child: const Icon(Icons.add),
       ),
       // [MOB-BUG-012] FIX: Container di luar SafeArea agar warna solid sampai tepi layar
@@ -495,7 +495,7 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
         key: const ValueKey('form-builder-bottom-action'),
         decoration: const BoxDecoration(
           color: Colors.white,
-          border: Border(top: BorderSide(color: Color(0xFFC1C8C0))),
+          border: Border(top: BorderSide(color: Color(0xFFC4C7C7))),
         ),
         child: SafeArea(
           top: false,
@@ -545,7 +545,7 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
       ),
       child: Row(
         children: [
-          const Icon(Icons.lock_outline, color: Color(0xFF727971), size: 18),
+          const Icon(Icons.lock_outline, color: Color(0xFF747878), size: 18),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -553,12 +553,12 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
               children: [
                 Text(
                   field.fieldName,
-                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: Color(0xFF1A1C1A)),
+                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: Color(0xFF1A1C1C)),
                 ),
                 const SizedBox(height: 4),
                 Row(
                   children: [
-                    _buildBadge(field.fieldType.toUpperCase(), const Color(0xFF424842), const Color(0xFFDFE3DE)),
+                    _buildBadge(field.fieldType.toUpperCase(), const Color(0xFF444748), const Color(0xFFC4C7C7)),
                     const SizedBox(width: 6),
                     _buildBadge('WAJIB', const Color(0xFFBA1A1A), const Color(0xFFFFDAD6)),
                   ],
@@ -577,7 +577,7 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
       margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
         color: Colors.white,
-        border: Border.all(color: const Color(0xFFDFE3DE), width: 1.5),
+        border: Border.all(color: const Color(0xFFC4C7C7), width: 1.5),
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 8, offset: const Offset(0, 2)),
@@ -590,7 +590,7 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
           children: [
             const Padding(
               padding: EdgeInsets.only(top: 2.0),
-              child: Icon(Icons.drag_indicator, color: Color(0xFFC1C8C0)),
+              child: Icon(Icons.drag_indicator, color: Color(0xFFC4C7C7)),
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -599,12 +599,12 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
                 children: [
                   Text(
                     field.fieldName,
-                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: Color(0xFF1A1C1A)),
+                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: Color(0xFF1A1C1C)),
                   ),
                   const SizedBox(height: 6),
                   Row(
                     children: [
-                      _buildBadge(field.fieldType.toUpperCase(), const Color(0xFF424842), const Color(0xFFDFE3DE)),
+                      _buildBadge(field.fieldType.toUpperCase(), const Color(0xFF444748), const Color(0xFFC4C7C7)),
                       if (field.isRequired) ...[
                         const SizedBox(width: 6),
                         _buildBadge('WAJIB', const Color(0xFFBA1A1A), const Color(0xFFFFDAD6)),
@@ -616,7 +616,7 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
                     const SizedBox(height: 6),
                     Text(
                       field.options!.take(3).join(' • ') + (field.options!.length > 3 ? ' +${field.options!.length - 3} lagi' : ''),
-                      style: const TextStyle(fontSize: 11, color: Color(0xFF727971)),
+                      style: const TextStyle(fontSize: 11, color: Color(0xFF747878)),
                     ),
                   ],
                 ],
@@ -639,7 +639,7 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
                 padding: const EdgeInsets.only(right: 4),
                 child: Icon(
                   field.isRequired ? Icons.toggle_on : Icons.toggle_off,
-                  color: field.isRequired ? const Color(0xFF41674B) : const Color(0xFFC1C8C0),
+                  color: field.isRequired ? const Color(0xFF000000) : const Color(0xFFC4C7C7),
                   size: 28,
                 ),
               ),

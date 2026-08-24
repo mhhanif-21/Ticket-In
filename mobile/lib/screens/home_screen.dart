@@ -47,16 +47,14 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    const primaryColor = Color(0xFF41674B);
-    const surfaceColor = Color(0xFFF9FAF5);
-    const surfaceContainerColor = Color(0xFFEEEEEA);
-    const outlineVariantColor = Color(0xFFC1C8C0);
-    const outlineColor = Color(0xFF727971);
-    const onSurfaceColor = Color(0xFF1A1C1A);
-    const onSurfaceVariantColor = Color(0xFF424842);
-    const primaryContainerColor = Color(0xFF7EA687);
-    const onPrimaryContainerColor = Color(0xFF163B24);
-    const secondaryColor = Color(0xFF5B5F5B);
+    const primaryColor = Color(0xFF000000);
+    const surfaceColor = Color(0xFFF9F9F9);
+    const surfaceContainerColor = Color(0xFFEEEEEE);
+    const outlineVariantColor = Color(0xFFC4C7C7);
+    const outlineColor = Color(0xFF747878);
+    const onSurfaceColor = Color(0xFF1A1C1C);
+    const onSurfaceVariantColor = Color(0xFF444748);
+    const secondaryColor = Color(0xFF5D5D5D);
     const errorColor = Color(0xFFBA1A1A);
 
     // [BUG-047] FIX: Sort list berdasarkan _sortOrder sebelum filter search
@@ -284,8 +282,8 @@ class _HomeScreenState extends State<HomeScreen> {
       floatingActionButton: Padding(
         padding: const EdgeInsets.only(bottom: 24.0),
         child: FloatingActionButton(
-          backgroundColor: primaryContainerColor,
-          foregroundColor: onPrimaryContainerColor,
+          backgroundColor: primaryColor,
+          foregroundColor: Colors.white,
           elevation: 4,
           onPressed: () async {
             await context.push('/create-event');
@@ -331,9 +329,9 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildNavItem(IconData icon, String label, bool isActive, VoidCallback onTap) {
-    const primaryContainerColor = Color(0xFF7EA687);
-    const onPrimaryContainerColor = Color(0xFF163B24);
-    const onSurfaceVariantColor = Color(0xFF424842);
+    const primaryContainerColor = Color(0xFFE5E2E1);
+    const onPrimaryContainerColor = Color(0xFF1C1B1B);
+    const onSurfaceVariantColor = Color(0xFF444748);
 
     return InkWell(
       onTap: onTap,

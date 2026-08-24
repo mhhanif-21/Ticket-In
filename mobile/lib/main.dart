@@ -60,25 +60,25 @@ class _SplashScreenState extends State<SplashScreen> {
   Widget build(BuildContext context) {
     // Layar putih bersih dengan loading indicator saat cek token
     return const Scaffold(
-      backgroundColor: Color(0xFFF9FAF5),
+      backgroundColor: Color(0xFFF9F9F9),
       body: Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.event_available, size: 48, color: Color(0xFF41674B)),
+            Icon(Icons.event_available, size: 48, color: Color(0xFF000000)),
             SizedBox(height: 16),
             Text(
               'Event Gate',
               style: TextStyle(
                 fontSize: 24,
                 fontWeight: FontWeight.w600,
-                color: Color(0xFF41674B),
+                color: Color(0xFF000000),
                 letterSpacing: -0.02,
               ),
             ),
             SizedBox(height: 32),
             CircularProgressIndicator(
-              color: Color(0xFF41674B),
+              color: Color(0xFF000000),
               strokeWidth: 2,
             ),
           ],

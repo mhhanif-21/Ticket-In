@@ -90,9 +90,9 @@ class _EditEventScreenState extends State<EditEventScreen> {
         return Theme(
           data: Theme.of(context).copyWith(
             colorScheme: const ColorScheme.light(
-              primary: Color(0xFF41674B),
+              primary: Color(0xFF000000),
               onPrimary: Colors.white,
-              onSurface: Color(0xFF1A1C1A),
+              onSurface: Color(0xFF1A1C1C),
             ),
           ),
           child: child!,
@@ -166,7 +166,7 @@ class _EditEventScreenState extends State<EditEventScreen> {
             style: const TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w500,
-              color: Color(0xFF424842),
+              color: Color(0xFF444748),
             ),
           ),
         ),
@@ -177,21 +177,21 @@ class _EditEventScreenState extends State<EditEventScreen> {
           readOnly: readOnly,
           onTap: onTap,
           validator: validator,
-          style: const TextStyle(fontSize: 14, color: Color(0xFF1A1C1A)),
+          style: const TextStyle(fontSize: 14, color: Color(0xFF1A1C1C)),
           decoration: InputDecoration(
             hintText: hint,
-            hintStyle: const TextStyle(color: Color(0xFFC1C8C0), fontSize: 14),
-            prefixIcon: icon != null ? Icon(icon, color: const Color(0xFFC1C8C0)) : null,
+            hintStyle: const TextStyle(color: Color(0xFFC4C7C7), fontSize: 14),
+            prefixIcon: icon != null ? Icon(icon, color: const Color(0xFFC4C7C7)) : null,
             filled: true,
             fillColor: const Color(0xFFFFFFFF),
             contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),
-              borderSide: const BorderSide(color: Color(0xFFDFE3DE)),
+              borderSide: const BorderSide(color: Color(0xFFC4C7C7)),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),
-              borderSide: const BorderSide(color: Color(0xFF7EA687)),
+              borderSide: const BorderSide(color: Color(0xFF000000)),
             ),
             errorBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),
@@ -209,22 +209,21 @@ class _EditEventScreenState extends State<EditEventScreen> {
 
   @override
   Widget build(BuildContext context) {
-    const bgColor = Color(0xFFF3F5F2);
-    const primaryColor = Color(0xFF41674B);
-    const primaryContainerColor = Color(0xFF7EA687);
-    const onPrimaryContainerColor = Color(0xFF163B24);
+    const bgColor = Color(0xFFF3F3F3);
+    const primaryColor = Color(0xFF000000);
+    const primaryContainerColor = Color(0xFFE5E2E1);
     
     return Scaffold(
       backgroundColor: bgColor,
       appBar: AppBar(
-        backgroundColor: const Color(0xFFF9FAF5),
+        backgroundColor: const Color(0xFFF9F9F9),
         elevation: 0,
         centerTitle: true,
-        iconTheme: const IconThemeData(color: Color(0xFF424842)),
+        iconTheme: const IconThemeData(color: Color(0xFF444748)),
         title: const Text(
           'Lihat/Edit Detail Acara',
           style: TextStyle(
-            color: Color(0xFF1A1C1A),
+            color: Color(0xFF1A1C1C),
             fontSize: 16,
             fontWeight: FontWeight.w600,
           ),
@@ -232,7 +231,7 @@ class _EditEventScreenState extends State<EditEventScreen> {
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(1.0),
           child: Container(
-            color: const Color(0xFFC1C8C0),
+            color: const Color(0xFFC4C7C7),
             height: 1.0,
           ),
         ),
@@ -283,7 +282,7 @@ class _EditEventScreenState extends State<EditEventScreen> {
                                   style: TextStyle(
                                     fontSize: 12,
                                     fontWeight: FontWeight.w500,
-                                    color: Color(0xFF424842),
+                                    color: Color(0xFF444748),
                                   ),
                                 ),
                               ],
@@ -356,7 +355,7 @@ class _EditEventScreenState extends State<EditEventScreen> {
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w500,
-                            color: Color(0xFF424842),
+                            color: Color(0xFF444748),
                           ),
                         ),
                       ),
@@ -374,11 +373,11 @@ class _EditEventScreenState extends State<EditEventScreen> {
                           contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
                           enabledBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(10),
-                            borderSide: const BorderSide(color: Color(0xFFDFE3DE)),
+                            borderSide: const BorderSide(color: Color(0xFFC4C7C7)),
                           ),
                           focusedBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(10),
-                            borderSide: const BorderSide(color: Color(0xFF7EA687)),
+                          borderSide: const BorderSide(color: Color(0xFF000000)),
                           ),
                         ),
                       ),
@@ -394,7 +393,7 @@ class _EditEventScreenState extends State<EditEventScreen> {
         key: const ValueKey('edit-event-bottom-action'),
         decoration: const BoxDecoration(
           color: Colors.white,
-          border: Border(top: BorderSide(color: Color(0xFFC1C8C0))),
+          border: Border(top: BorderSide(color: Color(0xFFC4C7C7))),
         ),
         child: SafeArea(
           top: false,
@@ -406,8 +405,8 @@ class _EditEventScreenState extends State<EditEventScreen> {
               child: ElevatedButton(
                 onPressed: _submit,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: primaryContainerColor,
-                  foregroundColor: onPrimaryContainerColor,
+                  backgroundColor: primaryColor,
+                  foregroundColor: Colors.white,
                   elevation: 0,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(10),
