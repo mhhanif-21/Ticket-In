@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useParams } from 'next/navigation';
-import { Keyboard, ArrowLeft, Send, CheckCircle2, XCircle, Loader2, AlertCircle } from 'lucide-react';
+import { Keyboard, ArrowLeft, Send, CheckCircle2, XCircle, Loader2, AlertCircle, X } from 'lucide-react';
 import Link from 'next/link';
 import { getScanFeedbackDismissMs, type ScanFeedbackStatus } from '@/lib/checkin/scanFeedback';
 
@@ -35,14 +35,24 @@ export default function ManualCheckInPage() {
     };
   }, []);
 
+  const dismissScanResult = () => {
+    if (dismissTimerRef.current !== null) {
+      clearTimeout(dismissTimerRef.current);
+      dismissTimerRef.current = null;
+    }
+
+    setScanResult({ status: 'idle', message: '' });
+    setLoading(false);
+    inputRef.current?.focus();
+  };
+
   const scheduleDismiss = (status: ScanFeedbackStatus) => {
     if (dismissTimerRef.current !== null) {
       clearTimeout(dismissTimerRef.current);
     }
 
     dismissTimerRef.current = setTimeout(() => {
-      dismissTimerRef.current = null;
-      setScanResult({ status: 'idle', message: '' });
+      dismissScanResult();
     }, getScanFeedbackDismissMs(status));
   };
 
@@ -185,6 +195,14 @@ export default function ManualCheckInPage() {
                   <p className="text-white/90 text-sm mt-0.5 font-medium">{scanResult.details}</p>
                 )}
               </div>
+              <button
+                type="button"
+                onClick={dismissScanResult}
+                aria-label="Tutup hasil scan"
+                className="ml-auto shrink-0 w-9 h-9 rounded-full flex items-center justify-center text-white/90 hover:bg-white/15 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
             </div>
           </div>
         )}

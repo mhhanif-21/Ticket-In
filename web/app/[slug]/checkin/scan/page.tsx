@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { Html5Qrcode, Html5QrcodeSupportedFormats, Html5QrcodeCameraScanConfig } from 'html5-qrcode';
-import { RefreshCcw, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
+import { RefreshCcw, CheckCircle, XCircle, AlertCircle, X } from 'lucide-react';
 import { getScanFeedbackDismissMs, type ScanFeedbackStatus } from '@/lib/checkin/scanFeedback';
 
 type ScanTicketHandler = (ticketCode: string, method?: string) => Promise<void>;
@@ -26,6 +26,24 @@ export default function WebScannerPage() {
   const isProcessingRef = useRef(false);
   const dismissTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const handleScannedTicketRef = useRef<ScanTicketHandler | null>(null);
+
+  const dismissScanResult = useCallback(() => {
+    if (dismissTimerRef.current !== null) {
+      clearTimeout(dismissTimerRef.current);
+      dismissTimerRef.current = null;
+    }
+
+    setScanResult(null);
+    setIsProcessing(false);
+
+    try {
+      if (scannerRef.current?.isScanning) {
+        scannerRef.current.resume();
+      }
+    } catch (e) {
+      console.error('Failed to resume scanner after dismissing result', e);
+    }
+  }, []);
 
   // Sync ref with state
   useEffect(() => {
@@ -177,19 +195,10 @@ export default function WebScannerPage() {
     }
 
     dismissTimerRef.current = setTimeout(() => {
-      dismissTimerRef.current = null;
       if (!isComponentMounted.current) return;
-      setScanResult(null);
-      setIsProcessing(false);
-      try {
-        if (scannerRef.current?.isScanning) {
-          scannerRef.current.resume();
-        }
-      } catch (e) {
-        console.error('Failed to resume scanner', e);
-      }
+      dismissScanResult();
     }, getScanFeedbackDismissMs(resultStatus));
-  }, []);
+  }, [dismissScanResult]);
 
   useEffect(() => {
     handleScannedTicketRef.current = handleScannedTicket;
@@ -357,9 +366,17 @@ export default function WebScannerPage() {
       {scanResult && (
         <>
           <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40 transition-opacity" />
-          <div className={`fixed bottom-0 left-0 right-0 w-full max-w-md mx-auto rounded-t-3xl p-stack-lg z-50 animate-slide-up shadow-[0_-8px_32px_rgba(0,0,0,0.1)] flex flex-col items-center text-center
+          <div className={`fixed bottom-0 left-0 right-0 w-full max-w-md mx-auto rounded-t-3xl p-stack-lg z-50 animate-slide-up shadow-[0_-8px_32px_rgba(0,0,0,0.1)] flex flex-col items-center text-center relative
             bg-surface-container-lowest dark:bg-[#1e1e1e] dark:border-t dark:border-white/10`}
           >
+            <button
+              type="button"
+              onClick={dismissScanResult}
+              aria-label="Tutup hasil scan"
+              className="absolute top-4 right-4 w-10 h-10 rounded-full flex items-center justify-center text-on-surface-variant hover:bg-surface-container-high dark:text-white/70 dark:hover:bg-white/10 transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
             <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-stack-sm
               ${scanResult.status === 'success' ? 'bg-[#16a34a] text-white' : 'bg-[#ba1a1a] text-white'}`}
             >
