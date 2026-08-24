@@ -1,6 +1,11 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Ticket generation runs in serverless worker routes and Sharp/librsvg
+  // needs the bundled font files at runtime, not only during the build.
+  outputFileTracingIncludes: {
+    '/*': ['./assets/fonts/**/*'],
+  },
   images: {
     remotePatterns: [
       {

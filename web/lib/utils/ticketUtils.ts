@@ -1,6 +1,68 @@
 import crypto from 'crypto';
+import fs from 'node:fs';
+import path from 'node:path';
 import QRCode from 'qrcode';
 import sharp from 'sharp';
+
+const TICKET_FONT_FAMILY = 'Noto Sans';
+const TICKET_FONT_DIRECTORY = path.join(process.cwd(), 'assets', 'fonts');
+const TICKET_FONT_CONFIG_DIRECTORY = path.join('/tmp', 'ticketin-fontconfig');
+const TICKET_FONT_CONFIG_PATH = path.join(TICKET_FONT_CONFIG_DIRECTORY, 'fonts.conf');
+const TICKET_FONT_CACHE_DIRECTORY = path.join('/tmp', 'ticketin-font-cache');
+const TICKET_FONT_FILES = ['NotoSans-Regular.ttf', 'NotoSans-Bold.ttf'] as const;
+let ticketFontConfigReady = false;
+
+function escapeXml(value: string): string {
+  return value.replace(/[<>&'"]/g, (character) => {
+    switch (character) {
+      case '<':
+        return '&lt;';
+      case '>':
+        return '&gt;';
+      case '&':
+        return '&amp;';
+      case '"':
+        return '&quot;';
+      case "'":
+        return '&apos;';
+      default:
+        return character;
+    }
+  });
+}
+
+function ensureTicketFontConfig(): void {
+  if (ticketFontConfigReady) {
+    return;
+  }
+
+  const missingFont = TICKET_FONT_FILES.find(
+    (fontFile) => !fs.existsSync(path.join(TICKET_FONT_DIRECTORY, fontFile)),
+  );
+  if (missingFont) {
+    throw new Error(`Ticket font asset is missing: ${missingFont}`);
+  }
+
+  fs.mkdirSync(TICKET_FONT_CONFIG_DIRECTORY, { recursive: true });
+  fs.mkdirSync(TICKET_FONT_CACHE_DIRECTORY, { recursive: true });
+  fs.writeFileSync(
+    TICKET_FONT_CONFIG_PATH,
+    `<?xml version="1.0"?>
+<!DOCTYPE fontconfig SYSTEM "fonts.dtd">
+<fontconfig>
+  <dir>${escapeXml(TICKET_FONT_DIRECTORY)}</dir>
+  <cachedir>${escapeXml(TICKET_FONT_CACHE_DIRECTORY)}</cachedir>
+</fontconfig>
+`,
+    'utf8',
+  );
+
+  // Sharp/librsvg resolves SVG <text> through fontconfig on Linux. Keep the
+  // config and cache in /tmp, which is writable in Vercel serverless workers.
+  process.env.FONTCONFIG_FILE = TICKET_FONT_CONFIG_PATH;
+  process.env.FONTCONFIG_PATH = TICKET_FONT_CONFIG_DIRECTORY;
+  ticketFontConfigReady = true;
+}
 
 /**
  * Generates an 8-character random alphanumeric string for a ticket code.
@@ -18,6 +80,8 @@ export function generateRandomTicketCode(): string {
 }
 
 export async function generateQrCodeWithText(ticketCode: string, participantName: string, eventName: string): Promise<Buffer> {
+  ensureTicketFontConfig();
+
   // 1. Generate the base QR Code as a Buffer
   const qrBuffer = await QRCode.toBuffer(ticketCode, {
     errorCorrectionLevel: 'H',
@@ -48,18 +112,18 @@ export async function generateQrCodeWithText(ticketCode: string, participantName
       <!-- Top Section: Event Info -->
       <rect x="0" y="0" width="${width}" height="140" fill="#4f46e5" rx="24"/>
       <rect x="0" y="100" width="${width}" height="40" fill="#4f46e5"/> <!-- To square bottom of header -->
-      <text x="50%" y="70" font-family="Arial, sans-serif" font-size="28" font-weight="bold" fill="#ffffff" text-anchor="middle">
+      <text x="50%" y="70" font-family="${TICKET_FONT_FAMILY}" font-size="28" font-weight="bold" fill="#ffffff" text-anchor="middle">
         TICKET KELUAR MASUK
       </text>
-      <text x="50%" y="110" font-family="Arial, sans-serif" font-size="20" font-weight="normal" fill="#e0e7ff" text-anchor="middle">
+      <text x="50%" y="110" font-family="${TICKET_FONT_FAMILY}" font-size="20" font-weight="normal" fill="#e0e7ff" text-anchor="middle">
         ${safeEvent}
       </text>
 
       <!-- Bottom Section: Participant & Ticket Code -->
-      <text x="50%" y="540" font-family="Arial, sans-serif" font-size="16" fill="#6b7280" text-anchor="middle" letter-spacing="2">
+      <text x="50%" y="540" font-family="${TICKET_FONT_FAMILY}" font-size="16" fill="#6b7280" text-anchor="middle" letter-spacing="2">
         NAMA PESERTA
       </text>
-      <text x="50%" y="580" font-family="Arial, sans-serif" font-size="32" font-weight="bold" fill="#111827" text-anchor="middle">
+      <text x="50%" y="580" font-family="${TICKET_FONT_FAMILY}" font-size="32" font-weight="bold" fill="#111827" text-anchor="middle">
         ${safeName}
       </text>
 
@@ -68,10 +132,10 @@ export async function generateQrCodeWithText(ticketCode: string, participantName
       <circle cx="0" cy="620" r="16" fill="#f3f4f6"/>
       <circle cx="500" cy="620" r="16" fill="#f3f4f6"/>
 
-      <text x="50%" y="670" font-family="Arial, sans-serif" font-size="16" fill="#6b7280" text-anchor="middle" letter-spacing="2">
+      <text x="50%" y="670" font-family="${TICKET_FONT_FAMILY}" font-size="16" fill="#6b7280" text-anchor="middle" letter-spacing="2">
         KODE TIKET
       </text>
-      <text x="50%" y="710" font-family="Arial, sans-serif" font-size="36" font-weight="bold" fill="#4f46e5" text-anchor="middle" letter-spacing="4">
+      <text x="50%" y="710" font-family="${TICKET_FONT_FAMILY}" font-size="36" font-weight="bold" fill="#4f46e5" text-anchor="middle" letter-spacing="4">
         ${ticketCode}
       </text>
     </svg>
