@@ -3,6 +3,9 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useParams, useSearchParams, useRouter } from 'next/navigation';
 
+const POLLING_INTERVAL_MS = 3000;
+const POLLING_TIMEOUT_MS = 60000;
+
 export default function StatusCheckPage() {
   const params = useParams();
   const searchParams = useSearchParams();
@@ -20,7 +23,7 @@ export default function StatusCheckPage() {
   const [error, setError] = useState('');
 
   const [ticketData, setTicketData] = useState<any>(null);
-  const [pollingStatus, setPollingStatus] = useState<'idle' | 'processing' | 'completed'>('idle');
+  const [pollingStatus, setPollingStatus] = useState<'idle' | 'processing' | 'completed' | 'failed'>('idle');
 
   // Submit form
   const checkStatus = async (e?: React.FormEvent, checkName?: string, checkEmail?: string) => {
@@ -68,30 +71,59 @@ export default function StatusCheckPage() {
 
   // Polling effect
   useEffect(() => {
-    let interval: any;
-    if (pollingStatus === 'processing' && ticketData?.id) {
-      interval = setInterval(async () => {
-        try {
-          const res = await fetch(`/api/v1/registration/${ticketData.id}/status`);
-          const data = await res.json();
-          if (data.status === 'completed') {
-            setTicketData((prev: any) => ({
-              ...prev,
-              qr_code_url: data.qr_code_url,
-              ticket_code: data.ticket_code
-            }));
-            setPollingStatus('completed');
-            clearInterval(interval);
-          }
-        } catch (err) {
-          // just retry on next interval
-        }
-      }, 3000);
-    }
-    return () => {
-      if (interval) clearInterval(interval);
+    if (pollingStatus !== 'processing' || !ticketData?.registration_id) return;
+
+    let stopped = false;
+    let requestInFlight = false;
+    const interval = window.setInterval(() => {
+      void pollStatus();
+    }, POLLING_INTERVAL_MS);
+    const timeout = window.setTimeout(() => {
+      if (stopped) return;
+      stopped = true;
+      window.clearInterval(interval);
+      setPollingStatus('failed');
+      setError('Tiket belum selesai diterbitkan. Silakan cek status kembali beberapa saat lagi.');
+    }, POLLING_TIMEOUT_MS);
+
+    const stopPolling = () => {
+      stopped = true;
+      window.clearInterval(interval);
+      window.clearTimeout(timeout);
     };
-  }, [pollingStatus, ticketData?.id]);
+
+    async function pollStatus() {
+      if (stopped || requestInFlight) return;
+      requestInFlight = true;
+      try {
+        const res = await fetch(`/api/v1/registration/${encodeURIComponent(ticketData.registration_id)}/status`, {
+          cache: 'no-store',
+        });
+        const data = await res.json();
+        if (!res.ok || data.status === 'error') return;
+
+        if (data.status === 'completed') {
+          stopPolling();
+          setTicketData((prev: any) => ({
+            ...prev,
+            qr_code_url: data.qr_code_url,
+            ticket_code: data.ticket_code,
+          }));
+          setPollingStatus('completed');
+        }
+      } catch {
+        // Transient polling errors are retried until the timeout is reached.
+      } finally {
+        requestInFlight = false;
+      }
+    }
+
+    void pollStatus();
+
+    return () => {
+      stopPolling();
+    };
+  }, [pollingStatus, ticketData?.registration_id]);
 
   return (
     <main className="flex-grow w-full max-w-[1200px] mx-auto px-margin-mobile md:px-margin-desktop py-stack-lg flex flex-col items-center justify-center relative">
@@ -224,6 +256,16 @@ export default function StatusCheckPage() {
                 <div>
                   <h3 className="font-body-lg text-body-lg text-primary font-bold mb-stack-sm">Sedang Menerbitkan Tiket</h3>
                   <p className="font-description text-description text-on-surface-variant">Sistem sedang men-generate QR Code unik Anda. Mohon tunggu...</p>
+                </div>
+              </section>
+            ) : ticketData.status === 'Accepted' && pollingStatus === 'failed' ? (
+              <section className="bg-surface-container-lowest rounded-xl p-stack-lg shadow-[0_4px_12px_rgba(0,0,0,0.05)] flex flex-col items-center justify-center text-center gap-stack-md border border-surface-variant">
+                <div className="w-16 h-16 rounded-full bg-error-container flex items-center justify-center text-error">
+                  <span className="material-symbols-outlined text-[32px]">error</span>
+                </div>
+                <div>
+                  <h3 className="font-body-lg text-body-lg text-primary font-bold mb-stack-sm">Tiket Belum Siap</h3>
+                  <p className="font-description text-description text-on-surface-variant">{error}</p>
                 </div>
               </section>
             ) : ticketData.status === 'Accepted' && pollingStatus === 'completed' ? (

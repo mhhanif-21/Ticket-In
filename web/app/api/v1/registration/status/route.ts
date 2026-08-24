@@ -7,6 +7,7 @@ import { getClientIp } from '@/lib/security/ip';
 import { checkRateLimit } from '@/lib/security/rateLimit';
 
 export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
 
 const MAX_LOOKUP_REQUESTS_PER_MINUTE = 15;
 const MAX_LOOKUP_REQUESTS_PER_EVENT_PER_MINUTE = 60;
@@ -121,6 +122,7 @@ export async function GET(request: Request) {
 
     const regRecords = await db
       .select({
+        id: registrations.id,
         status: registrations.status,
         ticketCode: registrations.ticketCode,
         qrCodeUrl: registrations.qrCodeUrl,
@@ -148,6 +150,7 @@ export async function GET(request: Request) {
         status: 'success',
         message: 'Tiket berhasil ditemukan',
         data: {
+          registration_id: reg.id,
           status: reg.status,
           ticket_code: reg.ticketCode,
           qr_code_url: reg.qrCodeUrl,
