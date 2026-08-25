@@ -11,7 +11,7 @@ class FakeExportService extends AdminService {
   FakeExportService(this.statuses);
 
   @override
-  Future<Map<String, dynamic>> getParticipants(String eventId, {String? status, String? attendance, String? sort, String? search, int page = 1, int limit = 15}) async => {
+  Future<Map<String, dynamic>> getParticipants(String eventId, {String? status, String? attendance, String? sort, String? search, DateTime? startDate, DateTime? endDate, int page = 1, int limit = 15}) async => {
         'data': <dynamic>[],
         'meta': {'totalPages': 1},
       };

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
 import '../services/admin_service.dart';
+import '../utils/participant_answers.dart';
 
 class ReviewDetailScreen extends StatefulWidget {
   final Map<String, dynamic> participantData;
@@ -16,6 +17,7 @@ class _ReviewDetailScreenState extends State<ReviewDetailScreen> {
   bool _isProcessing = false;
 
   void _updateStatus(String status) async {
+    if (widget.participantData['status']?.toString() != 'Pending') return;
     setState(() => _isProcessing = true);
     try {
       final action = status == 'Accepted' ? 'Approve' : 'Reject';
@@ -30,6 +32,26 @@ class _ReviewDetailScreenState extends State<ReviewDetailScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Gagal: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isProcessing = false);
+    }
+  }
+
+  void _retryTicket() async {
+    setState(() => _isProcessing = true);
+    try {
+      await (widget.adminService ?? AdminService()).retryTicketGeneration(widget.participantData['id']);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Retry penerbitan tiket berhasil dikirim')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Gagal retry tiket: $e')),
         );
       }
     } finally {
@@ -55,6 +77,14 @@ class _ReviewDetailScreenState extends State<ReviewDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final currentStatus = widget.participantData['status']?.toString() ?? 'Pending';
+    final ticketJobStatus = widget.participantData['ticketJobStatus']?.toString();
+    final participantName = _textValue(widget.participantData['name'], fallback: 'Unknown');
+    final answerRows = buildParticipantAnswerRows(
+      answers: widget.participantData['answers'],
+      answerFieldLabels: widget.participantData['answerFieldLabels'],
+    );
+
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
@@ -95,26 +125,26 @@ class _ReviewDetailScreenState extends State<ReviewDetailScreen> {
                     ),
                     alignment: Alignment.center,
                     child: Text(
-                      widget.participantData['name']?[0] ?? '?',
+                      participantName.isNotEmpty ? participantName[0] : '?',
                       style: const TextStyle(fontSize: 32, fontWeight: FontWeight.w600, color: AppColors.secondary),
                     ),
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    widget.participantData['name'] ?? 'Unknown',
+                    participantName,
                     style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w600, color: AppColors.onSurface),
                   ),
                   const SizedBox(height: 8),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(
-                      color: _getStatusBgColor(widget.participantData['status'] ?? 'Pending'),
+                      color: _getStatusBgColor(currentStatus),
                       borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: _getStatusBgColor(widget.participantData['status'] ?? 'Pending')),
+                      border: Border.all(color: _getStatusBgColor(currentStatus)),
                     ),
                     child: Text(
-                      widget.participantData['status'] ?? 'Pending',
-                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: _getStatusTextColor(widget.participantData['status'] ?? 'Pending')),
+                      currentStatus,
+                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: _getStatusTextColor(currentStatus)),
                     ),
                   ),
                 ],
@@ -126,22 +156,24 @@ class _ReviewDetailScreenState extends State<ReviewDetailScreen> {
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.onSurface),
             ),
             const SizedBox(height: 16),
-            _buildDetailRow('Email', widget.participantData['email'] ?? '-'),
+            _buildDetailRow('Email', _textValue(widget.participantData['email'])),
             const SizedBox(height: 12),
-            _buildDetailRow('Waktu Daftar', widget.participantData['createdAt'] ?? '-'),
+            _buildDetailRow('Waktu Daftar', _textValue(widget.participantData['createdAt'])),
             const SizedBox(height: 32),
             const Text(
               'Jawaban Form',
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.onSurface),
             ),
             const SizedBox(height: 16),
-            if (widget.participantData['answers'] != null)
-              ...((widget.participantData['answers'] as Map<String, dynamic>).entries.map((e) {
+            if (answerRows.isEmpty)
+              _buildDetailRow('Jawaban', '-')
+            else
+              ...answerRows.map((row) {
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 12.0),
-                  child: _buildDetailRow(e.key, e.value.toString()),
+                  child: _buildDetailRow(row.label, row.value),
                 );
-              }).toList()),
+              }),
           ],
         ),
       ),
@@ -156,37 +188,57 @@ class _ReviewDetailScreenState extends State<ReviewDetailScreen> {
           top: false,
           child: Padding(
             padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: _isProcessing ? null : () => _updateStatus('Rejected'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: AppColors.error,
-                      side: const BorderSide(color: AppColors.error),
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
-                    child: const Text('Tolak', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+            child: currentStatus == 'Pending'
+                ? Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: _isProcessing ? null : () => _updateStatus('Rejected'),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: AppColors.error,
+                            side: const BorderSide(color: AppColors.error),
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                          child: const Text('Tolak', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: _isProcessing ? null : () => _updateStatus('Accepted'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primary,
+                            foregroundColor: AppColors.onPrimary,
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                          child: _isProcessing
+                            ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: AppColors.onPrimary, strokeWidth: 2))
+                            : const Text('Setujui', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                        ),
+                      ),
+                    ],
+                  )
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text(
+                        'Status $currentStatus sudah final.',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(color: AppColors.onSurfaceVariant),
+                      ),
+                      if (currentStatus == 'Accepted' && (ticketJobStatus == null || ticketJobStatus == 'failed')) ...[
+                        const SizedBox(height: 12),
+                        OutlinedButton(
+                          onPressed: _isProcessing ? null : _retryTicket,
+                          child: _isProcessing
+                              ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                              : const Text('Retry Penerbitan Tiket'),
+                        ),
+                      ],
+                    ],
                   ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: _isProcessing ? null : () => _updateStatus('Accepted'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                      foregroundColor: AppColors.onPrimary,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
-                    child: _isProcessing
-                      ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: AppColors.onPrimary, strokeWidth: 2))
-                      : const Text('Setujui', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
-                  ),
-                ),
-              ],
-            ),
           ),
         ),
       ),
@@ -202,5 +254,11 @@ class _ReviewDetailScreenState extends State<ReviewDetailScreen> {
         Text(value, style: const TextStyle(fontSize: 16, color: AppColors.onSurface)),
       ],
     );
+  }
+
+  String _textValue(Object? value, {String fallback = '-'}) {
+    if (value == null) return fallback;
+    final text = value.toString().trim();
+    return text.isEmpty ? fallback : text;
   }
 }

@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'dart:async';
 import '../theme/app_colors.dart';
 import '../services/admin_service.dart';
+import '../utils/participant_answers.dart';
 // [MOB-BUG-013] FIX: Import dari provider terpusat
 import '../providers/admin_providers.dart';
 
@@ -20,6 +21,8 @@ class ParticipantsState {
   final String filterStatus;
   final String filterAttendance;
   final String filterSort;
+  final DateTime? filterStartDate;
+  final DateTime? filterEndDate;
   final String? error;
 
   ParticipantsState({
@@ -32,6 +35,8 @@ class ParticipantsState {
     this.filterStatus = 'Semua',
     this.filterAttendance = 'Semua',
     this.filterSort = 'desc',
+    this.filterStartDate,
+    this.filterEndDate,
     this.error,
   });
 
@@ -45,6 +50,9 @@ class ParticipantsState {
     String? filterStatus,
     String? filterAttendance,
     String? filterSort,
+    DateTime? filterStartDate,
+    DateTime? filterEndDate,
+    bool clearDateRange = false,
     String? error,
     bool clearError = false,
   }) {
@@ -58,6 +66,8 @@ class ParticipantsState {
       filterStatus: filterStatus ?? this.filterStatus,
       filterAttendance: filterAttendance ?? this.filterAttendance,
       filterSort: filterSort ?? this.filterSort,
+      filterStartDate: clearDateRange ? null : (filterStartDate ?? this.filterStartDate),
+      filterEndDate: clearDateRange ? null : (filterEndDate ?? this.filterEndDate),
       error: clearError ? null : (error ?? this.error),
     );
   }
@@ -66,6 +76,7 @@ class ParticipantsState {
 class ParticipantsNotifier extends FamilyNotifier<ParticipantsState, String> {
   late String eventId;
   late final AdminService adminService;
+  int _requestGeneration = 0;
 
   @override
   ParticipantsState build(String eventId) {
@@ -76,7 +87,8 @@ class ParticipantsNotifier extends FamilyNotifier<ParticipantsState, String> {
   }
 
   Future<void> _loadInitial() async {
-    state = state.copyWith(isLoading: true, error: null, clearError: true);
+    final requestGeneration = ++_requestGeneration;
+    state = state.copyWith(isLoading: true, isFetchingMore: false, error: null, clearError: true);
     try {
       final res = await adminService.getParticipants(
         eventId,
@@ -84,10 +96,14 @@ class ParticipantsNotifier extends FamilyNotifier<ParticipantsState, String> {
         attendance: state.filterAttendance,
         sort: state.filterSort,
         search: state.searchQuery,
+        startDate: state.filterStartDate,
+        endDate: state.filterEndDate,
         page: 1,
       );
       final data = res['data'] as List;
       final totalPages = res['meta']['totalPages'] as int;
+
+      if (requestGeneration != _requestGeneration) return;
 
       state = state.copyWith(
         participants: data,
@@ -96,6 +112,7 @@ class ParticipantsNotifier extends FamilyNotifier<ParticipantsState, String> {
         isLoading: false,
       );
     } catch (e) {
+      if (requestGeneration != _requestGeneration) return;
       state = state.copyWith(isLoading: false, error: e.toString());
     }
   }
@@ -103,6 +120,7 @@ class ParticipantsNotifier extends FamilyNotifier<ParticipantsState, String> {
   Future<void> loadMore() async {
     if (state.isLoading || state.isFetchingMore || !state.hasMore) return;
 
+    final requestGeneration = _requestGeneration;
     state = state.copyWith(isFetchingMore: true);
     try {
       final nextPage = state.page + 1;
@@ -112,10 +130,14 @@ class ParticipantsNotifier extends FamilyNotifier<ParticipantsState, String> {
         attendance: state.filterAttendance,
         sort: state.filterSort,
         search: state.searchQuery,
+        startDate: state.filterStartDate,
+        endDate: state.filterEndDate,
         page: nextPage,
       );
       final data = res['data'] as List;
       final totalPages = res['meta']['totalPages'] as int;
+
+      if (requestGeneration != _requestGeneration) return;
 
       state = state.copyWith(
         participants: [...state.participants, ...data],
@@ -124,6 +146,7 @@ class ParticipantsNotifier extends FamilyNotifier<ParticipantsState, String> {
         isFetchingMore: false,
       );
     } catch (e) {
+      if (requestGeneration != _requestGeneration) return;
       state = state.copyWith(isFetchingMore: false, error: e.toString());
     }
   }
@@ -134,17 +157,33 @@ class ParticipantsNotifier extends FamilyNotifier<ParticipantsState, String> {
     _loadInitial();
   }
 
-  void updateFilters({String? status, String? attendance, String? sort}) {
+  void updateFilters({
+    String? status,
+    String? attendance,
+    String? sort,
+    DateTime? startDate,
+    DateTime? endDate,
+    bool clearDateRange = false,
+  }) {
     state = state.copyWith(
       filterStatus: status,
       filterAttendance: attendance,
       filterSort: sort,
+      filterStartDate: startDate,
+      filterEndDate: endDate,
+      clearDateRange: clearDateRange,
     );
     _loadInitial();
   }
 
-  void refresh() {
-    _loadInitial();
+  Future<void> refresh() {
+    return _loadInitial();
+  }
+
+  void clearError() {
+    if (state.error != null) {
+      state = state.copyWith(clearError: true);
+    }
   }
 }
 
@@ -286,6 +325,8 @@ class _ParticipantsScreenState extends ConsumerState<ParticipantsScreen> {
     String tempStatus = currentState.filterStatus;
     String tempAttendance = currentState.filterAttendance;
     String tempSort = currentState.filterSort;
+    DateTime? tempStartDate = currentState.filterStartDate;
+    DateTime? tempEndDate = currentState.filterEndDate;
 
     showModalBottomSheet(
       context: context,
@@ -363,6 +404,8 @@ class _ParticipantsScreenState extends ConsumerState<ParticipantsScreen> {
                                               tempStatus = status;
                                               tempAttendance =
                                                   'Semua'; // Reset mutually exclusive filters
+                                              tempStartDate = null;
+                                              tempEndDate = null;
                                             }
                                           });
                                         },
@@ -408,6 +451,8 @@ class _ParticipantsScreenState extends ConsumerState<ParticipantsScreen> {
                                           tempAttendance = att;
                                           tempStatus =
                                               'Semua'; // Reset mutually exclusive filters
+                                          tempStartDate = null;
+                                          tempEndDate = null;
                                         }
                                       });
                                     },
@@ -426,7 +471,7 @@ class _ParticipantsScreenState extends ConsumerState<ParticipantsScreen> {
                               ),
                               const SizedBox(height: 24),
 
-                              // Filter 3: Waktu Pendaftaran (Sort)
+                              // Filter 3: Waktu Pendaftaran
                               const Text(
                                 'Waktu Pendaftaran',
                                 style: TextStyle(
@@ -435,6 +480,47 @@ class _ParticipantsScreenState extends ConsumerState<ParticipantsScreen> {
                                   color: AppColors.onSurfaceVariant,
                                 ),
                               ),
+                              const SizedBox(height: 12),
+                              OutlinedButton.icon(
+                                onPressed: () async {
+                                  final firstDate = await showDatePicker(
+                                    context: context,
+                                    initialDate: tempStartDate ?? tempEndDate ?? DateTime.now(),
+                                    firstDate: DateTime(2000),
+                                    lastDate: DateTime(2100),
+                                  );
+                                  if (firstDate == null || !context.mounted) return;
+
+                                  final lastDate = await showDatePicker(
+                                    context: context,
+                                    initialDate: tempEndDate ?? firstDate,
+                                    firstDate: firstDate,
+                                    lastDate: DateTime(2100),
+                                  );
+                                  if (lastDate == null) return;
+
+                                  setSheetState(() {
+                                    tempStartDate = firstDate;
+                                    tempEndDate = lastDate;
+                                    tempStatus = 'Semua';
+                                    tempAttendance = 'Semua';
+                                  });
+                                },
+                                icon: const Icon(Icons.date_range),
+                                label: Text(
+                                  tempStartDate != null && tempEndDate != null
+                                      ? '${_formatDate(tempStartDate!)} - ${_formatDate(tempEndDate!)}'
+                                      : 'Pilih rentang tanggal',
+                                ),
+                              ),
+                              if (tempStartDate != null || tempEndDate != null)
+                                TextButton(
+                                  onPressed: () => setSheetState(() {
+                                    tempStartDate = null;
+                                    tempEndDate = null;
+                                  }),
+                                  child: const Text('Hapus rentang tanggal'),
+                                ),
                               const SizedBox(height: 12),
                               Wrap(
                                 spacing: 8,
@@ -478,6 +564,9 @@ class _ParticipantsScreenState extends ConsumerState<ParticipantsScreen> {
                               status: tempStatus,
                               attendance: tempAttendance,
                               sort: tempSort,
+                              startDate: tempStartDate,
+                              endDate: tempEndDate,
+                              clearDateRange: tempStartDate == null && tempEndDate == null,
                             );
                             Navigator.pop(context);
                           },
@@ -524,17 +613,22 @@ class _ParticipantsScreenState extends ConsumerState<ParticipantsScreen> {
     );
   }
 
+  String _formatDate(DateTime value) =>
+      '${value.day.toString().padLeft(2, '0')}/${value.month.toString().padLeft(2, '0')}/${value.year}';
+
   @override
   Widget build(BuildContext context) {
     // [BUG-063] FIX: Menggunakan Riverpod StateNotifierProvider alih-alih setState lokal yang kotor
     final state = ref.watch(participantsProvider(widget.eventId));
 
     // Handle error UI feedback once
-    if (state.error != null) {
+    final errorMessage = state.error;
+    if (errorMessage != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text(state.error!)));
+        ).showSnackBar(SnackBar(content: Text(errorMessage)));
+        ref.read(participantsProvider(widget.eventId).notifier).clearError();
       });
     }
 
@@ -582,7 +676,7 @@ class _ParticipantsScreenState extends ConsumerState<ParticipantsScreen> {
       ),
       body: RefreshIndicator(
         onRefresh: () async {
-          ref.read(participantsProvider(widget.eventId).notifier).refresh();
+          await ref.read(participantsProvider(widget.eventId).notifier).refresh();
         },
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 16.0),
@@ -624,9 +718,11 @@ class _ParticipantsScreenState extends ConsumerState<ParticipantsScreen> {
                         color: AppColors.surface,
                         borderRadius: BorderRadius.circular(10),
                         border: Border.all(
-                          color:
-                              (state.filterStatus != 'Semua' ||
-                                  state.filterAttendance != 'Semua')
+                            color:
+                            (state.filterStatus != 'Semua' ||
+                                  state.filterAttendance != 'Semua' ||
+                                  state.filterStartDate != null ||
+                                  state.filterEndDate != null)
                               ? AppColors.primary
                               : AppColors.outlineVariant,
                         ),
@@ -635,7 +731,9 @@ class _ParticipantsScreenState extends ConsumerState<ParticipantsScreen> {
                         Icons.tune,
                         color:
                             (state.filterStatus != 'Semua' ||
-                                state.filterAttendance != 'Semua')
+                                state.filterAttendance != 'Semua' ||
+                                state.filterStartDate != null ||
+                                state.filterEndDate != null)
                             ? AppColors.primary
                             : AppColors.secondary,
                       ),
@@ -724,7 +822,10 @@ class _ParticipantsScreenState extends ConsumerState<ParticipantsScreen> {
 
   Widget _buildParticipantCard(Map<String, dynamic> p) {
     final name = p['name'] ?? 'Unknown';
-    final organization = p['company'] ?? p['organization'] ?? '-';
+    final organization = participantOrganizationValue(
+      answers: p['answers'],
+      answerFieldLabels: p['answerFieldLabels'],
+    );
     // [BUG-050] FIX: Mendukung status "Draft"
     final status = p['status'] ?? 'Pending';
     final attendance = p['presenceStatus'] ?? 'Absent';

@@ -56,17 +56,27 @@ class AdminService {
     String? attendance,
     String? sort,
     String? search,
+    DateTime? startDate,
+    DateTime? endDate,
     int page = 1,
     int limit = 15,
   }) async {
-    List<String> queries = ['page=$page', 'limit=$limit'];
+    final queryParameters = <String, String>{
+      'page': page.toString(),
+      'limit': limit.toString(),
+    };
 
-    if (status != null && status != 'Semua') queries.add('status=$status');
-    if (attendance != null && attendance != 'Semua') queries.add('attendance=${attendance == 'Hadir' ? 'true' : 'false'}');
-    if (sort != null) queries.add('sort=$sort');
-    if (search != null && search.isNotEmpty) queries.add('search=$search');
+    if (status != null && status != 'Semua') queryParameters['status'] = status;
+    if (attendance != null && attendance != 'Semua') {
+      queryParameters['attendance'] = attendance == 'Hadir' ? 'true' : 'false';
+    }
+    if (sort != null) queryParameters['sort'] = sort;
+    if (search != null && search.isNotEmpty) queryParameters['search'] = search;
+    if (startDate != null) queryParameters['start_date'] = _dateQueryValue(startDate);
+    if (endDate != null) queryParameters['end_date'] = _dateQueryValue(endDate);
 
-    final queryString = queries.isNotEmpty ? '?${queries.join('&')}' : '';
+    final encodedQuery = Uri(queryParameters: queryParameters).query;
+    final queryString = encodedQuery.isEmpty ? '' : '?$encodedQuery';
     final response = await _api.get('/v1/events/$eventId/registrations$queryString');
 
     if (response.statusCode == 200) {
@@ -87,6 +97,19 @@ class AdminService {
     );
     if (response.statusCode != 200) {
       throw Exception('Failed to review participant: ${response.body}');
+    }
+  }
+
+  String _dateQueryValue(DateTime value) =>
+      '${value.year.toString().padLeft(4, '0')}-${value.month.toString().padLeft(2, '0')}-${value.day.toString().padLeft(2, '0')}';
+
+  Future<void> retryTicketGeneration(String registrationId) async {
+    final response = await _api.post(
+      '/v1/registrations/$registrationId/ticket/retry',
+      {},
+    );
+    if (response.statusCode != 200) {
+      throw Exception('Failed to retry ticket generation: ${response.body}');
     }
   }
 }

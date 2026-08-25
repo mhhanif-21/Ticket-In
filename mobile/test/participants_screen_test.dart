@@ -16,6 +16,8 @@ class FakeParticipantsService extends AdminService {
     String? attendance,
     String? sort,
     String? search,
+    DateTime? startDate,
+    DateTime? endDate,
     int page = 1,
     int limit = 15,
   }) async {
