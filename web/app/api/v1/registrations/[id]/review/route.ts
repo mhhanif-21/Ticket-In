@@ -35,21 +35,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
     if (action === 'Approve') {
       const transition = await db.transaction(async (tx) => {
+        // Review actions are strict state transitions. A second Approve is not
+        // a ticket retry and must not republish the worker job.
         const [updated] = await tx.update(registrations)
           .set({ status: 'Accepted' })
           .where(and(eq(registrations.id, id), eq(registrations.status, 'Pending')))
           .returning({ id: registrations.id });
 
-        if (!updated) {
-          const [existing] = await tx
-            .select({ status: registrations.status })
-            .from(registrations)
-            .where(eq(registrations.id, id))
-            .limit(1);
-          if (!existing || existing.status !== 'Accepted') {
-            return null;
-          }
-        }
+        if (!updated) return null;
 
         // The acceptance transition and durable job creation commit together.
         const job = await ensureTicketGenerationJobTx(tx, id);
@@ -57,7 +50,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       });
 
       if (!transition) {
-        return NextResponse.json({ status: 'error', message: 'Registrasi tidak ditemukan atau bukan berstatus Pending' }, { status: 409 });
+        return NextResponse.json({
+          status: 'error',
+          message: 'Registrasi tidak ditemukan atau bukan berstatus Pending. Status final tidak dapat diubah ulang.',
+        }, { status: 409 });
       }
 
       try {

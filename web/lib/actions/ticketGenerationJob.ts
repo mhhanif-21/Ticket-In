@@ -14,6 +14,26 @@ export interface TicketGenerationJob {
   lastError: string | null;
 }
 
+export function getTicketWorkerUrl(): string {
+  const configuredUrl = process.env.NEXT_URL?.trim()
+    || process.env.NEXT_PUBLIC_APP_URL?.trim()
+    || (process.env.VERCEL_URL?.trim() ? `https://${process.env.VERCEL_URL.trim()}` : '')
+    || 'http://localhost:3000';
+
+  let parsedUrl: URL;
+  try {
+    parsedUrl = new URL(configuredUrl);
+  } catch {
+    throw new Error('Ticket worker URL is invalid');
+  }
+
+  if (!['http:', 'https:'].includes(parsedUrl.protocol)) {
+    throw new Error('Ticket worker URL must use HTTP or HTTPS');
+  }
+
+  return `${parsedUrl.origin}${parsedUrl.pathname.replace(/\/$/, '')}/api/v1/worker/process-ticket`;
+}
+
 export async function ensureTicketGenerationJobTx(tx: any, registrationId: string): Promise<TicketGenerationJob> {
   const [inserted] = await tx
     .insert(ticketGenerationJobs)
@@ -134,7 +154,7 @@ export async function publishTicketGenerationJob(registrationId: string): Promis
 
   try {
     const published = await publishJob({
-      url: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/v1/worker/process-ticket`,
+      url: getTicketWorkerUrl(),
       body: { registration_id: registrationId },
     });
     const messageId = typeof published === 'object' && published !== null && 'messageId' in published

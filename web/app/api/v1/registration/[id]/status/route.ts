@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { db } from '@/db';
 import { registrations } from '@/db/schema';
 import { eq } from 'drizzle-orm';
+import { getTicketGenerationJob } from '@/lib/actions/ticketGenerationJob';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -29,22 +30,25 @@ export async function GET(request: Request, props: { params: Promise<{ id: strin
     const reg = regRecords[0];
 
     if (!reg.ticketCode || !reg.qrCodeUrl) {
-      // Self-healing: if status is Accepted but no ticket, trigger it directly.
-      // We don't use QStash here because QStash cannot reach localhost in dev mode.
-      if (reg.status === 'Accepted') {
-        try {
-          const { GenerateTicketAction } = await import('@/lib/actions/ticket');
-          // Start it in background to not block the polling response, though Vercel might kill it.
-          // For local testing, it will run fine.
-          GenerateTicketAction(id).catch(console.error);
-        } catch (err) {
-          console.error('Failed to self-heal ticket generation:', err);
-        }
+      // Ticket generation is owned by the durable QStash worker. A polling
+      // request must only observe job state; fire-and-forget work here can be
+      // terminated by Vercel and leaves the participant loading forever.
+      const job = await getTicketGenerationJob(id);
+      if (job?.status === 'failed') {
+        return NextResponse.json({
+          status: 'failed',
+          message: 'Penerbitan tiket gagal dan perlu diulang oleh admin.',
+          job_status: job.status,
+          qr_code_url: null,
+        }, { status: 200 });
       }
 
       return NextResponse.json({
         status: 'processing',
-        message: 'Sedang diproses...',
+        message: reg.status === 'Accepted'
+          ? 'Tiket sedang diproses oleh worker.'
+          : 'Registrasi belum diterima.',
+        job_status: job?.status || null,
         qr_code_url: null
       }, { status: 200 });
     }

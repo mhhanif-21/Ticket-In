@@ -55,4 +55,20 @@ describe('BUG-008 review state machine', () => {
     }
     publishSpy.mockRestore();
   });
+
+  it('does not allow Approve to be repeated after a final or non-review status', async () => {
+    const publishSpy = vi.spyOn(qstash, 'publishJob');
+
+    for (const registrationId of [acceptedId, rejectedId, draftId]) {
+      const response = await POST(new Request(`http://localhost/api/v1/registrations/${registrationId}/review`, {
+        method: 'POST',
+        body: JSON.stringify({ action: 'Approve' }),
+        headers: { 'Content-Type': 'application/json' },
+      }), { params: Promise.resolve({ id: registrationId }) });
+      expect(response.status).toBe(409);
+    }
+
+    expect(publishSpy).not.toHaveBeenCalled();
+    publishSpy.mockRestore();
+  });
 });

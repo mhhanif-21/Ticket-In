@@ -13,6 +13,17 @@ export interface EmailPayload {
   attachment?: { content: string; name: string }[];
 }
 
+export function getConfiguredBrevoSender(): { email: string; name: string } {
+  const email = process.env.BREVO_SENDER_EMAIL?.trim();
+  const name = process.env.BREVO_SENDER_NAME?.trim() || 'Event Gate';
+
+  if (!email) {
+    throw new Error('BREVO_SENDER_EMAIL is not defined');
+  }
+
+  return { email, name };
+}
+
 export async function sendEmail(payload: EmailPayload): Promise<void> {
   const apiKey = process.env.BREVO_API_KEY?.trim();
   const apiUrl = process.env.BREVO_API_URL?.trim() || DEFAULT_BREVO_API_URL;
@@ -20,10 +31,9 @@ export async function sendEmail(payload: EmailPayload): Promise<void> {
     throw new Error('BREVO_API_KEY is not defined');
   }
 
-  // Fallback sender if not provided
-  if (!payload.sender) {
-    payload.sender = { email: 'noreply@eventgate.com', name: 'Event Gate' };
-  }
+  const requestPayload = payload.sender
+    ? payload
+    : { ...payload, sender: getConfiguredBrevoSender() };
 
   const controller = new AbortController();
   // Hard timeout 3 seconds
@@ -37,7 +47,7 @@ export async function sendEmail(payload: EmailPayload): Promise<void> {
         'Content-Type': 'application/json',
         'api-key': apiKey,
       },
-      body: JSON.stringify(payload),
+      body: JSON.stringify(requestPayload),
       signal: controller.signal,
     });
 

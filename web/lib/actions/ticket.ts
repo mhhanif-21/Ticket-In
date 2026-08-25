@@ -5,10 +5,11 @@ import { generateRandomTicketCode, generateQrCodeWithText } from '../utils/ticke
 import { supabaseAdmin } from '../supabase';
 import { STORAGE_BUCKETS } from '../storage/buckets';
 
-import { sendEmail } from '../services/brevo';
+import { getConfiguredBrevoSender, sendEmail } from '../services/brevo';
 import { events } from '../../db/schema';
 import {
   claimTicketGenerationJob,
+  getTicketGenerationJob,
   markTicketGenerationJobCompleted,
   markTicketGenerationJobFailed,
 } from './ticketGenerationJob';
@@ -84,6 +85,7 @@ export async function triggerTicketEmailDelivery(registrationId: string) {
     to: [{ email: registration.email, name: registration.name }],
     subject: `Your Ticket for ${event.name}`,
     htmlContent,
+    sender: getConfiguredBrevoSender(),
     attachment: [attachment],
   });
   console.log(`Ticket email sent to ${registration.email}`);
@@ -117,8 +119,14 @@ export async function GenerateTicketAction(registrationId: string) {
   // 3. Idempotency Check: Jika tiket sudah digenerate, lewati
   if (registration.ticketCode && registration.qrCodeUrl) {
     console.log(`Ticket already generated for registration ${registrationId}. Skipping generation.`);
-    // Lanjut ke pengiriman email
+    const existingJob = await getTicketGenerationJob(registrationId);
+    if (existingJob?.status === 'completed') {
+      return { status: 'already_generated', ticketCode: registration.ticketCode };
+    }
+    // Reuse the existing QR on delivery retry and close the durable job only
+    // after the email provider accepts the message.
     await triggerTicketEmailDelivery(registrationId);
+    await markTicketGenerationJobCompleted(registrationId);
     return { status: 'already_generated', ticketCode: registration.ticketCode };
   }
 

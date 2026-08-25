@@ -3,6 +3,7 @@ import { eq } from 'drizzle-orm';
 import { db } from '../../db';
 import { events, registrations, ticketGenerationJobs } from '../../db/schema';
 import { POST } from '../../app/api/v1/registrations/[id]/review/route';
+import { POST as retryTicket } from '../../app/api/v1/registrations/[id]/ticket/retry/route';
 import { POST as register } from '../../app/api/v1/events/[id]/register/route';
 import * as qstash from '../../lib/services/qstash';
 import { NextRequest } from 'next/server';
@@ -41,7 +42,11 @@ describe('BUG-009 QStash publish failure', () => {
     const [failedJob] = await db.select().from(ticketGenerationJobs).where(eq(ticketGenerationJobs.registrationId, registrationId));
     expect(failedJob).toMatchObject({ status: 'failed', attempts: 1, lastError: 'QStash unavailable' });
 
-    expect((await POST(request(), { params: Promise.resolve({ id: registrationId }) })).status).toBe(200);
+    const retryResponse = await retryTicket(
+      new Request(`http://localhost/api/v1/registrations/${registrationId}/ticket/retry`, { method: 'POST' }),
+      { params: Promise.resolve({ id: registrationId }) },
+    );
+    expect(retryResponse.status).toBe(200);
     expect(publishSpy).toHaveBeenCalledTimes(2);
     const jobs = await db.select().from(ticketGenerationJobs).where(eq(ticketGenerationJobs.registrationId, registrationId));
     expect(jobs).toHaveLength(1);

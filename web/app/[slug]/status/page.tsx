@@ -110,6 +110,10 @@ export default function StatusCheckPage() {
             ticket_code: data.ticket_code,
           }));
           setPollingStatus('completed');
+        } else if (data.status === 'failed') {
+          stopPolling();
+          setError(data.message || 'Penerbitan tiket gagal. Silakan hubungi panitia.');
+          setPollingStatus('failed');
         }
       } catch {
         // Transient polling errors are retried until the timeout is reached.
