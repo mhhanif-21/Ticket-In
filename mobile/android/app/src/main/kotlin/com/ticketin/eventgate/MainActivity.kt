@@ -1,4 +1,4 @@
-package com.example.event_gate_admin
+package com.ticketin.eventgate
 
 import io.flutter.embedding.android.FlutterActivity
 

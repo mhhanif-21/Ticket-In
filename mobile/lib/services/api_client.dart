@@ -15,8 +15,9 @@ abstract interface class AuthSessionStore {
 class SecureAuthSessionStore implements AuthSessionStore {
   final FlutterSecureStorage _storage;
 
-  const SecureAuthSessionStore({FlutterSecureStorage storage = const FlutterSecureStorage()})
-      : _storage = storage;
+  const SecureAuthSessionStore({
+    FlutterSecureStorage storage = const FlutterSecureStorage(),
+  }) : _storage = storage;
 
   @override
   Future<String?> read({required String key}) => _storage.read(key: key);
@@ -37,13 +38,57 @@ class MultipartUploadFile {
 }
 
 class ApiClient {
-  // Override for a physical device, Docker, staging, or production with:
-  // --dart-define=API_BASE_URL=https://api.example.com/api
-  // The default targets the Android emulator host bridge.
-  static const String baseUrl = String.fromEnvironment(
+  // Every build must provide its endpoint explicitly. For local Android
+  // debugging, pass --dart-define=API_BASE_URL=http://10.0.2.2:3000/api.
+  // Release builds are additionally checked by Gradle and only accept HTTPS.
+  static const String configuredApiBaseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'http://10.0.2.2:3000/api',
   );
+  static const bool isReleaseBuild = bool.fromEnvironment('dart.vm.product');
+  static final String baseUrl = resolveBaseUrl(
+    configuredApiBaseUrl,
+    releaseBuild: isReleaseBuild,
+  );
+
+  static const Set<String> _localDevelopmentHosts = {
+    'localhost',
+    '127.0.0.1',
+    '::1',
+    '10.0.2.2',
+    '10.0.3.2',
+  };
+
+  static String resolveBaseUrl(
+    String rawBaseUrl, {
+    required bool releaseBuild,
+  }) {
+    final value = rawBaseUrl.trim();
+    if (value.isEmpty) {
+      throw StateError(
+        'API_BASE_URL wajib diisi. Gunakan --dart-define=API_BASE_URL=<url>.',
+      );
+    }
+
+    final uri = Uri.tryParse(value);
+    if (uri == null ||
+        (uri.scheme != 'http' && uri.scheme != 'https') ||
+        uri.host.isEmpty) {
+      throw StateError(
+        'API_BASE_URL harus berupa URL HTTP(S) absolut yang valid.',
+      );
+    }
+
+    final host = uri.host.toLowerCase();
+    if (releaseBuild &&
+        (uri.scheme != 'https' || _localDevelopmentHosts.contains(host))) {
+      throw StateError(
+        'Release API_BASE_URL wajib HTTPS dan tidak boleh menuju host lokal atau emulator.',
+      );
+    }
+
+    return value;
+  }
+
   final String _baseUrl;
 
   // [MOB-BUG-006] FIX: Timeout constant agar tidak infinite loading
@@ -59,9 +104,12 @@ class ApiClient {
     String? baseUrl,
     AuthSessionStore? sessionStore,
     http.Client? httpClient,
-  })  : _baseUrl = baseUrl ?? ApiClient.baseUrl,
-        _storage = sessionStore ?? const SecureAuthSessionStore(),
-        _httpClient = httpClient ?? http.Client();
+  }) : _baseUrl = resolveBaseUrl(
+         baseUrl ?? configuredApiBaseUrl,
+         releaseBuild: isReleaseBuild,
+       ),
+       _storage = sessionStore ?? const SecureAuthSessionStore(),
+       _httpClient = httpClient ?? http.Client();
 
   Uri buildUri(String endpoint) => Uri.parse('$_baseUrl$endpoint');
 
