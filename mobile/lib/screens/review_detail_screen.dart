@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../theme/app_colors.dart';
 import '../services/admin_service.dart';
 import '../utils/participant_answers.dart';
@@ -52,6 +53,25 @@ class _ReviewDetailScreenState extends State<ReviewDetailScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Gagal retry tiket: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isProcessing = false);
+    }
+  }
+
+  void _openParticipantFile(String fieldKey) async {
+    setState(() => _isProcessing = true);
+    try {
+      final url = await (widget.adminService ?? AdminService())
+          .getParticipantFileUrl(widget.participantData['id'].toString(), fieldKey);
+      if (!await canLaunchUrl(url) || !await launchUrl(url, mode: LaunchMode.externalApplication)) {
+        throw Exception('Browser tidak dapat membuka berkas.');
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Gagal membuka berkas: $e')),
         );
       }
     } finally {
@@ -171,7 +191,18 @@ class _ReviewDetailScreenState extends State<ReviewDetailScreen> {
               ...answerRows.map((row) {
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 12.0),
-                  child: _buildDetailRow(row.label, row.value),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildDetailRow(row.label, row.value),
+                      if (row.isFile)
+                        TextButton.icon(
+                          onPressed: _isProcessing ? null : () => _openParticipantFile(row.fieldKey),
+                          icon: const Icon(Icons.open_in_new, size: 16),
+                          label: const Text('Buka berkas'),
+                        ),
+                    ],
+                  ),
                 );
               }),
           ],

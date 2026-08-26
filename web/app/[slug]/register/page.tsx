@@ -5,6 +5,7 @@ import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { RegistrationField } from '@/components/registration/RegistrationField';
 import { getRegistrationFieldKey, isStaticRegistrationField, validateRegistrationAnswers } from '@/lib/validation/registrationForm';
+import { validateParticipantFile } from '@/lib/validation/participantFile';
 import {
   loadRegistrationResubmitState,
   saveRegistrationResubmitState,
@@ -45,6 +46,7 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [fileErrors, setFileErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (correctionRegistrationId) {
@@ -74,6 +76,12 @@ export default function RegisterPage() {
     setSubmitting(true);
     setError('');
 
+    if (Object.keys(fileErrors).length > 0) {
+      setSubmitting(false);
+      setError('Perbaiki berkas yang ditandai sebelum mengirim formulir.');
+      return;
+    }
+
     try {
       const formData = new FormData(e.currentTarget);
       const dynamicFields = (eventData.formFields || []).filter((field: any) => !isStaticRegistrationField(field.fieldName));
@@ -87,21 +95,14 @@ export default function RegisterPage() {
         formData.set('resubmit_token', resubmitState.resubmitToken);
       }
 
-      // Client-Side Validation: Check magic bytes for 'image' fields
+      // Repeat the immediate picker validation so programmatic form changes
+      // cannot bypass the browser-side guard.
       for (const [key, value] of formData.entries()) {
         if (value instanceof File && value.size > 0) {
           const fieldDef = eventData.formFields?.find((field: any) => getRegistrationFieldKey(field) === key);
 
           if (fieldDef?.fieldType === 'image' || fieldDef?.fieldType === 'file') {
-            const buffer = await value.slice(0, 8).arrayBuffer();
-            const bytes = new Uint8Array(buffer);
-
-            const isJPEG = bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
-            const isPNG = bytes.length >= 8 && bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47;
-
-            if (!isJPEG && !isPNG) {
-              throw new Error(`Berkas untuk kolom "${fieldDef.fieldName}" tidak valid. Hanya menerima gambar JPG/PNG asli.`);
-            }
+            await validateParticipantFile({ file: value, fieldType: fieldDef.fieldType });
           }
         }
       }
@@ -163,6 +164,27 @@ export default function RegisterPage() {
     }
   };
 
+  const handleFileChange = async (field: any, file: File | null) => {
+    const fieldKey = getRegistrationFieldKey(field);
+    if (!file || file.size === 0) {
+      setFileErrors((current) => {
+        const { [fieldKey]: _removed, ...rest } = current;
+        return rest;
+      });
+      return;
+    }
+    try {
+      await validateParticipantFile({ file, fieldType: field.fieldType });
+      setFileErrors((current) => {
+        const { [fieldKey]: _removed, ...rest } = current;
+        return rest;
+      });
+    } catch (validationError) {
+      const message = validationError instanceof Error ? validationError.message : 'Berkas tidak valid.';
+      setFileErrors((current) => ({ ...current, [fieldKey]: message }));
+    }
+  };
+
   if (loading) {
     return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
   }
@@ -182,7 +204,7 @@ export default function RegisterPage() {
       <div className="hidden md:block md:w-1/2 relative overflow-hidden rounded-[16px]">
         <div className="absolute inset-0 bg-surface-variant flex items-center justify-center">
           {eventData.posterUrl ? (
-            <img className="object-cover w-full h-full mix-blend-multiply opacity-80" src={eventData.posterUrl} alt={eventData.name} />
+            <img className="object-contain w-full h-full mix-blend-multiply opacity-80" src={eventData.posterUrl} alt={eventData.name} />
           ) : (
             <div className="text-secondary font-display-lg text-center px-4">{eventData.name}</div>
           )}
@@ -240,7 +262,15 @@ export default function RegisterPage() {
               }
 
               const fieldKey = getRegistrationFieldKey(field);
-              return <RegistrationField key={fieldKey} field={field} defaultValue={resubmitState?.answers?.[fieldKey]} />;
+              return (
+                <RegistrationField
+                  key={fieldKey}
+                  field={field}
+                  defaultValue={resubmitState?.answers?.[fieldKey]}
+                  fileError={fileErrors[fieldKey]}
+                  onFileChange={handleFileChange}
+                />
+              );
             })}
 
             <div className="pt-stack-md mt-stack-sm border-t border-outline-variant/30">

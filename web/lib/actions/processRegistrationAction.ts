@@ -5,6 +5,7 @@ import { getRegistrationFieldKey, isStaticRegistrationField, validateRegistratio
 import { getVerifiedResubmitToken, issueResubmitTokenRecord } from '../security/resubmit';
 import { ensureTicketGenerationJobTx } from './ticketGenerationJob';
 import { assertEventIsPublic } from '../events/eventLifecycle';
+import { claimParticipantFileUploadsTx } from '../registration/participantFileLifecycle';
 
 interface RegistrationPayload {
   name: string;
@@ -13,6 +14,8 @@ interface RegistrationPayload {
   registrationId?: string; // Untuk re-submit form / ubah email
   resubmitToken?: string;
   preserveAnswers?: boolean; // Retry delivery tanpa mengirim ulang file/field
+  fileUploadIds?: string[];
+  fileUploadRequestId?: string;
 }
 
 async function invalidateResubmitTokensTx(tx: any, registrationId: string, usedAt = new Date()): Promise<void> {
@@ -246,6 +249,17 @@ export async function processRegistrationAction(slug: string, payload: Registrat
         .values(regData)
         .returning({ id: registrations.id, status: registrations.status });
       registrationId = inserted.id;
+    }
+
+    if (!payload.preserveAnswers && payload.fileUploadIds?.length) {
+      if (!payload.fileUploadRequestId) {
+        throw new Error('ParticipantFileClaimFailed: upload ownership proof is required');
+      }
+      await claimParticipantFileUploadsTx(tx, {
+        uploadIds: payload.fileUploadIds,
+        requestId: payload.fileUploadRequestId,
+        registrationId,
+      });
     }
 
     let ticketJobId: string | null = null;

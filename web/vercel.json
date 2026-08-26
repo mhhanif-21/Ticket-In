@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/v1/worker/reconcile-participant-files",
+      "schedule": "0 3 * * *"
+    }
+  ]
+}

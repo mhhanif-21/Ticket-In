@@ -1,8 +1,19 @@
 class ParticipantAnswerRow {
+  final String fieldKey;
   final String label;
   final String value;
+  final Object? rawValue;
 
-  const ParticipantAnswerRow({required this.label, required this.value});
+  const ParticipantAnswerRow({
+    required this.fieldKey,
+    required this.label,
+    required this.value,
+    required this.rawValue,
+  });
+
+  bool get isFile => rawValue is Map &&
+      (rawValue as Map)['fileName'] is String &&
+      ((rawValue as Map)['fileName'] as String).trim().isNotEmpty;
 }
 
 Map<String, dynamic> _asStringKeyedMap(Object? value) {
@@ -61,14 +72,21 @@ List<ParticipantAnswerRow> buildParticipantAnswerRows({
   final answerMap = _asStringKeyedMap(answers);
   final labelMap = _asStringKeyedMap(answerFieldLabels);
 
-  return answerMap.entries.map((entry) {
-    final configuredLabel = labelMap[entry.key];
+  final keys = <String>[...labelMap.keys];
+  for (final key in answerMap.keys) {
+    if (!labelMap.containsKey(key)) keys.add(key);
+  }
+
+  return keys.map((key) {
+    final configuredLabel = labelMap[key];
     final label = configuredLabel is String && configuredLabel.trim().isNotEmpty
         ? configuredLabel.trim()
-        : _humanizeAnswerKey(entry.key);
+        : _humanizeAnswerKey(key);
     return ParticipantAnswerRow(
+      fieldKey: key,
       label: label,
-      value: displayParticipantAnswerValue(entry.value),
+      value: displayParticipantAnswerValue(answerMap[key]),
+      rawValue: answerMap[key],
     );
   }).toList();
 }

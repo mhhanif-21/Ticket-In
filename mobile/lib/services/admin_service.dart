@@ -112,4 +112,17 @@ class AdminService {
       throw Exception('Failed to retry ticket generation: ${response.body}');
     }
   }
+
+  Future<Uri> getParticipantFileUrl(String registrationId, String fieldKey) async {
+    final response = await _api.get('/v1/registrations/$registrationId/files/$fieldKey');
+    if (response.statusCode != 200) {
+      throw Exception('Berkas belum dapat dibuka. Silakan coba lagi.');
+    }
+    final body = jsonDecode(response.body) as Map<String, dynamic>;
+    final url = (body['data'] as Map<String, dynamic>?)?['url']?.toString();
+    if (url == null || url.isEmpty) {
+      throw Exception('Berkas belum dapat dibuka. Silakan coba lagi.');
+    }
+    return Uri.parse(url);
+  }
 }

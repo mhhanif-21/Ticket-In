@@ -13,9 +13,13 @@ interface RegistrationFieldDefinition {
 export function RegistrationField({
   field,
   defaultValue,
+  fileError,
+  onFileChange,
 }: {
   field: RegistrationFieldDefinition;
   defaultValue?: string | string[];
+  fileError?: string;
+  onFileChange?: (field: RegistrationFieldDefinition, file: File | null) => void;
 }) {
   const fieldName = getRegistrationFieldKey(field);
   const options = Array.isArray(field.options) ? field.options.filter((option): option is string => typeof option === 'string') : [];
@@ -45,7 +49,20 @@ export function RegistrationField({
           {options.map((option) => <option key={option} value={option}>{option}</option>)}
         </select>
       ) : field.fieldType === 'file' || field.fieldType === 'image' ? (
-        <input type="file" name={fieldName} required={field.isRequired} accept=".jpg,.jpeg,.png,image/jpeg,image/png" className="w-full px-4 py-3 border border-outline-variant rounded-DEFAULT font-body-md text-primary bg-surface-bright file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-surface-dim file:text-primary hover:file:bg-surface-container-high" />
+        <>
+          <input
+            type="file"
+            name={fieldName}
+            required={field.isRequired}
+            accept={field.fieldType === 'file'
+              ? '.jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf'
+              : '.jpg,.jpeg,.png,image/jpeg,image/png'}
+            onChange={(event) => onFileChange?.(field, event.currentTarget.files?.[0] ?? null)}
+            className="w-full px-4 py-3 border border-outline-variant rounded-DEFAULT font-body-md text-primary bg-surface-bright file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-surface-dim file:text-primary hover:file:bg-surface-container-high"
+          />
+          <p className="font-body-sm text-on-surface-variant">JPG, PNG, atau PDF maksimal 5 MB.</p>
+          {fileError ? <p role="alert" className="font-body-sm text-error">{fileError}</p> : null}
+        </>
       ) : (
         <input type="text" name={fieldName} required={field.isRequired} className="w-full h-[48px] px-4 bg-transparent border border-outline-variant rounded-DEFAULT font-body-md text-primary placeholder-on-surface-variant focus:outline-none input-border focus:border-primary" />
       )}

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { db } from '@/db';
 import { registrations, ticketGenerationJobs } from '@/db/schema';
 import { eq, and, or, ilike, desc, asc, sql } from 'drizzle-orm';
+import { getAuthenticatedAdmin } from '@/lib/security/adminRoute';
 
 export const runtime = 'nodejs';
 
@@ -34,6 +35,9 @@ function parseDateValue(value: string): { date: Date; dateOnly: boolean } | null
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
+    if (!await getAuthenticatedAdmin(request)) {
+      return NextResponse.json({ status: 'error', message: 'Unauthorized' }, { status: 403 });
+    }
     const { searchParams } = new URL(request.url);
     const { id: eventId } = await params;
     

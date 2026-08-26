@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { randomUUID } from 'node:crypto';
 import { processRegistrationAction } from '@/lib/actions/processRegistrationAction';
 import { supabaseAdmin } from '@/lib/supabase';
 import { db } from '@/db';
@@ -10,6 +9,18 @@ import { publishTicketGenerationJob } from '@/lib/actions/ticketGenerationJob';
 import { STORAGE_BUCKETS } from '@/lib/storage/buckets';
 import { resetOtpRegistrationRateLimit } from '@/lib/security/otpRateLimit';
 import { isPublicEventStatus } from '@/lib/events/eventLifecycle';
+import {
+  createParticipantFileStoragePath,
+  createParticipantFileUploadRequestId,
+  createStagedParticipantFileUpload,
+  queueParticipantFileUploadsForCleanup,
+  reconcileParticipantFileUploads,
+} from '@/lib/registration/participantFileLifecycle';
+import {
+  ParticipantFileValidationError,
+  validateParticipantFileContent,
+  validateParticipantFileMetadata,
+} from '@/lib/validation/participantFile';
 
 export const runtime = 'nodejs';
 
@@ -32,27 +43,36 @@ function toPublicRegistrationData(result: {
   };
 }
 
-async function cleanupUploadedFiles(uploadedPaths: string[]): Promise<void> {
-  if (uploadedPaths.length === 0) return;
-
-  try {
-    const { error } = await supabaseAdmin.storage
-      .from(STORAGE_BUCKETS.participantFiles)
-      .remove(uploadedPaths);
-    if (error) {
-      console.error('Registration upload cleanup failed');
-    }
-  } catch {
-    // Cleanup must never replace the original response or reveal storage data.
-    console.error('Registration upload cleanup failed');
+class ParticipantFileUploadError extends Error {
+  constructor() {
+    super('Berkas belum dapat diunggah. Silakan coba lagi.');
+    this.name = 'ParticipantFileUploadError';
   }
 }
 
+async function cleanupStagedUploads(uploadIds: string[]): Promise<void> {
+  if (uploadIds.length === 0) return;
+  try {
+    await queueParticipantFileUploadsForCleanup(uploadIds);
+    await reconcileParticipantFileUploads(uploadIds.length);
+  } catch {
+    // A durable ledger still records these objects for a later reconciliation.
+    console.error('Participant file cleanup scheduling failed');
+  }
+}
+
+function fileNameFor(value: Blob, fallback: string): string {
+  const candidate = (value as Blob & { name?: unknown }).name;
+  return typeof candidate === 'string' && candidate.trim() !== '' ? candidate.trim() : fallback;
+}
+
 export async function POST(req: NextRequest, props: { params: Promise<{ id: string }> }) {
-  const uploadedPaths: string[] = [];
-  let registrationCommitted = false;
+  const stagedUploadIds: string[] = [];
+  const uploadRequestId = createParticipantFileUploadRequestId();
+  let registrationOwnsUploads = false;
 
   try {
+    await reconcileParticipantFileUploads();
     const params = await props.params;
     const slug = params.id;
     
@@ -98,6 +118,7 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
       ...field,
       fieldKey: getRegistrationFieldKey(field),
     }));
+    const fieldsByKey = new Map(dynamicFormFields.map((field) => [field.fieldKey, field]));
 
     // Validate the untrusted multipart payload before any storage write. The action repeats
     // validation inside its transaction so the backend remains the source of truth.
@@ -111,52 +132,54 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
       validateRegistrationAnswers(dynamicFormFields, rawAnswers);
     }
 
-    // Process files and check size limit (1MB)
-    const MAX_FILE_SIZE = 1 * 1024 * 1024; // 1MB
-    const answers: Record<string, any> = {};
+    const answers: Record<string, unknown> = {};
 
     for (const [key, value] of Object.entries(rawAnswers)) {
-      if (key === 'name' || key === 'email' || key === 'registration_id' || key === 'resubmit_token' || key === 'retry_only') continue;
-
       if (value instanceof Blob) {
-        if (value.size > MAX_FILE_SIZE) {
-          await cleanupUploadedFiles(uploadedPaths);
-          return NextResponse.json({ status: 'error', message: `File size exceeds 1MB limit for field ${key}` }, { status: 413 });
+        // Browser submits an empty File for an optional, unselected input.
+        if (value.size === 0) continue;
+        const field = fieldsByKey.get(key);
+        if (!field || !['file', 'image'].includes(field.fieldType)) {
+          throw new RegistrationFormValidationError(`Field ${key} tidak menerima berkas`);
         }
 
-        const arrayBuffer = await value.arrayBuffer();
-        const buffer = Buffer.from(arrayBuffer);
+        const fileName = fileNameFor(value, 'berkas');
+        const declaredMime = (value as Blob & { type?: string }).type;
+        validateParticipantFileMetadata({ fileName, size: value.size, declaredMime, fieldType: field.fieldType });
+        const bytes = Buffer.from(await value.arrayBuffer());
+        const detectedMime = validateParticipantFileContent({
+          fileName,
+          declaredMime,
+          fieldType: field.fieldType,
+          bytes,
+        });
 
-        const isJPEG = buffer.length > 2 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff;
-        const isPNG = buffer.length > 7 && buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4e && buffer[3] === 0x47 && buffer[4] === 0x0d && buffer[5] === 0x0a && buffer[6] === 0x1a && buffer[7] === 0x0a;
-
-        if (!isJPEG && !isPNG) {
-          await cleanupUploadedFiles(uploadedPaths);
-          return NextResponse.json({ status: 'error', message: `Format file tidak valid pada field ${key}. Hanya menerima gambar JPG/PNG.` }, { status: 400 });
-        }
-
-        const detectedMime = isJPEG ? 'image/jpeg' : 'image/png';
-        const safeFileName = (value as File).name.replace(/[^a-zA-Z0-9.-]/g, '_');
-        const filePath = `${slug}/${randomUUID()}-${safeFileName}`;
-        // Track the path before upload so a timeout after object creation is
-        // cleaned up as part of this request as well.
-        uploadedPaths.push(filePath);
+        const filePath = createParticipantFileStoragePath(uploadRequestId, fileName);
+        const stagedUpload = await createStagedParticipantFileUpload({
+          requestId: uploadRequestId,
+          fieldKey: key,
+          storagePath: filePath,
+        });
+        stagedUploadIds.push(stagedUpload.id);
 
         const { error: uploadError } = await supabaseAdmin.storage
           .from(STORAGE_BUCKETS.participantFiles)
-          .upload(filePath, buffer, {
+          .upload(filePath, bytes, {
             contentType: detectedMime,
             upsert: false,
           });
 
         if (uploadError) {
-          console.error(`Upload Error for ${key}`);
-          await cleanupUploadedFiles(uploadedPaths);
-          return NextResponse.json({ status: 'error', message: `Gagal mengunggah file untuk field ${key}` }, { status: 500 });
+          console.error('Participant file upload failed', { uploadId: stagedUpload.id, fieldKey: key });
+          throw new ParticipantFileUploadError();
         }
 
-        answers[key] = { fileName: (value as File).name, size: value.size, type: detectedMime, path: filePath };
+        answers[key] = { fileName, size: value.size, type: detectedMime, path: filePath };
       } else if (Array.isArray(value)) {
+        if (value.some((item) => item instanceof Blob)) {
+          const field = fieldsByKey.get(key);
+          throw new RegistrationFormValidationError(`Field ${field?.fieldName ?? key} hanya menerima satu berkas`);
+        }
         answers[key] = value;
       } else {
         answers[key] = value;
@@ -170,10 +193,18 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
       registrationId,
       resubmitToken,
       preserveAnswers,
+      fileUploadIds: stagedUploadIds,
+      fileUploadRequestId: uploadRequestId,
     });
-    // From this point onward the registration transaction has committed. A
-    // provider failure is retryable and must retain the uploaded objects.
-    registrationCommitted = true;
+    // A duplicate/reused registration never references this request's newly
+    // staged files, so retain the original response but clean those objects.
+    if (result.reused) {
+      await cleanupStagedUploads(stagedUploadIds);
+    } else {
+      // From this point onward the transaction has claimed the objects. Email
+      // and QStash failures are retryable and must retain them.
+      registrationOwnsUploads = true;
+    }
 
     // BUG-040: Send OTP email if status is Draft and otpCode is generated
     if (result.status === 'Draft' && result.otpCode) {
@@ -217,20 +248,25 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
     }
 
     return NextResponse.json({ status: 'success', data: toPublicRegistrationData(result) }, { status: 201 });
-  } catch (error: any) {
-    if (!registrationCommitted) {
-      await cleanupUploadedFiles(uploadedPaths);
+  } catch (error: unknown) {
+    if (!registrationOwnsUploads) await cleanupStagedUploads(stagedUploadIds);
+
+    if (error instanceof ParticipantFileValidationError) {
+      return NextResponse.json({ status: 'error', code: error.code, message: error.message }, { status: error.status });
+    }
+    if (error instanceof ParticipantFileUploadError) {
+      return NextResponse.json({ status: 'error', code: 'REGISTRATION_FILE_UPLOAD_FAILED', message: error.message }, { status: 502 });
     }
 
     const message = error instanceof Error ? error.message : '';
     if (message.includes('QuotaExceededException')) {
-      return NextResponse.json({ status: 'error', message: error.message }, { status: 400 });
+      return NextResponse.json({ status: 'error', message }, { status: 400 });
     }
     if (message.includes('NotFoundException')) {
-      return NextResponse.json({ status: 'error', message: error.message }, { status: 404 });
+      return NextResponse.json({ status: 'error', message }, { status: 404 });
     }
     if (message.includes('Event belum dipublikasikan')) {
-      return NextResponse.json({ status: 'error', message: error.message }, { status: 409 });
+      return NextResponse.json({ status: 'error', message }, { status: 409 });
     }
     if (message.includes('InvalidRegistrationResubmit')) {
       return NextResponse.json({ status: 'error', message: 'Registrasi tidak dapat diperbarui untuk event atau status ini' }, { status: 409 });
@@ -239,7 +275,7 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
       return NextResponse.json({ status: 'error', message: error.message }, { status: 422 });
     }
     
-    console.error('Registration Error:', error);
+    console.error('Registration Error');
     return NextResponse.json({ status: 'error', message: 'Internal Server Error' }, { status: 500 });
   }
 }

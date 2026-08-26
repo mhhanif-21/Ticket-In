@@ -120,6 +120,7 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
                       _buildFieldTypeBtn('radio', 'Pilihan Ganda', Icons.radio_button_checked),
                       _buildFieldTypeBtn('checkbox', 'Kotak Centang', Icons.check_box),
                       _buildFieldTypeBtn('select', 'Dropdown', Icons.arrow_drop_down_circle),
+                      _buildFieldTypeBtn('file', 'Unggah Berkas', Icons.upload_file),
                     ],
                   ),
                 ),
@@ -318,6 +319,7 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
       case 'select': return 'Dropdown';
       case 'textarea': return 'Teks Panjang';
       case 'number': return 'Angka';
+      case 'file': return 'Unggah Berkas';
       default: return 'Teks Singkat';
     }
   }
