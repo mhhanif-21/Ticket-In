@@ -21,6 +21,29 @@ export async function POST(req: Request) {
       return NextResponse.json({ status: 'error', message: 'Unauthorized' }, { status: 403 });
     }
 
+    const idempotencyKey = req.headers.get('idempotency-key')?.trim();
+    if (!idempotencyKey || idempotencyKey.length < 16 || idempotencyKey.length > 128) {
+      return NextResponse.json({
+        status: 'error',
+        code: 'IDEMPOTENCY_KEY_REQUIRED',
+        message: 'Permintaan pembuatan acara tidak valid. Silakan coba lagi.',
+      }, { status: 400 });
+    }
+
+    const [existingByKey] = await db
+      .select()
+      .from(events)
+      .where(eq(events.creationKey, idempotencyKey))
+      .limit(1);
+    if (existingByKey) {
+      return NextResponse.json({
+        status: 'success',
+        message: 'Event sebelumnya digunakan kembali',
+        data: existingByKey,
+        idempotent_replay: true,
+      }, { status: 200 });
+    }
+
     const body = await req.json();
     const { name, capacity, registration_mode, location, date, description } = body;
 
@@ -53,7 +76,7 @@ export async function POST(req: Request) {
       );
     }
 
-    const [newEvent] = await db.insert(events).values({
+    const insertedEvents = await db.insert(events).values({
       name,
       slug,
       capacity: parseInt(capacity, 10),
@@ -62,11 +85,30 @@ export async function POST(req: Request) {
       description: description || null,
       registrationMode: mode,
       volunteerPinHash: '', // Dummy for now, generated in S3-T4
+      creationKey: idempotencyKey,
       status: 'Draft',
-    }).returning();
+    }).onConflictDoNothing({ target: events.creationKey }).returning();
+
+    const [newEvent] = insertedEvents;
+    if (!newEvent) {
+      const [replayedEvent] = await db
+        .select()
+        .from(events)
+        .where(eq(events.creationKey, idempotencyKey))
+        .limit(1);
+      if (replayedEvent) {
+        return NextResponse.json({
+          status: 'success',
+          message: 'Event sebelumnya digunakan kembali',
+          data: replayedEvent,
+          idempotent_replay: true,
+        }, { status: 200 });
+      }
+      throw new Error('Event idempotency conflict could not be resolved');
+    }
 
     return NextResponse.json(
-      { status: 'success', message: 'Event berhasil dibuat', data: newEvent },
+      { status: 'success', message: 'Event berhasil dibuat', data: newEvent, idempotent_replay: false },
       { status: 201 }
     );
   } catch (error: any) {

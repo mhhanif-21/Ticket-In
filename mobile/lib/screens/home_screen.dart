@@ -208,7 +208,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                       child: event.posterUrl != null
                                         ? ClipRRect(
                                             borderRadius: BorderRadius.circular(8),
-                                            child: Image.network(event.posterUrl!, fit: BoxFit.cover),
+                                            child: Image.network(event.posterUrl!, fit: BoxFit.contain),
                                           )
                                         : const Icon(Icons.image, color: outlineVariantColor),
                                     ),

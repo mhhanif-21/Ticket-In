@@ -3,7 +3,7 @@ import { eq } from 'drizzle-orm';
 
 import { db } from '@/db';
 import { events } from '@/db/schema';
-import { EventMediaUploadError, ReplaceEventMediaAction } from '@/lib/actions/ReplaceEventMediaAction';
+import { ReplaceEventMediaAction, EventMediaUploadError } from '@/lib/actions/ReplaceEventMediaAction';
 import { EventMediaValidationError } from '@/lib/events/eventMedia';
 
 export const runtime = 'nodejs';
@@ -29,8 +29,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     }
 
     const formData = await req.formData();
-    const poster = formData.get('poster');
-    if (!isMediaFile(poster)) {
+    const cover = formData.get('cover');
+    const gallery = formData.getAll('gallery').filter(isMediaFile);
+    if (!isMediaFile(cover)) {
       return NextResponse.json({
         status: 'error',
         code: 'MEDIA_FILE_MISSING',
@@ -40,14 +41,14 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
     const result = await ReplaceEventMediaAction.execute({
       eventId: id,
-      cover: poster,
-      gallery: [],
-      replaceGallery: false,
+      cover,
+      gallery,
+      replaceGallery: formData.get('replace_gallery') === 'true',
     });
 
     return NextResponse.json({
       status: 'success',
-      message: 'Poster berhasil diunggah',
+      message: 'Media acara berhasil diperbarui',
       data: result,
     });
   } catch (error) {
@@ -58,7 +59,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       return NextResponse.json({ status: 'error', code: 'MEDIA_UPLOAD_FAILED', message: error.message }, { status: 502 });
     }
 
-    console.error('Poster upload route failed', { error: error instanceof Error ? error.name : 'unknown' });
+    console.error('Event media route failed', { error: error instanceof Error ? error.name : 'unknown' });
     return NextResponse.json({ status: 'error', message: 'Internal server error' }, { status: 500 });
   }
 }

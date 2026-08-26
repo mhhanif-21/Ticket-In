@@ -1,6 +1,6 @@
 import { db } from '../../db';
-import { events, registrations } from '../../db/schema';
-import { eq, and, inArray, count } from 'drizzle-orm';
+import { eventMedia, events, registrations } from '../../db/schema';
+import { eq, and, inArray, count, asc } from 'drizzle-orm';
 
 export async function getPublicEventAction(slug: string) {
   // 1. Dapatkan event berdasarkan slug
@@ -27,6 +27,16 @@ export async function getPublicEventAction(slug: string) {
 
   const event = eventRecords[0];
 
+  const media = await db
+    .select({
+      role: eventMedia.role,
+      displayOrder: eventMedia.displayOrder,
+      publicUrl: eventMedia.publicUrl,
+    })
+    .from(eventMedia)
+    .where(eq(eventMedia.eventId, event.id))
+    .orderBy(asc(eventMedia.role), asc(eventMedia.displayOrder));
+
   // 2. Hitung jumlah pendaftar
   const countResult = await db
     .select({ count: count() })
@@ -43,6 +53,7 @@ export async function getPublicEventAction(slug: string) {
 
   return {
     ...event,
+    media,
     currentCount,
     isFull,
   };

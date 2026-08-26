@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/db';
-import { events, formFields } from '@/db/schema';
+import { eventMedia, events, formFields } from '@/db/schema';
 import { and, asc, eq } from 'drizzle-orm';
 import { getCanonicalBaseUrl } from '@/lib/security/url';
 import { getRegistrationFieldKey } from '@/lib/validation/registrationForm';
@@ -53,6 +53,16 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       .where(eq(formFields.eventId, event.id))
       .orderBy(asc(formFields.order));
 
+    const media = await db
+      .select({
+        role: eventMedia.role,
+        displayOrder: eventMedia.displayOrder,
+        publicUrl: eventMedia.publicUrl,
+      })
+      .from(eventMedia)
+      .where(eq(eventMedia.eventId, event.id))
+      .orderBy(asc(eventMedia.role), asc(eventMedia.displayOrder));
+
     const canonicalBaseUrl = getCanonicalBaseUrl(req);
 
     const eventDetail = {
@@ -75,7 +85,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
           order: field.order,
           fieldKey: getRegistrationFieldKey({ order: field.order }),
         })),
-      public_registration_url: `${canonicalBaseUrl}/${event.slug}/register`,
+      media,
+      public_registration_url: `${canonicalBaseUrl}/${event.slug}`,
       public_qr_code_url: `${canonicalBaseUrl}/api/v1/events/${event.slug}/qr`,
     };
 

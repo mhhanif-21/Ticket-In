@@ -56,7 +56,7 @@ export default async function Home() {
                       src={event.posterUrl}
                       alt={event.name}
                       fill
-                      className="object-cover transition-transform duration-300 group-hover:scale-105"
+                      className="object-contain"
                     />
                   ) : (
                     <div className="flex h-full items-center justify-center px-6 text-center font-headline-md text-headline-md text-secondary">

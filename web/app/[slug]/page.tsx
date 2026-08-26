@@ -20,14 +20,14 @@ export default async function PublicEventLandingPage(props: { params: Promise<{ 
 
   return (
     <main className="flex-grow w-full max-w-container-max mx-auto pb-stack-lg">
-      {/* Hero Event Poster (16:9 Aspect Ratio) */}
-      <div className="w-full aspect-[16/9] relative overflow-hidden bg-surface-container-highest shadow-[0_4px_12px_rgba(0,0,0,0.05)]">
+      {/* Hero Event Poster */}
+      <div className="w-full min-h-56 relative overflow-hidden bg-surface-container-highest shadow-[0_4px_12px_rgba(0,0,0,0.05)]">
         {event.posterUrl ? (
           <Image
             src={event.posterUrl}
             alt={event.name}
             fill
-            className="object-cover"
+            className="object-contain"
             unoptimized
           />
         ) : (
@@ -86,6 +86,19 @@ export default async function PublicEventLandingPage(props: { params: Promise<{ 
             {event.description || 'Tidak ada deskripsi.'}
           </p>
         </div>
+
+        {event.media.filter((media) => media.role === 'gallery').length > 0 && (
+          <section className="bg-surface-container-lowest dark:bg-[#1e1e1e] rounded-[16px] shadow-[0_4px_12px_rgba(0,0,0,0.05)] p-6 md:p-8">
+            <h3 className="font-label-caps text-label-caps text-secondary dark:text-white/60 uppercase tracking-widest border-b border-outline-variant/30 dark:border-white/10 pb-2 mb-4">Galeri</h3>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              {event.media.filter((media) => media.role === 'gallery').map((media) => (
+                <div key={`${media.role}-${media.displayOrder}`} className="relative min-h-48 overflow-hidden rounded-xl bg-surface-container-highest">
+                  <Image src={media.publicUrl} alt={`Galeri ${event.name}`} fill className="object-contain" unoptimized />
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
 
         {/* Call to Action Actions */}
         <div className="flex flex-col gap-stack-md pt-4">
