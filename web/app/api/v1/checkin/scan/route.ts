@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/db';
-import { registrations, checkInLogs } from '@/db/schema';
+import { registrations, checkInLogs, checkInSessions, events } from '@/db/schema';
 import { eq, and } from 'drizzle-orm';
 
 export const runtime = 'nodejs';
@@ -14,8 +14,9 @@ export async function POST(req: Request) {
     const role = req.headers.get('x-user-role');
     const sessionId = req.headers.get('x-session-id');
     const eventIdFromHeader = req.headers.get('x-event-id');
+    const sessionVersionFromHeader = req.headers.get('x-session-version');
 
-    if (role !== 'volunteer' || !sessionId || !eventIdFromHeader) {
+    if (role !== 'volunteer' || !sessionId || !eventIdFromHeader || !sessionVersionFromHeader) {
       return NextResponse.json(
         { status: 'error', message: 'Akses ditolak: Hanya panitia yang dapat melakukan scan' },
         { status: 403 }
@@ -41,8 +42,9 @@ export async function POST(req: Request) {
     }
 
     const event_id = eventIdFromHeader;
+    const sessionVersion = Number(sessionVersionFromHeader);
 
-    if (typeof ticket_code !== 'string' || !event_id) {
+    if (typeof ticket_code !== 'string' || !event_id || !Number.isSafeInteger(sessionVersion)) {
       return NextResponse.json(
         { status: 'error', message: 'ticket_code dan event_id wajib diisi' },
         { status: 400 }
@@ -54,6 +56,36 @@ export async function POST(req: Request) {
 
     // 2. Lakukan transaksi database
     return await db.transaction(async (tx) => {
+      const [session] = await tx
+        .select({
+          id: checkInSessions.id,
+          endedAt: checkInSessions.endedAt,
+          sessionVersion: checkInSessions.sessionVersion,
+          eventStatus: events.status,
+          eventSessionVersion: events.volunteerSessionVersion,
+        })
+        .from(checkInSessions)
+        .innerJoin(events, eq(checkInSessions.eventId, events.id))
+        .where(and(
+          eq(checkInSessions.id, sessionId),
+          eq(checkInSessions.eventId, event_id),
+        ))
+        .for('update')
+        .limit(1);
+
+      if (
+        !session
+        || session.endedAt
+        || session.eventStatus !== 'Published'
+        || session.sessionVersion !== sessionVersion
+        || session.eventSessionVersion !== sessionVersion
+      ) {
+        return NextResponse.json(
+          { status: 'error', message: 'Sesi check-in tidak lagi aktif untuk event ini.' },
+          { status: 403 },
+        );
+      }
+
       // 2a. Cari Registrasi berdasarkan ticket_code & event_id
       const regRecords = await tx
         .select()

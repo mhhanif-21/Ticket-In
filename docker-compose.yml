@@ -17,11 +17,13 @@ services:
         psql --dbname="$$DATABASE_URL" --set=ON_ERROR_STOP=1 --file=/migrations/0009_s9_ticket-templates.sql
         psql --dbname="$$DATABASE_URL" --set=ON_ERROR_STOP=1 --file=/migrations/0010_s9_registration-file-lifecycle.sql
         psql --dbname="$$DATABASE_URL" --set=ON_ERROR_STOP=1 --file=/migrations/0011_web-security-perimeter.sql
+        psql --dbname="$$DATABASE_URL" --set=ON_ERROR_STOP=1 --file=/migrations/0012_registration-event-lifecycle-integrity.sql
         test "$$(psql --dbname="$$DATABASE_URL" --tuples-only --no-align --command="SELECT count(*) FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'events' AND column_name = 'status'")" = "1"
         test "$$(psql --dbname="$$DATABASE_URL" --tuples-only --no-align --command="SELECT count(*) FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'event_media' AND column_name = 'public_url'")" = "1"
         test "$$(psql --dbname="$$DATABASE_URL" --tuples-only --no-align --command="SELECT count(*) FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'event_ticket_templates' AND column_name = 'elements'")" = "1"
         test "$$(psql --dbname="$$DATABASE_URL" --tuples-only --no-align --command="SELECT count(*) FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'participant_file_uploads' AND column_name = 'status'")" = "1"
         test "$$(psql --dbname="$$DATABASE_URL" --tuples-only --no-align --command="SELECT count(*) FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'registration_status_capabilities' AND column_name = 'token_hash'")" = "1"
+        test "$$(psql --dbname="$$DATABASE_URL" --tuples-only --no-align --command="SELECT count(*) FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'form_fields' AND column_name = 'field_key'")" = "1"
     networks:
       - TiketIn-network
       - supabase-local

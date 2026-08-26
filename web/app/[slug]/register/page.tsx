@@ -5,7 +5,12 @@ import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { AdaptiveImage } from '@/components/media/AdaptiveImage';
 import { RegistrationField } from '@/components/registration/RegistrationField';
-import { getRegistrationFieldKey, isStaticRegistrationField, validateRegistrationAnswers } from '@/lib/validation/registrationForm';
+import {
+  getRegistrationFieldKey,
+  isStaticRegistrationFieldDefinition,
+  validateRegistrationAnswers,
+  validateRegistrationIdentity,
+} from '@/lib/validation/registrationForm';
 import { validateParticipantFile } from '@/lib/validation/participantFile';
 import {
   loadRegistrationResubmitState,
@@ -86,7 +91,11 @@ export default function RegisterPage() {
 
     try {
       const formData = new FormData(e.currentTarget);
-      const dynamicFields = (eventData.formFields || []).filter((field: any) => !isStaticRegistrationField(field.fieldName));
+      validateRegistrationIdentity({
+        name: formData.get('name'),
+        email: formData.get('email'),
+      });
+      const dynamicFields = (eventData.formFields || []).filter((field: any) => !isStaticRegistrationFieldDefinition(field));
       validateRegistrationAnswers(dynamicFields, collectAnswerValues(formData));
 
       if (correctionMode) {
@@ -274,7 +283,7 @@ export default function RegisterPage() {
             {/* Dynamic Fields */}
             {eventData.formFields?.map((field: any) => {
               // Lewati nama dan email karena sudah ada field statis
-              if (isStaticRegistrationField(field.fieldName)) {
+              if (isStaticRegistrationFieldDefinition(field)) {
                 return null;
               }
 

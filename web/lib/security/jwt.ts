@@ -5,6 +5,7 @@ export interface VolunteerJwtPayload extends jose.JWTPayload {
   event_id: string;
   event_slug: string;
   session_id: string;
+  session_version: number;
   volunteer_name: string;
 }
 
@@ -59,6 +60,7 @@ export async function verifyVolunteerToken(token: string): Promise<VolunteerJwtP
     typeof payload.event_id !== 'string' ||
     typeof payload.event_slug !== 'string' ||
     typeof payload.session_id !== 'string' ||
+    !Number.isSafeInteger(payload.session_version) ||
     typeof payload.volunteer_name !== 'string'
   ) {
     throw new Error('Volunteer token claims are incomplete or invalid');

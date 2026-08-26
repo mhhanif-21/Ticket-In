@@ -6,6 +6,7 @@ import bcrypt from 'bcryptjs';
 import { getClientIp } from '@/lib/security/ip';
 import { checkRateLimit, resetRateLimit } from '@/lib/security/rateLimit';
 import { signVolunteerToken } from '@/lib/security/jwt';
+import { isPublicEventStatus } from '@/lib/events/eventLifecycle';
 
 export const runtime = 'nodejs';
 
@@ -102,6 +103,13 @@ export async function POST(req: Request) {
       );
     }
 
+    if (!isPublicEventStatus(event.status)) {
+      return NextResponse.json(
+        { status: 'error', message: 'Akses panitia tidak tersedia untuk event ini.' },
+        { status: 409 },
+      );
+    }
+
     // 2. Validasi PIN
     const isPinValid = await bcrypt.compare(pin, event.volunteerPinHash);
 
@@ -122,6 +130,7 @@ export async function POST(req: Request) {
       .values({
         eventId: event.id,
         volunteerName: volunteer_name,
+        sessionVersion: event.volunteerSessionVersion,
       })
       .returning();
 
@@ -131,6 +140,7 @@ export async function POST(req: Request) {
       event_slug: event.slug,
       volunteer_name: volunteer_name,
       session_id: sessionRecord.id,
+      session_version: event.volunteerSessionVersion,
     });
 
     const response = NextResponse.json(

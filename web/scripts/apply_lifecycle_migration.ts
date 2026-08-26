@@ -32,6 +32,11 @@ const MIGRATIONS = [
     path: resolve(process.cwd(), 'supabase/migrations/0011_web-security-perimeter.sql'),
     lockKey: 2026082611,
   },
+  {
+    id: '0012_registration-event-lifecycle-integrity',
+    path: resolve(process.cwd(), 'supabase/migrations/0012_registration-event-lifecycle-integrity.sql'),
+    lockKey: 2026082612,
+  },
 ] as const;
 
 type SchemaRow = {
@@ -118,6 +123,20 @@ async function verifyRegistrationStatusCapabilitySchema(): Promise<void> {
   }
 }
 
+async function verifyRegistrationLifecycleSchema(): Promise<void> {
+  const rows = await client.unsafe<SchemaRow[]>(`
+    SELECT column_name
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'form_fields'
+      AND column_name IN ('field_key', 'field_kind')
+  `);
+
+  if (rows.length !== 2) {
+    throw new Error('Migration verification failed: public.form_fields stable identity columns are missing');
+  }
+}
+
 async function applyMigration(migration: (typeof MIGRATIONS)[number]): Promise<void> {
   const migrationSql = await readFile(migration.path, 'utf8');
 
@@ -154,7 +173,8 @@ async function main(): Promise<void> {
   await verifyTicketTemplateSchema();
   await verifyParticipantFileLifecycleSchema();
   await verifyRegistrationStatusCapabilitySchema();
-  console.log('Database lifecycle, event media, ticket template, participant file, and public status capability migrations applied and verified.');
+  await verifyRegistrationLifecycleSchema();
+  console.log('Database lifecycle, event media, ticket template, participant file, public status capability, and registration integrity migrations applied and verified.');
 }
 
 main()

@@ -84,6 +84,7 @@ export async function middleware(req: NextRequest) {
     const userId = role === 'volunteer' ? (payload?.volunteer_name as string) : (payload?.id as string);
     const eventId = role === 'volunteer' ? (payload?.event_id as string) : '';
     const sessionId = role === 'volunteer' ? (payload?.session_id as string) : '';
+    const sessionVersion = role === 'volunteer' ? String(payload?.session_version ?? '') : '';
 
     // Role-based Access Control (RBAC)
     if (accessPolicy === 'admin' && role !== 'admin') {
@@ -99,6 +100,7 @@ export async function middleware(req: NextRequest) {
     if (role) requestHeaders.set('x-user-role', role);
     if (eventId) requestHeaders.set('x-event-id', eventId);
     if (sessionId) requestHeaders.set('x-session-id', sessionId);
+    if (sessionVersion) requestHeaders.set('x-session-version', sessionVersion);
 
     return NextResponse.next({
       request: {

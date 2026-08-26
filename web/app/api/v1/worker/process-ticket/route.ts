@@ -5,6 +5,7 @@ import {
   ensureTicketGenerationJob,
   getTicketGenerationJob,
   markTicketGenerationJobCompleted,
+  markTicketGenerationJobCancelled,
   markTicketGenerationJobFailed,
   registrationIsAccepted,
 } from '@/lib/actions/ticketGenerationJob';
@@ -36,7 +37,15 @@ export async function POST(req: NextRequest) {
     }
 
     // LLD-WRK-001: Panggil orchestrator logic tiket. Duplicate delivery is safe.
+    if (job?.status === 'cancelled') {
+      return NextResponse.json({ status: 'success', data: { jobStatus: 'cancelled' } }, { status: 200 });
+    }
+
     const result = await GenerateTicketAction(registration_id);
+    if (result.status === 'cancelled') {
+      await markTicketGenerationJobCancelled(registration_id);
+      return NextResponse.json({ status: 'success', data: { jobStatus: 'cancelled' } }, { status: 200 });
+    }
     if (job && result.status !== 'in_progress') await markTicketGenerationJobCompleted(registration_id);
 
     return NextResponse.json({ status: 'success', data: { jobStatus: job ? 'completed' : null } }, { status: 200 });

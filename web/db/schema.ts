@@ -28,6 +28,8 @@ export const events = pgTable(
     capacity: integer('capacity').notNull(),
     registrationMode: varchar('registration_mode', { length: 50 }).notNull(), // Auto-Accept, Manual Review
     volunteerPinHash: varchar('volunteer_pin_hash', { length: 255 }).notNull(),
+    volunteerSessionVersion: integer('volunteer_session_version').notNull().default(1),
+    formVersion: integer('form_version').notNull().default(1),
     status: varchar('status', { length: 20 }).notNull().default('Draft'), // Draft, Published, Cancelled
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
@@ -150,11 +152,19 @@ export const formFields = pgTable('form_fields', {
     .notNull()
     .references(() => events.id, { onDelete: 'cascade' }),
   fieldName: varchar('field_name', { length: 255 }).notNull(),
+  fieldKey: varchar('field_key', { length: 128 }).notNull().default(sql`'field_' || gen_random_uuid()::text`),
+  fieldKind: varchar('field_kind', { length: 32 }).notNull().default('custom'), // custom, static_name, static_email
   fieldType: varchar('field_type', { length: 50 }).notNull(), // text, number, radio, checkbox, select, file, email, textarea, image
   isRequired: boolean('is_required').default(false).notNull(),
   options: jsonb('options'), // string array for radio, checkbox, and select
   order: integer('order').default(0).notNull(),
-});
+}, (table) => ({
+  eventFieldKeyUnique: uniqueIndex('form_fields_event_field_key_unique').on(table.eventId, table.fieldKey),
+  kindCheck: check(
+    'form_fields_kind_check',
+    sql`${table.fieldKind} IN ('custom', 'static_name', 'static_email')`,
+  ),
+}));
 
 export const formFieldsRelations = relations(formFields, ({ one }) => ({
   event: one(events, {
@@ -175,7 +185,8 @@ export const registrations = pgTable(
     email: varchar('email', { length: 255 }).notNull(),
     answers: jsonb('answers'), // user's answers to the form fields
     answerFieldLabels: jsonb('answer_field_labels'), // immutable label snapshot keyed by public field key
-    status: varchar('status', { length: 50 }).notNull(), // Draft, Pending, Accepted, Rejected
+    formVersion: integer('form_version').notNull().default(1),
+    status: varchar('status', { length: 50 }).notNull(), // Draft, Pending, Accepted, Rejected, Expired
     ticketCode: varchar('ticket_code', { length: 8 }).unique(),
     qrCodeUrl: text('qr_code_url'),
     presenceStatus: varchar('presence_status', { length: 50 }).default('Absent').notNull(), // Absent, Present
@@ -232,7 +243,7 @@ export const ticketGenerationJobs = pgTable(
     registrationId: uuid('registration_id')
       .notNull()
       .references(() => registrations.id, { onDelete: 'cascade' }),
-    status: varchar('status', { length: 20 }).notNull(), // queued, published, failed, completed
+    status: varchar('status', { length: 20 }).notNull(), // queued, published, failed, completed, cancelled
     attempts: integer('attempts').default(0).notNull(),
     qstashMessageId: varchar('qstash_message_id', { length: 255 }),
     lastError: text('last_error'),
@@ -336,6 +347,7 @@ export const checkInSessions = pgTable('check_in_sessions', {
     .notNull()
     .references(() => events.id, { onDelete: 'cascade' }),
   volunteerName: varchar('volunteer_name', { length: 255 }).notNull(),
+  sessionVersion: integer('session_version').notNull().default(1),
   startedAt: timestamp('started_at').defaultNow().notNull(),
   endedAt: timestamp('ended_at'),
 });

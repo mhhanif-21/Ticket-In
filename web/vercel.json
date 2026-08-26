@@ -3,6 +3,10 @@
     {
       "path": "/api/v1/worker/reconcile-participant-files",
       "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/v1/worker/expire-registration-drafts",
+      "schedule": "15 3 * * *"
     }
   ]
 }

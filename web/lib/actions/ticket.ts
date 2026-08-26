@@ -12,10 +12,12 @@ import {
 
 import { getConfiguredBrevoSender, sendEmail } from '../services/brevo';
 import { events } from '../../db/schema';
+import { isPublicEventStatus } from '../events/eventLifecycle';
 import {
   claimTicketGenerationJob,
   getTicketGenerationJob,
   markTicketGenerationJobCompleted,
+  markTicketGenerationJobCancelled,
   markTicketGenerationJobFailed,
 } from './ticketGenerationJob';
 
@@ -128,6 +130,11 @@ export async function GenerateTicketAction(registrationId: string) {
   }
 
   const { registration, event } = result[0];
+
+  if (!isPublicEventStatus(event.status)) {
+    await markTicketGenerationJobCancelled(registrationId, 'Event is not published. Ticket issuance was cancelled.');
+    return { status: 'cancelled', ticketCode: null, qrCodeUrl: null };
+  }
 
   // 2. Validate status (BIZ-003)
   if (registration.status !== 'Accepted') {

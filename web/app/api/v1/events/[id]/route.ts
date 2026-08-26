@@ -1,14 +1,19 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/db';
-import { eventMedia, events, formFields } from '@/db/schema';
-import { and, asc, eq } from 'drizzle-orm';
+import { eventMedia, events, formFields, registrations } from '@/db/schema';
+import { and, asc, count, eq, inArray } from 'drizzle-orm';
 import { getCanonicalBaseUrl } from '@/lib/security/url';
 import { getRegistrationFieldKey } from '@/lib/validation/registrationForm';
 import {
   EventLifecycleError,
   canTransitionEventStatus,
-  normalizeEventStatus,
 } from '@/lib/events/eventLifecycle';
+import { EventValidationError, validateEventUpdatePayload } from '@/lib/validation/event';
+import { cancelEventOperationalAccessTx } from '@/lib/events/eventLifecycleActions';
+import {
+  CAPACITY_CONSUMING_REGISTRATION_STATUSES,
+  expireStaleDraftRegistrationsForEventTx,
+} from '@/lib/registration/draftLifecycle';
 
 export const runtime = 'nodejs';
 const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -48,6 +53,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
         isRequired: formFields.isRequired,
         options: formFields.options,
         order: formFields.order,
+        fieldKey: formFields.fieldKey,
+        fieldKind: formFields.fieldKind,
       })
       .from(formFields)
       .where(eq(formFields.eventId, event.id))
@@ -83,7 +90,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
           isRequired: field.isRequired,
           options: field.options,
           order: field.order,
-          fieldKey: getRegistrationFieldKey({ order: field.order }),
+          fieldKey: getRegistrationFieldKey(field),
+          fieldKind: field.fieldKind,
         })),
       media,
       public_registration_url: `${canonicalBaseUrl}/${event.slug}`,
@@ -113,54 +121,85 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     }
 
     const { id } = await params;
-    const body = await req.json() as Record<string, unknown>;
+    let body: unknown;
+    try {
+      body = await req.json();
+    } catch {
+      return NextResponse.json({ status: 'error', code: 'EVENT_PAYLOAD_INVALID', message: 'Payload JSON tidak valid.' }, { status: 400 });
+    }
 
-    const [existing] = await db.select().from(events).where(eq(events.id, id));
-    if (!existing) {
+    const input = validateEventUpdatePayload(body);
+    const updatedEvent = await db.transaction(async (tx) => {
+      // Use the same event-row lock as registration creation. This makes a
+      // capacity reduction and a concurrent registration mutually exclusive.
+      const [existing] = await tx
+        .select()
+        .from(events)
+        .where(eq(events.id, id))
+        .for('update')
+        .limit(1);
+      if (!existing) return null;
+
+      const updateData: Partial<typeof events.$inferInsert> = {};
+      if (input.name !== undefined) updateData.name = input.name;
+      if (input.slug !== undefined) updateData.slug = input.slug;
+      if (input.description !== undefined) updateData.description = input.description;
+      if (input.location !== undefined) updateData.location = input.location;
+      if (input.date !== undefined) updateData.date = input.date;
+      if (input.capacity !== undefined) {
+        await expireStaleDraftRegistrationsForEventTx(tx, existing.id);
+        const [activeRegistrations] = await tx
+          .select({ count: count() })
+          .from(registrations)
+          .where(and(
+            eq(registrations.eventId, existing.id),
+            inArray(registrations.status, CAPACITY_CONSUMING_REGISTRATION_STATUSES),
+          ));
+        if (Number(activeRegistrations.count) > input.capacity) {
+          throw new EventValidationError(
+            'EVENT_CAPACITY_BELOW_REGISTRATIONS',
+            'Kapasitas tidak boleh lebih kecil dari jumlah pendaftaran aktif.',
+            'capacity',
+          );
+        }
+        updateData.capacity = input.capacity;
+      }
+      if (input.registrationMode !== undefined) updateData.registrationMode = input.registrationMode;
+      if (input.status !== undefined) {
+        const nextStatus = input.status;
+        if (!canTransitionEventStatus(existing.status, nextStatus)) {
+          throw new EventLifecycleError(`Transisi status acara dari ${existing.status} ke ${nextStatus} tidak diizinkan`);
+        }
+        updateData.status = nextStatus;
+      }
+      updateData.updatedAt = new Date();
+
+      const [updated] = await tx
+        .update(events)
+        .set(updateData)
+        .where(eq(events.id, id))
+        .returning();
+      if (input.status === 'Cancelled') {
+        await cancelEventOperationalAccessTx(tx, id);
+      }
+      return updated;
+    });
+
+    if (!updatedEvent) {
       return NextResponse.json({ status: 'error', message: 'Event tidak ditemukan' }, { status: 404 });
     }
 
-    const updateData: Partial<typeof events.$inferInsert> = {};
-    if (typeof body.name === 'string') updateData.name = body.name;
-    if (body.description === null || typeof body.description === 'string') updateData.description = body.description;
-    if (typeof body.location === 'string') updateData.location = body.location;
-    if (typeof body.date === 'string') updateData.date = new Date(body.date);
-    if (body.capacity !== undefined) updateData.capacity = parseInt(String(body.capacity), 10);
-    if (body.registration_mode !== undefined) {
-      if (body.registration_mode !== 'Auto-Accept' && body.registration_mode !== 'Manual Review') {
-        return NextResponse.json({ status: 'error', message: 'Registration mode tidak valid' }, { status: 400 });
-      }
-      updateData.registrationMode = body.registration_mode as 'Auto-Accept' | 'Manual Review';
-    }
-    if (body.status !== undefined) {
-      let nextStatus;
-      try {
-        nextStatus = normalizeEventStatus(body.status);
-      } catch (error) {
-        if (error instanceof EventLifecycleError) {
-          return NextResponse.json({ status: 'error', message: error.message }, { status: 400 });
-        }
-        throw error;
-      }
-      if (!canTransitionEventStatus(existing.status, nextStatus)) {
-        return NextResponse.json({
-          status: 'error',
-          message: `Transisi status acara dari ${existing.status} ke ${nextStatus} tidak diizinkan`,
-        }, { status: 409 });
-      }
-      updateData.status = nextStatus;
-    }
-
-    updateData.updatedAt = new Date();
-
-    const [updatedEvent] = await db
-      .update(events)
-      .set(updateData)
-      .where(eq(events.id, id))
-      .returning();
-
     return NextResponse.json({ status: 'success', message: 'Event berhasil diperbarui', data: updatedEvent });
-  } catch (error: any) {
+  } catch (error: unknown) {
+    if (error instanceof EventValidationError) {
+      return NextResponse.json(
+        { status: 'error', code: error.code, message: error.message, field: error.field },
+        { status: 422 },
+      );
+    }
+    if (error instanceof EventLifecycleError) {
+      return NextResponse.json({ status: 'error', message: error.message }, { status: 400 });
+    }
     console.error('Error updating event:', error);
     return NextResponse.json(
       { status: 'error', message: 'Internal server error' },

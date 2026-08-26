@@ -4,6 +4,7 @@ export type ChoiceFieldType = (typeof CHOICE_FIELD_TYPES)[number];
 export interface RegistrationFormField {
   id?: string;
   fieldKey?: string;
+  fieldKind?: string;
   order?: number;
   fieldName: string;
   fieldType: string;
@@ -20,8 +21,21 @@ export class RegistrationFormValidationError extends Error {
 
 export const STATIC_REGISTRATION_FIELD_NAMES = new Set(['nama', 'email']);
 
+export const STATIC_FIELD_KINDS = new Set(['static_name', 'static_email']);
+
+const MAX_STATIC_NAME_LENGTH = 255;
+const MAX_STATIC_EMAIL_LENGTH = 254;
+const MAX_TEXT_ANSWER_LENGTH = 4_000;
+
 export function isStaticRegistrationField(fieldName: string): boolean {
-  return STATIC_REGISTRATION_FIELD_NAMES.has(fieldName.trim().toLowerCase());
+  return STATIC_REGISTRATION_FIELD_NAMES.has(
+    fieldName.normalize('NFKC').replace(/\s+/g, '').toLowerCase(),
+  );
+}
+
+export function isStaticRegistrationFieldDefinition(field: Pick<RegistrationFormField, 'fieldName' | 'fieldKind'>): boolean {
+  return (typeof field.fieldKind === 'string' && STATIC_FIELD_KINDS.has(field.fieldKind))
+    || isStaticRegistrationField(field.fieldName);
 }
 
 export function getRegistrationFieldKey(field: Pick<RegistrationFormField, 'id' | 'fieldKey' | 'order'>): string {
@@ -29,12 +43,12 @@ export function getRegistrationFieldKey(field: Pick<RegistrationFormField, 'id' 
     return field.fieldKey;
   }
 
-  if (Number.isInteger(field.order) && (field.order as number) >= 0) {
-    return `field_${field.order}`;
-  }
-
   if (typeof field.id === 'string' && field.id.trim() !== '') {
     return `field_${field.id}`;
+  }
+
+  if (Number.isInteger(field.order) && (field.order as number) >= 0) {
+    return `field_${field.order}`;
   }
 
   throw new RegistrationFormValidationError('Konfigurasi field pendaftaran tidak memiliki key yang valid');
@@ -44,6 +58,36 @@ const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export function isValidEmailFormat(value: string): boolean {
   return EMAIL_PATTERN.test(value.trim());
+}
+
+export interface ValidatedRegistrationIdentity {
+  name: string;
+  email: string;
+}
+
+export function validateRegistrationIdentity(input: { name: unknown; email: unknown }): ValidatedRegistrationIdentity {
+  if (typeof input.name !== 'string') {
+    throw new RegistrationFormValidationError('Nama wajib diisi.');
+  }
+  const name = input.name.trim();
+  if (!name) {
+    throw new RegistrationFormValidationError('Nama wajib diisi.');
+  }
+  if (name.length > MAX_STATIC_NAME_LENGTH) {
+    throw new RegistrationFormValidationError(`Nama maksimal ${MAX_STATIC_NAME_LENGTH} karakter.`);
+  }
+
+  if (typeof input.email !== 'string') {
+    throw new RegistrationFormValidationError('Email wajib diisi.');
+  }
+  const email = input.email.trim().toLowerCase();
+  if (!email || !isValidEmailFormat(email)) {
+    throw new RegistrationFormValidationError('Email harus menggunakan format yang valid.');
+  }
+  if (email.length > MAX_STATIC_EMAIL_LENGTH) {
+    throw new RegistrationFormValidationError(`Email maksimal ${MAX_STATIC_EMAIL_LENGTH} karakter.`);
+  }
+  return { name, email };
 }
 
 function isChoiceFieldType(fieldType: string): fieldType is ChoiceFieldType {
@@ -98,7 +142,7 @@ export function validateRegistrationAnswers(fields: RegistrationFormField[], ans
     }
 
     if (field.fieldType === 'number') {
-      if (typeof value !== 'string' || !Number.isFinite(Number(value))) {
+      if (typeof value !== 'string' || value.trim() === '' || !Number.isFinite(Number(value))) {
         throw new RegistrationFormValidationError(`Field ${field.fieldName} harus berupa angka`);
       }
       continue;
@@ -127,6 +171,9 @@ export function validateRegistrationAnswers(fields: RegistrationFormField[], ans
 
     if (typeof value !== 'string') {
       throw new RegistrationFormValidationError(`Nilai tidak valid untuk field ${field.fieldName}`);
+    }
+    if (value.trim().length > MAX_TEXT_ANSWER_LENGTH) {
+      throw new RegistrationFormValidationError(`Field ${field.fieldName} maksimal ${MAX_TEXT_ANSWER_LENGTH} karakter`);
     }
   }
 }

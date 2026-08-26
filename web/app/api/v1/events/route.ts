@@ -2,17 +2,9 @@ import { NextResponse } from 'next/server';
 import { db } from '@/db';
 import { events } from '@/db/schema';
 import { eq } from 'drizzle-orm';
-import { headers } from 'next/headers';
+import { EventValidationError, validateEventCreatePayload } from '@/lib/validation/event';
 
 export const runtime = 'nodejs';
-
-// Helper to generate a slug from name
-function generateSlug(name: string): string {
-  return name
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/(^-|-$)+/g, '');
-}
 
 export async function POST(req: Request) {
   try {
@@ -44,18 +36,17 @@ export async function POST(req: Request) {
       }, { status: 200 });
     }
 
-    const body = await req.json();
-    const { name, capacity, registration_mode, location, date, description } = body;
-
-    if (!name || !capacity || !location || !date) {
-      return NextResponse.json(
-        { status: 'error', message: 'Missing required fields' },
-        { status: 400 }
-      );
+    let body: unknown;
+    try {
+      body = await req.json();
+    } catch {
+      return NextResponse.json({ status: 'error', code: 'EVENT_PAYLOAD_INVALID', message: 'Payload JSON tidak valid.' }, { status: 400 });
     }
 
+    const eventInput = validateEventCreatePayload(body);
+
     // Generate slug
-    const baseSlug = generateSlug(name);
+    const baseSlug = eventInput.slug;
     let slug = baseSlug;
     let counter = 1;
     
@@ -67,23 +58,14 @@ export async function POST(req: Request) {
       counter++;
     }
 
-    // Registration mode validation
-    const mode = registration_mode || 'Auto-Accept'; // default mode
-    if (mode !== 'Auto-Accept' && mode !== 'Manual Review') {
-      return NextResponse.json(
-        { status: 'error', message: 'Registration mode tidak valid' },
-        { status: 400 }
-      );
-    }
-
     const insertedEvents = await db.insert(events).values({
-      name,
+      name: eventInput.name,
       slug,
-      capacity: parseInt(capacity, 10),
-      location,
-      date: new Date(date),
-      description: description || null,
-      registrationMode: mode,
+      capacity: eventInput.capacity,
+      location: eventInput.location,
+      date: eventInput.date,
+      description: eventInput.description,
+      registrationMode: eventInput.registrationMode,
       volunteerPinHash: '', // Dummy for now, generated in S3-T4
       creationKey: idempotencyKey,
       status: 'Draft',
@@ -111,7 +93,13 @@ export async function POST(req: Request) {
       { status: 'success', message: 'Event berhasil dibuat', data: newEvent, idempotent_replay: false },
       { status: 201 }
     );
-  } catch (error: any) {
+  } catch (error: unknown) {
+    if (error instanceof EventValidationError) {
+      return NextResponse.json(
+        { status: 'error', code: error.code, message: error.message, field: error.field },
+        { status: 422 },
+      );
+    }
     console.error('Error creating event:', error);
     return NextResponse.json(
       { status: 'error', message: 'Internal server error' },

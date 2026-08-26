@@ -23,7 +23,10 @@ export function getApiAccessPolicy(pathname: string, method: string): ApiAccessP
     return 'worker';
   }
 
-  if (pathname === '/api/v1/worker/reconcile-participant-files') {
+  if (
+    pathname === '/api/v1/worker/reconcile-participant-files'
+    || pathname === '/api/v1/worker/expire-registration-drafts'
+  ) {
     return 'cron';
   }
 

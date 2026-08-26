@@ -1,12 +1,21 @@
 import { db } from '../../db';
 import { events, formFields, registrations, otps, resubmitTokens } from '../../db/schema';
 import { eq, and, inArray, count, desc, sql, isNull, gt } from 'drizzle-orm';
-import { getRegistrationFieldKey, isStaticRegistrationField, validateRegistrationAnswers } from '../validation/registrationForm';
+import {
+  getRegistrationFieldKey,
+  isStaticRegistrationFieldDefinition,
+  validateRegistrationAnswers,
+  validateRegistrationIdentity,
+} from '../validation/registrationForm';
 import { getVerifiedResubmitToken, issueResubmitTokenRecord } from '../security/resubmit';
 import { rotateRegistrationStatusCapabilityTx } from '../security/publicStatusCapability';
 import { ensureTicketGenerationJobTx } from './ticketGenerationJob';
 import { assertEventIsPublic } from '../events/eventLifecycle';
 import { claimParticipantFileUploadsTx } from '../registration/participantFileLifecycle';
+import {
+  CAPACITY_CONSUMING_REGISTRATION_STATUSES,
+  expireStaleDraftRegistrationsForEventTx,
+} from '../registration/draftLifecycle';
 
 interface RegistrationPayload {
   name: string;
@@ -43,6 +52,7 @@ async function issueResubmitTokenTx(
 }
 
 export async function processRegistrationAction(slug: string, payload: RegistrationPayload) {
+  const identity = validateRegistrationIdentity(payload);
   const result = await db.transaction(async (tx) => {
     // 1. Ambil Event dengan pessimistic lock
     const eventRecords = await tx
@@ -58,6 +68,10 @@ export async function processRegistrationAction(slug: string, payload: Registrat
     const event = eventRecords[0];
     assertEventIsPublic(event.status);
 
+    // The event row lock serializes expiry, capacity counting, and insertion
+    // for this event. Expired Drafts stop consuming quota before every write.
+    await expireStaleDraftRegistrationsForEventTx(tx, event.id);
+
     const eventFormFields = await tx
       .select({
         id: formFields.id,
@@ -66,6 +80,8 @@ export async function processRegistrationAction(slug: string, payload: Registrat
         isRequired: formFields.isRequired,
         options: formFields.options,
         order: formFields.order,
+        fieldKey: formFields.fieldKey,
+        fieldKind: formFields.fieldKind,
       })
       .from(formFields)
       .where(eq(formFields.eventId, event.id));
@@ -73,7 +89,7 @@ export async function processRegistrationAction(slug: string, payload: Registrat
     // BUG-E FIX: Skip field Nama/Email — dihandle sebagai field statis (name/email),
     // bukan sebagai field dinamis dengan key field_{id}
     const dynamicFields = eventFormFields.filter(
-      (f) => !isStaticRegistrationField(f.fieldName)
+      (f) => !isStaticRegistrationFieldDefinition(f)
     ).map((field) => ({
       ...field,
       fieldKey: getRegistrationFieldKey(field),
@@ -94,7 +110,7 @@ export async function processRegistrationAction(slug: string, payload: Registrat
     }
 
     const reusedDraftRegistration = Boolean(registrationId);
-    const normalizedEmail = payload.email.trim().toLowerCase();
+    const normalizedEmail = identity.email;
 
     // A delivery retry is idempotent per event and normalized email for both modes.
     // The event row lock serializes concurrent retries before a new registration is inserted.
@@ -110,7 +126,7 @@ export async function processRegistrationAction(slug: string, payload: Registrat
         .limit(1)
         .for('update');
 
-      if (existingRegistration && (event.registrationMode === 'Auto-Accept' || existingRegistration.status !== 'Draft')) {
+      if (existingRegistration && (event.registrationMode === 'Auto-Accept' || ['Pending', 'Accepted', 'Rejected'].includes(existingRegistration.status))) {
         let ticketJobId: string | null = null;
         let ticketJobStatus: string | null = null;
         if (existingRegistration.status === 'Accepted') {
@@ -144,7 +160,7 @@ export async function processRegistrationAction(slug: string, payload: Registrat
       .where(
         and(
           eq(registrations.eventId, event.id),
-          inArray(registrations.status, ['Draft', 'Pending', 'Accepted'])
+          inArray(registrations.status, CAPACITY_CONSUMING_REGISTRATION_STATUSES)
         )
       );
     
@@ -163,10 +179,11 @@ export async function processRegistrationAction(slug: string, payload: Registrat
 
     const regData = {
       eventId: event.id,
-      name: payload.name,
+      name: identity.name,
       email: normalizedEmail,
       answers: payload.answers || {},
       answerFieldLabels,
+      formVersion: event.formVersion,
       status,
     };
 
@@ -360,6 +377,11 @@ export async function verifyOtpAction(registrationId: string, otpCode: string) {
     }
 
     if (otpRecord.expiresAt < new Date()) {
+      const expiredAt = new Date();
+      await tx.update(registrations)
+        .set({ status: 'Expired', updatedAt: expiredAt })
+        .where(and(eq(registrations.id, registrationId), eq(registrations.status, 'Draft')));
+      await invalidateResubmitTokensTx(tx, registrationId, expiredAt);
       throw new Error('InvalidOTP: OTP expired');
     }
 

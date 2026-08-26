@@ -1,9 +1,9 @@
 import { and, eq, inArray, lt, or, sql } from 'drizzle-orm';
 import { db } from '../../db';
-import { registrations, ticketGenerationJobs } from '../../db/schema';
+import { events, registrations, ticketGenerationJobs } from '../../db/schema';
 import { publishJob } from '../services/qstash';
 
-export type TicketGenerationJobStatus = 'queued' | 'publishing' | 'published' | 'processing' | 'failed' | 'completed';
+export type TicketGenerationJobStatus = 'queued' | 'publishing' | 'published' | 'processing' | 'failed' | 'completed' | 'cancelled';
 
 export interface TicketGenerationJob {
   id: string;
@@ -124,7 +124,7 @@ function errorMessage(error: unknown): string {
 export async function publishTicketGenerationJob(registrationId: string): Promise<TicketGenerationJob> {
   const job = await getTicketGenerationJob(registrationId);
   if (!job) throw new Error('Ticket generation job not found');
-  if (job.status === 'published' || job.status === 'completed') return job;
+  if (job.status === 'published' || job.status === 'completed' || job.status === 'cancelled') return job;
 
   const stalePublishingBefore = new Date(Date.now() - 5 * 60 * 1000);
   const [claimed] = await db
@@ -209,11 +209,22 @@ export async function markTicketGenerationJobFailed(registrationId: string, erro
     .where(eq(ticketGenerationJobs.registrationId, registrationId));
 }
 
+export async function markTicketGenerationJobCancelled(registrationId: string, reason = 'Event is no longer active.'): Promise<void> {
+  await db
+    .update(ticketGenerationJobs)
+    .set({ status: 'cancelled', lastError: reason, updatedAt: new Date() })
+    .where(and(
+      eq(ticketGenerationJobs.registrationId, registrationId),
+      inArray(ticketGenerationJobs.status, ['queued', 'publishing', 'published', 'processing', 'failed']),
+    ));
+}
+
 export async function registrationIsAccepted(registrationId: string): Promise<boolean> {
   const [registration] = await db
-    .select({ status: registrations.status })
+    .select({ status: registrations.status, eventStatus: events.status })
     .from(registrations)
+    .innerJoin(events, eq(registrations.eventId, events.id))
     .where(eq(registrations.id, registrationId))
     .limit(1);
-  return registration?.status === 'Accepted';
+  return registration?.status === 'Accepted' && registration.eventStatus === 'Published';
 }

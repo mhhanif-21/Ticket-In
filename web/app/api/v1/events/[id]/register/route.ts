@@ -4,7 +4,13 @@ import { supabaseAdmin } from '@/lib/supabase';
 import { db } from '@/db';
 import { events, formFields } from '@/db/schema';
 import { eq } from 'drizzle-orm';
-import { getRegistrationFieldKey, isStaticRegistrationField, RegistrationFormValidationError, validateRegistrationAnswers } from '@/lib/validation/registrationForm';
+import {
+  getRegistrationFieldKey,
+  isStaticRegistrationFieldDefinition,
+  RegistrationFormValidationError,
+  validateRegistrationAnswers,
+  validateRegistrationIdentity,
+} from '@/lib/validation/registrationForm';
 import { publishTicketGenerationJob } from '@/lib/actions/ticketGenerationJob';
 import { STORAGE_BUCKETS } from '@/lib/storage/buckets';
 import { resetOtpRegistrationRateLimit } from '@/lib/security/otpRateLimit';
@@ -88,15 +94,13 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
 
     const formData = await req.formData();
     
-    const name = formData.get('name') as string;
-    const email = formData.get('email') as string;
+    const identity = validateRegistrationIdentity({
+      name: formData.get('name'),
+      email: formData.get('email'),
+    });
     const registrationId = formData.get('registration_id') as string | undefined;
     const resubmitToken = formData.get('resubmit_token') as string | undefined;
     const preserveAnswers = formData.get('retry_only') === 'true';
-
-    if (!name || !email) {
-      return NextResponse.json({ status: 'error', message: 'Name and email are required' }, { status: 422 });
-    }
 
     const [event] = await db.select({ id: events.id, status: events.status }).from(events).where(eq(events.slug, slug)).limit(1);
     if (!event) {
@@ -112,12 +116,14 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
       isRequired: formFields.isRequired,
       options: formFields.options,
       order: formFields.order,
+      fieldKey: formFields.fieldKey,
+      fieldKind: formFields.fieldKind,
     }).from(formFields).where(eq(formFields.eventId, event.id));
 
     // Fix validasi: skip field Nama/Email karena dihandle sebagai static field (name/email),
     // bukan sebagai field dinamis dengan key field_{id}
     const dynamicFormFields = eventFormFields.filter(
-      (f) => !isStaticRegistrationField(f.fieldName)
+      (f) => !isStaticRegistrationFieldDefinition(f)
     ).map((field) => ({
       ...field,
       fieldKey: getRegistrationFieldKey(field),
@@ -191,8 +197,8 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
     }
 
     const result = await processRegistrationAction(slug, {
-      name,
-      email,
+      name: identity.name,
+      email: identity.email,
       answers,
       registrationId,
       resubmitToken,
@@ -216,7 +222,7 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
       await resetOtpRegistrationRateLimit(result.registrationId);
       const { sendOtpEmail } = await import('@/lib/email');
       try {
-        await sendOtpEmail(email, name, result.otpCode);
+        await sendOtpEmail(identity.email, identity.name, result.otpCode);
       } catch {
         console.error('OTP delivery failed');
         return NextResponse.json({
