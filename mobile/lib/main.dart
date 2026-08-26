@@ -14,18 +14,17 @@ import 'screens/executive_oversight_screen.dart';
 import 'screens/admin_dashboard_screen.dart';
 import 'screens/participants_screen.dart';
 import 'screens/review_detail_screen.dart';
+import 'screens/ticket_template_screen.dart';
+import 'services/api_client.dart';
 
 void main() {
-  runApp(
-    const ProviderScope(
-      child: EventGateAdminApp(),
-    ),
-  );
+  runApp(const ProviderScope(child: EventGateAdminApp()));
 }
+
 // ─────────────────────────────────────────────────────────
 // [BUG-053] FIX: Splash Screen dengan Session Persistence
-// Cek auth_token di SecureStorage saat app dibuka.
-// Jika token ada → langsung masuk Dashboard, skip Login.
+// Cek session di SecureStorage saat app dibuka.
+// Access token dapat diperbarui memakai refresh token tanpa login ulang.
 // ─────────────────────────────────────────────────────────
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -43,15 +42,22 @@ class _SplashScreenState extends State<SplashScreen> {
 
   Future<void> _checkSession() async {
     const storage = FlutterSecureStorage();
-    final token = await storage.read(key: 'auth_token');
+    final accessToken = await storage.read(key: ApiClient.accessTokenKey);
+    final refreshToken = await storage.read(key: ApiClient.refreshTokenKey);
 
     if (!mounted) return;
 
-    if (token != null && token.isNotEmpty) {
-      // Token ditemukan → langsung ke Dashboard
+    if (accessToken != null &&
+        accessToken.isNotEmpty &&
+        refreshToken != null &&
+        refreshToken.isNotEmpty) {
+      // Session ditemukan → langsung ke Dashboard. ApiClient akan refresh jika perlu.
       context.go('/admin-dashboard');
     } else {
-      // Tidak ada token → ke halaman Login
+      // Session lama hanya berisi access token; login ulang sekali untuk memperoleh refresh token.
+      await storage.delete(key: ApiClient.accessTokenKey);
+      await storage.delete(key: ApiClient.refreshTokenKey);
+      if (!mounted) return;
       context.go('/login');
     }
   }
@@ -77,10 +83,7 @@ class _SplashScreenState extends State<SplashScreen> {
               ),
             ),
             SizedBox(height: 32),
-            CircularProgressIndicator(
-              color: Color(0xFF000000),
-              strokeWidth: 2,
-            ),
+            CircularProgressIndicator(color: Color(0xFF000000), strokeWidth: 2),
           ],
         ),
       ),
@@ -92,25 +95,17 @@ final _router = GoRouter(
   // [BUG-053] FIX: initialLocation sekarang ke /splash yang akan redirect secara cerdas
   initialLocation: '/splash',
   routes: [
-    GoRoute(
-      path: '/splash',
-      builder: (context, state) => const SplashScreen(),
-    ),
-    GoRoute(
-      path: '/login',
-      builder: (context, state) => const LoginScreen(),
-    ),
-    GoRoute(
-      path: '/home',
-      builder: (context, state) => const HomeScreen(),
-    ),
+    GoRoute(path: '/splash', builder: (context, state) => const SplashScreen()),
+    GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
+    GoRoute(path: '/home', builder: (context, state) => const HomeScreen()),
     GoRoute(
       path: '/create-event',
       builder: (context, state) => const CreateEventScreen(),
     ),
     GoRoute(
       path: '/edit-event/:id',
-      builder: (context, state) => EditEventScreen(eventId: state.pathParameters['id']!),
+      builder: (context, state) =>
+          EditEventScreen(eventId: state.pathParameters['id']!),
     ),
     GoRoute(
       path: '/form-builder/:id',
@@ -123,12 +118,19 @@ final _router = GoRouter(
     ),
     GoRoute(
       path: '/access-management/:id',
-      builder: (context, state) => AccessManagementScreen(eventId: state.pathParameters['id']!),
+      builder: (context, state) =>
+          AccessManagementScreen(eventId: state.pathParameters['id']!),
+    ),
+    GoRoute(
+      path: '/ticket-template/:id',
+      builder: (context, state) =>
+          TicketTemplateScreen(eventId: state.pathParameters['id']!),
     ),
     // [BUG-048] FIX: Route baru untuk halaman detail event menggantikan Bottom Sheet
     GoRoute(
       path: '/event-detail/:id',
-      builder: (context, state) => DetailEventMetricsScreen(eventId: state.pathParameters['id']!),
+      builder: (context, state) =>
+          DetailEventMetricsScreen(eventId: state.pathParameters['id']!),
     ),
     GoRoute(
       path: '/detail-metrics/:id',
@@ -146,11 +148,14 @@ final _router = GoRouter(
     ),
     GoRoute(
       path: '/participants/:id',
-      builder: (context, state) => ParticipantsScreen(eventId: state.pathParameters['id']!),
+      builder: (context, state) =>
+          ParticipantsScreen(eventId: state.pathParameters['id']!),
     ),
     GoRoute(
       path: '/review-detail',
-      builder: (context, state) => ReviewDetailScreen(participantData: state.extra as Map<String, dynamic>),
+      builder: (context, state) => ReviewDetailScreen(
+        participantData: state.extra as Map<String, dynamic>,
+      ),
     ),
   ],
 );
