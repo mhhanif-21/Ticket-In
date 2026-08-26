@@ -4,6 +4,11 @@ import { and, eq, isNull } from 'drizzle-orm';
 import { generateRandomTicketCode, generateQrCodeWithText } from '../utils/ticketUtils';
 import { supabaseAdmin } from '../supabase';
 import { STORAGE_BUCKETS } from '../storage/buckets';
+import {
+  getActiveApprovalEmailTemplate,
+  getTicketTemplateConfig,
+  renderApprovalEmailTemplate,
+} from '../tickets/ticketTemplate';
 
 import { getConfiguredBrevoSender, sendEmail } from '../services/brevo';
 import { events } from '../../db/schema';
@@ -70,21 +75,34 @@ export async function triggerTicketEmailDelivery(registrationId: string) {
     throw new Error('Ticket not fully generated');
   }
 
-  // Construct Email
-  const htmlContent = `
-    <h1>Hello ${registration.name},</h1>
-    <p>Your ticket for <strong>${event.name}</strong> is ready!</p>
-    <p>Ticket Code: <strong>${registration.ticketCode}</strong></p>
-    <p>Please show the QR code below at the entrance:</p>
-    <img src="${registration.qrCodeUrl}" alt="QR Code" />
-  `;
+  const approvalTemplate = await getActiveApprovalEmailTemplate(event.id);
+  const renderedEmail = approvalTemplate
+    ? renderApprovalEmailTemplate(approvalTemplate, {
+      name: registration.name,
+      email: registration.email,
+      eventName: event.name,
+      ticketCode: registration.ticketCode,
+      ticketImageUrl: registration.qrCodeUrl,
+      answers: registration.answers,
+      answerFieldLabels: registration.answerFieldLabels,
+    })
+    : {
+      subject: `Your Ticket for ${event.name}`,
+      htmlContent: `
+        <h1>Hello ${registration.name},</h1>
+        <p>Your ticket for <strong>${event.name}</strong> is ready!</p>
+        <p>Ticket Code: <strong>${registration.ticketCode}</strong></p>
+        <p>Please show the QR code below at the entrance:</p>
+        <img src="${registration.qrCodeUrl}" alt="QR Code" />
+      `,
+    };
 
   // Brevo wrapper already enforces the 3-second hard timeout
   const attachment = await getTicketQrAttachment(registration.qrCodeUrl, registration.ticketCode);
   await sendEmail({
     to: [{ email: registration.email, name: registration.name }],
-    subject: `Your Ticket for ${event.name}`,
-    htmlContent,
+    subject: renderedEmail.subject,
+    htmlContent: renderedEmail.htmlContent,
     sender: getConfiguredBrevoSender(),
     attachment: [attachment],
   });
@@ -135,6 +153,8 @@ export async function GenerateTicketAction(registrationId: string) {
     return { status: 'in_progress', ticketCode: null, qrCodeUrl: null };
   }
 
+  const ticketTemplate = await getTicketTemplateConfig(event.id);
+
   const maxRetries = 3;
   let attempt = 0;
   let finalTicketCode = '';
@@ -148,7 +168,12 @@ export async function GenerateTicketAction(registrationId: string) {
       const ticketCode = generateRandomTicketCode();
 
       // 5. Render QR Code (FR-REG-11)
-      const qrBuffer = await generateQrCodeWithText(ticketCode, registration.name, event.name);
+      const qrBuffer = await generateQrCodeWithText(ticketCode, registration.name, event.name, {
+        template: ticketTemplate,
+        participantEmail: registration.email,
+        answers: registration.answers,
+        answerFieldLabels: registration.answerFieldLabels,
+      });
 
       // 6. Upload to Supabase Storage (bucket: tickets)
       const fileName = `${registrationId}-${ticketCode}.png`;

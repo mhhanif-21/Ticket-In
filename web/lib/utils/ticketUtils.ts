@@ -3,6 +3,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import QRCode from 'qrcode';
 import sharp from 'sharp';
+import { resolveRegistrationFieldToken, type TicketTemplateConfig, type TicketTemplateElement } from '@/lib/tickets/ticketTemplate';
+import { STORAGE_BUCKETS } from '@/lib/storage/buckets';
+import { supabaseAdmin } from '@/lib/supabase';
 
 const TICKET_FONT_FAMILY = 'Noto Sans';
 const TICKET_FONT_DIRECTORY = path.join(process.cwd(), 'assets', 'fonts');
@@ -79,7 +82,116 @@ export function generateRandomTicketCode(): string {
   return result;
 }
 
-export async function generateQrCodeWithText(ticketCode: string, participantName: string, eventName: string): Promise<Buffer> {
+type TicketRenderOptions = {
+  template?: TicketTemplateConfig;
+  participantEmail?: string;
+  answers?: unknown;
+  answerFieldLabels?: unknown;
+};
+
+function getTemplateText(
+  element: TicketTemplateElement,
+  input: {
+    ticketCode: string;
+    participantName: string;
+    participantEmail: string;
+    eventName: string;
+    answers: unknown;
+    answerFieldLabels: unknown;
+  },
+): string {
+  switch (element.type) {
+    case 'ticket_code':
+      return input.ticketCode;
+    case 'name':
+      return input.participantName || '-';
+    case 'email':
+      return input.participantEmail || '-';
+    case 'event_name':
+      return input.eventName || '-';
+    case 'field':
+      return resolveRegistrationFieldToken(element.token ?? '', input.answers, input.answerFieldLabels);
+    default:
+      return '-';
+  }
+}
+
+async function generateCustomTicket(
+  ticketCode: string,
+  participantName: string,
+  eventName: string,
+  template: TicketTemplateConfig,
+  options: TicketRenderOptions,
+): Promise<Buffer> {
+  if (!template.backgroundPath) {
+    throw new Error('Custom ticket template background is missing');
+  }
+  ensureTicketFontConfig();
+
+  const { data, error } = await supabaseAdmin.storage
+    .from(STORAGE_BUCKETS.ticketTemplates)
+    .download(template.backgroundPath);
+  if (error || !data) {
+    throw new Error('Custom ticket template background could not be loaded');
+  }
+
+  // Bounding the rendered pixel count protects the serverless worker from a
+  // valid-but-extremely-large source image while retaining its original ratio.
+  const normalizedBackground = await sharp(Buffer.from(await data.arrayBuffer()))
+    .rotate()
+    .resize({ width: 1200, height: 1600, fit: 'inside', withoutEnlargement: true })
+    .png({ compressionLevel: 9 })
+    .toBuffer();
+  const metadata = await sharp(normalizedBackground).metadata();
+  if (!metadata.width || !metadata.height) {
+    throw new Error('Custom ticket template dimensions are invalid');
+  }
+
+  const qrBuffer = await QRCode.toBuffer(ticketCode, {
+    errorCorrectionLevel: 'H',
+    type: 'png',
+    margin: 2,
+    width: 300,
+  });
+  const context = {
+    ticketCode,
+    participantName,
+    participantEmail: options.participantEmail ?? '',
+    eventName,
+    answers: options.answers,
+    answerFieldLabels: options.answerFieldLabels,
+  };
+  const composites: sharp.OverlayOptions[] = [];
+
+  for (const element of template.elements) {
+    const left = Math.round(element.x * metadata.width);
+    const top = Math.round(element.y * metadata.height);
+    const width = Math.max(1, Math.round(element.width * metadata.width));
+    const height = Math.max(1, Math.round(element.height * metadata.height));
+
+    if (element.type === 'qr') {
+      composites.push({
+        input: await sharp(qrBuffer).resize({ width, height, fit: 'contain' }).png().toBuffer(),
+        left,
+        top,
+      });
+      continue;
+    }
+
+    const text = escapeXml(getTemplateText(element, context));
+    const fontSize = Math.max(12, Math.min(56, Math.floor(height * 0.68)));
+    const textSvg = Buffer.from(
+      `<svg width="${width}" height="${height}">
+        <text x="0" y="${Math.max(fontSize, Math.floor(height * 0.72))}" font-family="${TICKET_FONT_FAMILY}" font-size="${fontSize}" font-weight="bold" fill="#111111">${text}</text>
+      </svg>`,
+    );
+    composites.push({ input: textSvg, left, top });
+  }
+
+  return sharp(normalizedBackground).composite(composites).png({ compressionLevel: 9 }).toBuffer();
+}
+
+async function generateDefaultQrCodeWithText(ticketCode: string, participantName: string, eventName: string): Promise<Buffer> {
   ensureTicketFontConfig();
 
   // 1. Generate the base QR Code as a Buffer
@@ -154,4 +266,20 @@ export async function generateQrCodeWithText(ticketCode: string, participantName
     .toBuffer();
 
   return finalImageBuffer;
+}
+
+/**
+ * Renders the default ticket or a validated per-event custom template. The
+ * optional context keeps the existing worker/API contract backward compatible.
+ */
+export async function generateQrCodeWithText(
+  ticketCode: string,
+  participantName: string,
+  eventName: string,
+  options: TicketRenderOptions = {},
+): Promise<Buffer> {
+  if (options.template?.mode === 'custom') {
+    return generateCustomTicket(ticketCode, participantName, eventName, options.template, options);
+  }
+  return generateDefaultQrCodeWithText(ticketCode, participantName, eventName);
 }

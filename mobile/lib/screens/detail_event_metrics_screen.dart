@@ -136,7 +136,7 @@ class DetailEventMetricsScreen extends ConsumerWidget {
           fit: StackFit.expand,
           children: [
             if (posterUrl != null && posterUrl.isNotEmpty)
-              Image.network(posterUrl, fit: BoxFit.cover)
+              Image.network(posterUrl, fit: BoxFit.contain)
             else
               Container(color: AppColors.primary),
 
@@ -478,6 +478,16 @@ class DetailEventMetricsScreen extends ConsumerWidget {
           subtitle: 'Atur PIN volunteer untuk check-in',
           onTap: () async {
             await context.push('/access-management/$eventId');
+            ref.invalidate(eventStatsProvider(eventId));
+          },
+        ),
+        _buildMenuTile(
+          context,
+          icon: Icons.confirmation_number_outlined,
+          title: 'Template Tiket & Email',
+          subtitle: 'Atur tampilan tiket dan email approval Manual Review',
+          onTap: () async {
+            await context.push('/ticket-template/$eventId');
             ref.invalidate(eventStatsProvider(eventId));
           },
         ),
