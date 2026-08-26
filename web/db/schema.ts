@@ -24,6 +24,7 @@ export const events = pgTable(
     location: varchar('location', { length: 255 }).notNull(),
     date: timestamp('date').notNull(),
     posterUrl: text('poster_url'),
+    creationKey: varchar('creation_key', { length: 128 }),
     capacity: integer('capacity').notNull(),
     registrationMode: varchar('registration_mode', { length: 50 }).notNull(), // Auto-Accept, Manual Review
     volunteerPinHash: varchar('volunteer_pin_hash', { length: 255 }).notNull(),
@@ -34,6 +35,7 @@ export const events = pgTable(
   (table) => ({
     slugIdx: index('events_slug_idx').on(table.slug),
     statusIdx: index('events_status_idx').on(table.status),
+    creationKeyUnique: uniqueIndex('events_creation_key_unique').on(table.creationKey),
     statusCheck: check(
       'events_status_check',
       sql`${table.status} IN ('Draft', 'Published', 'Cancelled')`,
@@ -46,6 +48,99 @@ export const eventsRelations = relations(events, ({ many }) => ({
   registrations: many(registrations),
   resubmitTokens: many(resubmitTokens),
   checkInSessions: many(checkInSessions),
+  media: many(eventMedia),
+}));
+
+export const eventMedia = pgTable(
+  'event_media',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    eventId: uuid('event_id')
+      .notNull()
+      .references(() => events.id, { onDelete: 'cascade' }),
+    role: varchar('role', { length: 20 }).notNull(), // cover, gallery
+    displayOrder: integer('display_order').notNull().default(0),
+    storagePath: text('storage_path'),
+    publicUrl: text('public_url').notNull(),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  },
+  (table) => ({
+    eventRoleOrderUnique: uniqueIndex('event_media_event_role_order_unique').on(
+      table.eventId,
+      table.role,
+      table.displayOrder,
+    ),
+    eventOrderIdx: index('event_media_event_order_idx').on(
+      table.eventId,
+      table.role,
+      table.displayOrder,
+    ),
+    roleOrderCheck: check(
+      'event_media_role_order_check',
+      sql`(${table.role} = 'cover' AND ${table.displayOrder} = 0) OR (${table.role} = 'gallery' AND ${table.displayOrder} BETWEEN 0 AND 4)`,
+    ),
+  }),
+);
+
+export const eventMediaRelations = relations(eventMedia, ({ one }) => ({
+  event: one(events, {
+    fields: [eventMedia.eventId],
+    references: [events.id],
+  }),
+}));
+
+// Per-event ticket rendering configuration. The background itself lives in
+// Storage; coordinates are persisted as normalized JSON so one configuration
+// works for any source image resolution.
+export const eventTicketTemplates = pgTable(
+  'event_ticket_templates',
+  {
+    eventId: uuid('event_id')
+      .primaryKey()
+      .references(() => events.id, { onDelete: 'cascade' }),
+    mode: varchar('mode', { length: 16 }).notNull().default('default'),
+    backgroundPath: text('background_path'),
+    elements: jsonb('elements').notNull().default([]),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  },
+  (table) => ({
+    modeCheck: check(
+      'event_ticket_templates_mode_check',
+      sql`${table.mode} IN ('default', 'custom')`,
+    ),
+  }),
+);
+
+export const eventTicketTemplatesRelations = relations(eventTicketTemplates, ({ one }) => ({
+  event: one(events, {
+    fields: [eventTicketTemplates.eventId],
+    references: [events.id],
+  }),
+}));
+
+// Plain-text template used only for Manual Review approval email. OTP keeps
+// the system template and never reads this table.
+export const eventApprovalEmailTemplates = pgTable(
+  'event_approval_email_templates',
+  {
+    eventId: uuid('event_id')
+      .primaryKey()
+      .references(() => events.id, { onDelete: 'cascade' }),
+    isActive: boolean('is_active').notNull().default(false),
+    subject: text('subject').notNull().default(''),
+    body: text('body').notNull().default(''),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  },
+);
+
+export const eventApprovalEmailTemplatesRelations = relations(eventApprovalEmailTemplates, ({ one }) => ({
+  event: one(events, {
+    fields: [eventApprovalEmailTemplates.eventId],
+    references: [events.id],
+  }),
 }));
 
 // 2. Table form_fields
@@ -94,6 +189,40 @@ export const registrations = pgTable(
   })
 );
 
+// Durable ownership and cleanup ledger for objects written before the
+// registration transaction commits. Only `claimed` rows belong to a saved
+// registration; all other states can be reconciled safely.
+export const participantFileUploads = pgTable(
+  'participant_file_uploads',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    requestId: uuid('request_id').notNull(),
+    registrationId: uuid('registration_id').references(() => registrations.id, { onDelete: 'set null' }),
+    bucket: varchar('bucket', { length: 128 }).notNull(),
+    storagePath: text('storage_path').notNull(),
+    fieldKey: varchar('field_key', { length: 128 }).notNull(),
+    status: varchar('status', { length: 24 }).notNull().default('staged'),
+    attempts: integer('attempts').notNull().default(0),
+    lastError: text('last_error'),
+    expiresAt: timestamp('expires_at').notNull(),
+    nextAttemptAt: timestamp('next_attempt_at').notNull().defaultNow(),
+    cleanupLeaseExpiresAt: timestamp('cleanup_lease_expires_at'),
+    cleanedAt: timestamp('cleaned_at'),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    updatedAt: timestamp('updated_at').notNull().defaultNow(),
+  },
+  (table) => ({
+    storagePathUnique: uniqueIndex('participant_file_uploads_storage_path_unique').on(table.storagePath),
+    retryIdx: index('participant_file_uploads_retry_idx').on(table.status, table.nextAttemptAt),
+    expiryIdx: index('participant_file_uploads_expiry_idx').on(table.status, table.expiresAt),
+    registrationIdx: index('participant_file_uploads_registration_idx').on(table.registrationId),
+    statusCheck: check(
+      'participant_file_uploads_status_check',
+      sql`${table.status} IN ('staged', 'claimed', 'cleanup_pending', 'cleaning', 'cleaned')`,
+    ),
+  }),
+);
+
 // Durable ticket-generation state. A registration can have exactly one job so
 // QStash retries and duplicate deliveries remain observable and idempotent.
 export const ticketGenerationJobs = pgTable(
@@ -127,6 +256,14 @@ export const registrationsRelations = relations(registrations, ({ one, many }) =
   resubmitTokens: many(resubmitTokens),
   checkInLogs: many(checkInLogs),
   ticketGenerationJobs: many(ticketGenerationJobs),
+  participantFileUploads: many(participantFileUploads),
+}));
+
+export const participantFileUploadsRelations = relations(participantFileUploads, ({ one }) => ({
+  registration: one(registrations, {
+    fields: [participantFileUploads.registrationId],
+    references: [registrations.id],
+  }),
 }));
 
 // One-time ownership proofs for public Draft resubmission. Only a SHA-256

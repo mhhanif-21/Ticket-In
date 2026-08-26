@@ -10,14 +10,20 @@ const bucketDefinitions = [
   {
     name: STORAGE_BUCKETS.eventPosters,
     public: true,
-    allowedMimeTypes: ['image/png', 'image/jpeg', 'image/jpg'],
+    allowedMimeTypes: ['image/png', 'image/jpeg', 'image/jpg', 'image/webp'],
+    fileSizeLimit: 5 * 1024 * 1024,
+  },
+  {
+    name: STORAGE_BUCKETS.ticketTemplates,
+    public: false,
+    allowedMimeTypes: ['image/png', 'image/jpeg', 'image/jpg', 'image/webp'],
     fileSizeLimit: 5 * 1024 * 1024,
   },
   {
     name: STORAGE_BUCKETS.participantFiles,
     public: false,
-    allowedMimeTypes: ['image/png', 'image/jpeg', 'image/jpg'],
-    fileSizeLimit: 1 * 1024 * 1024,
+    allowedMimeTypes: ['image/png', 'image/jpeg', 'image/jpg', 'application/pdf'],
+    fileSizeLimit: 5 * 1024 * 1024,
   },
   {
     name: STORAGE_BUCKETS.tickets,
@@ -36,7 +42,15 @@ async function setupStorage() {
 
   for (const definition of bucketDefinitions) {
     if (buckets.some((bucket) => bucket.name === definition.name)) {
-      console.log(`Bucket "${definition.name}" already exists.`);
+      const { error: updateError } = await supabaseAdmin.storage.updateBucket(definition.name, {
+        public: definition.public,
+        allowedMimeTypes: [...definition.allowedMimeTypes],
+        fileSizeLimit: definition.fileSizeLimit,
+      });
+      if (updateError) {
+        throw new Error(`Failed to update bucket "${definition.name}": ${updateError.message}`);
+      }
+      console.log(`Bucket "${definition.name}" updated successfully.`);
       continue;
     }
 

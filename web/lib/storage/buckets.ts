@@ -4,6 +4,7 @@
  */
 export const STORAGE_BUCKETS = {
   eventPosters: 'event_posters',
+  ticketTemplates: 'ticket_templates',
   participantFiles: 'participant_files',
   tickets: 'tickets',
 } as const;
