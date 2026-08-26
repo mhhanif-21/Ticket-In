@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../theme/app_colors.dart';
-import '../services/admin_service.dart';
 // [MOB-BUG-013] FIX: Import dari provider terpusat
 import '../providers/admin_providers.dart';
+
 final executiveStatsProvider = FutureProvider((ref) {
   final service = ref.read(adminServiceProvider);
   return service.getDashboardStats();
@@ -51,17 +51,19 @@ class ExecutiveOversightScreen extends ConsumerWidget {
             const SizedBox(height: 4),
             const Text(
               'Ringkasan tingkat tinggi untuk pemantauan strategis.',
-              style: TextStyle(
-                fontSize: 14,
-                color: AppColors.onSurfaceVariant,
-              ),
+              style: TextStyle(fontSize: 14, color: AppColors.onSurfaceVariant),
             ),
             const SizedBox(height: 24),
 
             statsAsync.when(
               data: (data) => _buildStatsContent(data),
               loading: () => const Center(child: CircularProgressIndicator()),
-              error: (err, stack) => Center(child: Text('Error: $err', style: const TextStyle(color: AppColors.error))),
+              error: (err, stack) => Center(
+                child: Text(
+                  'Error: $err',
+                  style: const TextStyle(color: AppColors.error),
+                ),
+              ),
             ),
           ],
         ),
@@ -73,33 +75,71 @@ class ExecutiveOversightScreen extends ConsumerWidget {
     // Calculate overall conversion if possible
     final int totalReg = data['total_registrations'] ?? 0;
     final int totalPresent = data['total_present'] ?? 0;
-    final String conversion = totalReg > 0 ? ((totalPresent / totalReg) * 100).toStringAsFixed(1) : '0.0';
+    final String conversion = totalReg > 0
+        ? ((totalPresent / totalReg) * 100).toStringAsFixed(1)
+        : '0.0';
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           children: [
-            Expanded(child: _buildSummaryCard('Total Acara', data['total_events']?.toString() ?? '0', Icons.event)),
+            Expanded(
+              child: _buildSummaryCard(
+                'Total Acara',
+                data['total_events']?.toString() ?? '0',
+                Icons.event,
+              ),
+            ),
             const SizedBox(width: 12),
-            Expanded(child: _buildSummaryCard('Kehadiran', '$conversion%', Icons.analytics)),
+            Expanded(
+              child: _buildSummaryCard(
+                'Kehadiran',
+                '$conversion%',
+                Icons.analytics,
+              ),
+            ),
           ],
         ),
         const SizedBox(height: 12),
         Row(
           children: [
-            Expanded(child: _buildSummaryCard('Pendaftar', totalReg.toString(), Icons.groups)),
+            Expanded(
+              child: _buildSummaryCard(
+                'Pendaftar',
+                totalReg.toString(),
+                Icons.groups,
+              ),
+            ),
             const SizedBox(width: 12),
-            Expanded(child: _buildSummaryCard('Hadir', totalPresent.toString(), Icons.how_to_reg)),
+            Expanded(
+              child: _buildSummaryCard(
+                'Hadir',
+                totalPresent.toString(),
+                Icons.how_to_reg,
+              ),
+            ),
           ],
         ),
         const SizedBox(height: 24),
         const Text(
           'Acara Mendatang',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: AppColors.onSurface),
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w600,
+            color: AppColors.onSurface,
+          ),
         ),
         const SizedBox(height: 12),
-        ...((data['recent_events'] as List<dynamic>?) ?? []).map((ev) {
+        if (((data['upcoming_events'] as List<dynamic>?) ?? []).isEmpty)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 16),
+            child: Text(
+              'Belum ada acara terbit yang akan datang.',
+              style: TextStyle(color: AppColors.onSurfaceVariant),
+            ),
+          ),
+        ...((data['upcoming_events'] as List<dynamic>?) ?? []).map((ev) {
           return Container(
             margin: const EdgeInsets.only(bottom: 12),
             padding: const EdgeInsets.all(16),
@@ -112,13 +152,14 @@ class ExecutiveOversightScreen extends ConsumerWidget {
                   color: Colors.black.withOpacity(0.03),
                   blurRadius: 8,
                   offset: const Offset(0, 2),
-                )
+                ),
               ],
             ),
             child: Row(
               children: [
                 Container(
-                  width: 50, height: 50,
+                  width: 50,
+                  height: 50,
                   decoration: BoxDecoration(
                     color: AppColors.primaryContainer,
                     borderRadius: BorderRadius.circular(10),
@@ -130,21 +171,41 @@ class ExecutiveOversightScreen extends ConsumerWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(ev['name'] ?? '', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16, color: AppColors.onSurface)),
+                      Text(
+                        ev['name'] ?? '',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 16,
+                          color: AppColors.onSurface,
+                        ),
+                      ),
                       const SizedBox(height: 4),
-                      Text('${ev['date']?.substring(0,10) ?? ''} • ${ev['location'] ?? ''}', style: const TextStyle(color: AppColors.onSurfaceVariant, fontSize: 13)),
+                      Text(
+                        '${ev['date']?.substring(0, 10) ?? ''} • ${ev['location'] ?? ''}',
+                        style: const TextStyle(
+                          color: AppColors.onSurfaceVariant,
+                          fontSize: 13,
+                        ),
+                      ),
                     ],
                   ),
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
                   decoration: BoxDecoration(
                     color: AppColors.secondaryContainer,
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
-                    'Kapasitas: ${ev['capacity'] ?? 0}',
-                    style: const TextStyle(color: AppColors.onSecondaryContainer, fontSize: 12, fontWeight: FontWeight.w600),
+                    'Pendaftar: ${ev['registrants_count'] ?? 0}',
+                    style: const TextStyle(
+                      color: AppColors.onSecondaryContainer,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
               ],
@@ -167,7 +228,7 @@ class ExecutiveOversightScreen extends ConsumerWidget {
             color: Colors.black.withOpacity(0.02),
             blurRadius: 10,
             offset: const Offset(0, 4),
-          )
+          ),
         ],
       ),
       child: Column(

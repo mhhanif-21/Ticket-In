@@ -28,9 +28,10 @@ class _EditEventScreenState extends State<EditEventScreen> {
   final _formKey = GlobalKey<FormState>();
   late final EventService _eventService;
 
-  late TextEditingController _nameController;
-  late TextEditingController _locationController;
-  late TextEditingController _capacityController;
+  final TextEditingController _nameController = TextEditingController();
+  final TextEditingController _locationController = TextEditingController();
+  final TextEditingController _capacityController = TextEditingController();
+  final TextEditingController _dateController = TextEditingController();
   final TextEditingController _descriptionController = TextEditingController();
 
   DateTime? _selectedDate;
@@ -49,15 +50,15 @@ class _EditEventScreenState extends State<EditEventScreen> {
   Future<void> _loadEvent() async {
     try {
       final event = await _eventService.getEventDetail(widget.eventId);
+      if (!mounted) return;
       setState(() {
         _event = event;
-        _nameController = TextEditingController(text: event.name);
-        _locationController = TextEditingController(text: event.location);
-        _capacityController = TextEditingController(
-          text: event.capacity.toString(),
-        );
+        _nameController.text = event.name;
+        _locationController.text = event.location;
+        _capacityController.text = event.capacity.toString();
         _descriptionController.text = event.description ?? '';
         _selectedDate = event.date;
+        _dateController.text = DateFormat('dd MMM yyyy').format(event.date);
         _selectedMode = event.registrationMode;
         _isLoading = false;
       });
@@ -78,15 +79,15 @@ class _EditEventScreenState extends State<EditEventScreen> {
       final picked = await ImagePicker().pickImage(source: ImageSource.gallery);
       if (picked != null) pickedFile = File(picked.path);
     }
+    if (!mounted) return;
     if (pickedFile == null) return;
 
     final validationError = await validateEventImageFile(pickedFile);
+    if (!mounted) return;
     if (validationError != null) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(validationError)));
-      }
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(validationError)));
       return;
     }
 
@@ -112,9 +113,11 @@ class _EditEventScreenState extends State<EditEventScreen> {
         );
       },
     );
+    if (!mounted) return;
     if (date != null) {
       setState(() {
         _selectedDate = date;
+        _dateController.text = DateFormat('dd MMM yyyy').format(date);
       });
     }
   }
@@ -123,6 +126,7 @@ class _EditEventScreenState extends State<EditEventScreen> {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _isLoading = true);
 
+    var metadataPersisted = false;
     try {
       final data = {
         'name': _nameController.text,
@@ -135,6 +139,7 @@ class _EditEventScreenState extends State<EditEventScreen> {
       };
 
       await _eventService.updateEvent(widget.eventId, data);
+      metadataPersisted = true;
       if (_posterFile != null) {
         await _eventService.uploadEventPoster(
           widget.eventId,
@@ -149,9 +154,21 @@ class _EditEventScreenState extends State<EditEventScreen> {
       Navigator.pop(context, true); // Return true to signal refresh
     } on EventMediaUploadException catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(error.message)));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            metadataPersisted
+                ? 'Data acara sudah tersimpan, tetapi poster belum diperbarui. ${error.message}'
+                : error.message,
+          ),
+          action: metadataPersisted && _posterFile != null
+              ? SnackBarAction(
+                  label: 'UNGGAH ULANG',
+                  onPressed: _retryPosterUpload,
+                )
+              : null,
+        ),
+      );
       setState(() => _isLoading = false);
     } catch (_) {
       if (!mounted) return;
@@ -164,11 +181,33 @@ class _EditEventScreenState extends State<EditEventScreen> {
     }
   }
 
+  Future<void> _retryPosterUpload() async {
+    final poster = _posterFile;
+    if (poster == null) return;
+    setState(() => _isLoading = true);
+    try {
+      await _eventService.uploadEventPoster(widget.eventId, poster.path);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Poster berhasil diperbarui.')),
+      );
+      Navigator.pop(context, true);
+    } on EventMediaUploadException catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(error.message)));
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
   @override
   void dispose() {
     _nameController.dispose();
     _locationController.dispose();
     _capacityController.dispose();
+    _dateController.dispose();
     _descriptionController.dispose();
     super.dispose();
   }
@@ -383,11 +422,7 @@ class _EditEventScreenState extends State<EditEventScreen> {
                           ? 'Pilih Tanggal Acara'
                           : DateFormat('dd MMM yyyy').format(_selectedDate!),
                       icon: Icons.calendar_today,
-                      controller: TextEditingController(
-                        text: _selectedDate == null
-                            ? ''
-                            : DateFormat('dd MMM yyyy').format(_selectedDate!),
-                      ),
+                      controller: _dateController,
                       readOnly: true,
                       onTap: _pickDate,
                       validator: (v) =>

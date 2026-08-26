@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../models/event_model.dart';
@@ -15,37 +17,102 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final EventService _eventService = EventService();
   List<EventModel> _events = [];
-  bool _isLoading = true;
+  bool _isLoading = false;
+  bool _isFetchingMore = false;
+  bool _hasNextPage = false;
+  int _page = 0;
   String _searchQuery = '';
-  // [BUG-047] FIX: Tambah state untuk sorting
   String _sortOrder = 'newest'; // 'newest' | 'oldest'
+  final ScrollController _scrollController = ScrollController();
+  Timer? _searchDebounce;
 
   @override
   void initState() {
     super.initState();
     _loadEvents();
+    _scrollController.addListener(_loadMoreWhenNeeded);
   }
 
-  Future<void> _loadEvents() async {
-    setState(() => _isLoading = true);
+  @override
+  void dispose() {
+    _searchDebounce?.cancel();
+    _scrollController
+      ..removeListener(_loadMoreWhenNeeded)
+      ..dispose();
+    super.dispose();
+  }
+
+  String get _apiSort => _sortOrder == 'newest' ? 'date_desc' : 'date_asc';
+
+  Future<void> _loadEvents({bool reset = true}) async {
+    if (_isLoading || _isFetchingMore) return;
+    final requestedPage = reset ? 1 : _page + 1;
+    setState(() {
+      if (reset) {
+        _isLoading = true;
+      } else {
+        _isFetchingMore = true;
+      }
+    });
     try {
-      final events = await _eventService.getEvents();
+      final result = await _eventService.getEvents(
+        page: requestedPage,
+        limit: 20,
+        search: _searchQuery,
+        sort: _apiSort,
+      );
+      if (!mounted) return;
       setState(() {
-        _events = events;
+        if (reset) {
+          _events = result.events;
+        } else {
+          final knownIds = _events.map((event) => event.id).toSet();
+          _events.addAll(
+            result.events.where((event) => knownIds.add(event.id)),
+          );
+        }
+        _page = result.page;
+        _hasNextPage = result.hasNextPage;
         _isLoading = false;
+        _isFetchingMore = false;
       });
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('Error: $e')));
-      setState(() => _isLoading = false);
+      setState(() {
+        _isLoading = false;
+        _isFetchingMore = false;
+      });
     }
+  }
+
+  void _loadMoreWhenNeeded() {
+    if (!_scrollController.hasClients ||
+        !_hasNextPage ||
+        _isLoading ||
+        _isFetchingMore ||
+        _scrollController.position.extentAfter > 240) {
+      return;
+    }
+    _loadEvents(reset: false);
+  }
+
+  void _onSearchChanged(String value) {
+    setState(() => _searchQuery = value);
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(
+      const Duration(milliseconds: 350),
+      () => _loadEvents(),
+    );
   }
 
   // [BUG-048] FIX: Hapus _showEventOptions (Bottom Sheet) — navigasi ke halaman detail
   void _navigateToEventDetail(EventModel event) {
-    context.push('/event-detail/${event.id}').then((_) => _loadEvents());
+    context.push('/event-detail/${event.id}').then((_) {
+      if (mounted) _loadEvents();
+    });
   }
 
   @override
@@ -59,17 +126,6 @@ class _HomeScreenState extends State<HomeScreen> {
     const onSurfaceVariantColor = Color(0xFF444748);
     const secondaryColor = Color(0xFF5D5D5D);
     const errorColor = Color(0xFFBA1A1A);
-
-    // [BUG-047] FIX: Sort list berdasarkan _sortOrder sebelum filter search
-    final sortedEvents = [..._events];
-    sortedEvents.sort(
-      (a, b) => _sortOrder == 'newest'
-          ? b.date.compareTo(a.date)
-          : a.date.compareTo(b.date),
-    );
-    final filteredEvents = sortedEvents
-        .where((e) => e.name.toLowerCase().contains(_searchQuery.toLowerCase()))
-        .toList();
 
     return Scaffold(
       // [BUG-042] FIX: Hapus extendBody:true agar Navbar tidak menutupi list event
@@ -111,8 +167,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             border: Border.all(color: outlineVariantColor),
                           ),
                           child: TextField(
-                            onChanged: (val) =>
-                                setState(() => _searchQuery = val),
+                            onChanged: _onSearchChanged,
                             decoration: const InputDecoration(
                               hintText: 'Cari nama event...',
                               hintStyle: TextStyle(
@@ -140,6 +195,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                 ? 'oldest'
                                 : 'newest';
                           });
+                          _loadEvents();
                         },
                         child: Container(
                           height: 48,
@@ -179,9 +235,9 @@ class _HomeScreenState extends State<HomeScreen> {
                 // [MOB-BUG-002] FIX: RefreshIndicator agar admin bisa pull-to-refresh daftar event
                 Expanded(
                   child: RefreshIndicator(
-                    onRefresh: () async => _loadEvents(),
+                    onRefresh: () => _loadEvents(),
                     color: primaryColor,
-                    child: filteredEvents.isEmpty
+                    child: _events.isEmpty
                         ? ListView(
                             physics: const AlwaysScrollableScrollPhysics(),
                             children: const [
@@ -197,11 +253,21 @@ class _HomeScreenState extends State<HomeScreen> {
                             ],
                           )
                         : ListView.builder(
+                            controller: _scrollController,
                             physics: const AlwaysScrollableScrollPhysics(),
                             padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
-                            itemCount: filteredEvents.length,
+                            itemCount:
+                                _events.length + (_isFetchingMore ? 1 : 0),
                             itemBuilder: (context, index) {
-                              final event = filteredEvents[index];
+                              if (index == _events.length) {
+                                return const Padding(
+                                  padding: EdgeInsets.symmetric(vertical: 16),
+                                  child: Center(
+                                    child: CircularProgressIndicator(),
+                                  ),
+                                );
+                              }
+                              final event = _events[index];
                               final dateStr = DateFormat(
                                 'dd MMM yyyy',
                               ).format(event.date);
@@ -238,6 +304,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                     children: [
                                       SizedBox(
                                         width: 80,
+                                        height: 96,
                                         child:
                                             event.posterUrl != null &&
                                                 event.posterUrl!.isNotEmpty
@@ -247,6 +314,9 @@ class _HomeScreenState extends State<HomeScreen> {
                                                 ),
                                                 backgroundColor:
                                                     surfaceContainerColor,
+                                                frameAspectRatio: 80 / 96,
+                                                blurredBackdrop: true,
+                                                expand: true,
                                                 borderRadius:
                                                     BorderRadius.circular(8),
                                               )
@@ -364,7 +434,7 @@ class _HomeScreenState extends State<HomeScreen> {
           elevation: 4,
           onPressed: () async {
             await context.push('/create-event');
-            _loadEvents();
+            if (mounted) _loadEvents();
           },
           child: const Icon(Icons.add),
         ),

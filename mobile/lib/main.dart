@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:go_router/go_router.dart';
 import 'screens/home_screen.dart';
 import 'theme/app_theme.dart';
@@ -15,54 +14,16 @@ import 'screens/admin_dashboard_screen.dart';
 import 'screens/participants_screen.dart';
 import 'screens/review_detail_screen.dart';
 import 'screens/ticket_template_screen.dart';
-import 'services/api_client.dart';
+import 'providers/admin_providers.dart';
+import 'services/auth_session.dart';
 
 void main() {
   runApp(const ProviderScope(child: EventGateAdminApp()));
 }
 
-// ─────────────────────────────────────────────────────────
-// [BUG-053] FIX: Splash Screen dengan Session Persistence
-// Cek session di SecureStorage saat app dibuka.
-// Access token dapat diperbarui memakai refresh token tanpa login ulang.
-// ─────────────────────────────────────────────────────────
-class SplashScreen extends StatefulWidget {
+class SplashScreen extends StatelessWidget {
   const SplashScreen({super.key});
 
-  @override
-  State<SplashScreen> createState() => _SplashScreenState();
-}
-
-class _SplashScreenState extends State<SplashScreen> {
-  @override
-  void initState() {
-    super.initState();
-    _checkSession();
-  }
-
-  Future<void> _checkSession() async {
-    const storage = FlutterSecureStorage();
-    final accessToken = await storage.read(key: ApiClient.accessTokenKey);
-    final refreshToken = await storage.read(key: ApiClient.refreshTokenKey);
-
-    if (!mounted) return;
-
-    if (accessToken != null &&
-        accessToken.isNotEmpty &&
-        refreshToken != null &&
-        refreshToken.isNotEmpty) {
-      // Session ditemukan → langsung ke Dashboard. ApiClient akan refresh jika perlu.
-      context.go('/admin-dashboard');
-    } else {
-      // Session lama hanya berisi access token; login ulang sekali untuk memperoleh refresh token.
-      await storage.delete(key: ApiClient.accessTokenKey);
-      await storage.delete(key: ApiClient.refreshTokenKey);
-      if (!mounted) return;
-      context.go('/login');
-    }
-  }
-
-  @override
   Widget build(BuildContext context) {
     // Layar putih bersih dengan loading indicator saat cek token
     return const Scaffold(
@@ -91,9 +52,34 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 }
 
-final _router = GoRouter(
-  // [BUG-053] FIX: initialLocation sekarang ke /splash yang akan redirect secara cerdas
+String? resolveAppRoute(AuthSessionStatus authStatus, String location) {
+  if (authStatus == AuthSessionStatus.initializing) {
+    return location == '/splash' ? null : '/splash';
+  }
+  if (authStatus == AuthSessionStatus.unauthenticated) {
+    return location == '/login' ? null : '/login';
+  }
+  if (location == '/splash' || location == '/login') {
+    return '/admin-dashboard';
+  }
+  return null;
+}
+
+Map<String, dynamic>? reviewParticipantDataFromExtra(Object? extra) {
+  if (extra is! Map) return null;
+  final data = <String, dynamic>{};
+  for (final entry in extra.entries) {
+    if (entry.key is String) data[entry.key as String] = entry.value;
+  }
+  final id = data['id'];
+  return id is String && id.trim().isNotEmpty ? data : null;
+}
+
+GoRouter buildAppRouter(AuthSessionController authSession) => GoRouter(
   initialLocation: '/splash',
+  refreshListenable: authSession,
+  redirect: (context, state) =>
+      resolveAppRoute(authSession.status, state.matchedLocation),
   routes: [
     GoRoute(path: '/splash', builder: (context, state) => const SplashScreen()),
     GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
@@ -153,18 +139,57 @@ final _router = GoRouter(
     ),
     GoRoute(
       path: '/review-detail',
-      builder: (context, state) => ReviewDetailScreen(
-        participantData: state.extra as Map<String, dynamic>,
-      ),
+      builder: (context, state) {
+        final participantData = reviewParticipantDataFromExtra(state.extra);
+        if (participantData == null) return const _InvalidReviewDetailScreen();
+        return ReviewDetailScreen(participantData: participantData);
+      },
     ),
   ],
 );
 
-class EventGateAdminApp extends ConsumerWidget {
+class _InvalidReviewDetailScreen extends StatelessWidget {
+  const _InvalidReviewDetailScreen();
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(title: const Text('Detail Pendaftar')),
+    body: Center(
+      child: ElevatedButton(
+        onPressed: () => context.go('/admin-dashboard'),
+        child: const Text('Data pendaftar tidak tersedia'),
+      ),
+    ),
+  );
+}
+
+class EventGateAdminApp extends ConsumerStatefulWidget {
   const EventGateAdminApp({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<EventGateAdminApp> createState() => _EventGateAdminAppState();
+}
+
+class _EventGateAdminAppState extends ConsumerState<EventGateAdminApp> {
+  late final GoRouter _router;
+
+  @override
+  void initState() {
+    super.initState();
+    _router = buildAppRouter(ref.read(authSessionProvider));
+  }
+
+  @override
+  void dispose() {
+    _router.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Register the provider dependency for testability and lifecycle ownership;
+    // GoRouter itself receives updates through refreshListenable.
+    ref.watch(authSessionProvider);
     return MaterialApp.router(
       title: 'Ticket-In',
       theme: AppTheme.lightTheme,

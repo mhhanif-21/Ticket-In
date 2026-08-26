@@ -1,4 +1,7 @@
 class FormFieldModel {
+  final String? id;
+  final String? fieldKey;
+  final String fieldKind;
   final String fieldName;
   final String fieldType;
   final bool isRequired;
@@ -6,6 +9,9 @@ class FormFieldModel {
   final int order;
 
   FormFieldModel({
+    this.id,
+    this.fieldKey,
+    this.fieldKind = 'custom',
     required this.fieldName,
     required this.fieldType,
     required this.isRequired,
@@ -15,6 +21,12 @@ class FormFieldModel {
 
   factory FormFieldModel.fromJson(Map<String, dynamic> json) {
     return FormFieldModel(
+      id: json['id']?.toString() ?? json['field_id']?.toString(),
+      fieldKey: json['field_key']?.toString() ?? json['fieldKey']?.toString(),
+      fieldKind:
+          json['field_kind']?.toString() ??
+          json['fieldKind']?.toString() ??
+          'custom',
       fieldName: json['field_name'] ?? json['fieldName'] ?? '',
       fieldType: json['field_type'] ?? json['fieldType'] ?? 'text',
       isRequired: json['is_required'] ?? json['isRequired'] ?? false,
@@ -27,6 +39,9 @@ class FormFieldModel {
 
   Map<String, dynamic> toJson() {
     return {
+      if (id != null) 'id': id,
+      if (fieldKey != null) 'field_key': fieldKey,
+      'field_kind': fieldKind,
       'field_name': fieldName,
       'field_type': fieldType,
       'is_required': isRequired,
@@ -34,6 +49,26 @@ class FormFieldModel {
       'order': order,
     };
   }
+
+  FormFieldModel copyWith({
+    String? id,
+    String? fieldKey,
+    String? fieldKind,
+    String? fieldName,
+    String? fieldType,
+    bool? isRequired,
+    List<String>? options,
+    int? order,
+  }) => FormFieldModel(
+    id: id ?? this.id,
+    fieldKey: fieldKey ?? this.fieldKey,
+    fieldKind: fieldKind ?? this.fieldKind,
+    fieldName: fieldName ?? this.fieldName,
+    fieldType: fieldType ?? this.fieldType,
+    isRequired: isRequired ?? this.isRequired,
+    options: options ?? this.options,
+    order: order ?? this.order,
+  );
 }
 
 class EventMediaModel {

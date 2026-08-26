@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -10,6 +11,12 @@ abstract interface class AuthSessionStore {
   Future<void> write({required String key, required String value});
 
   Future<void> delete({required String key});
+}
+
+/// Broadcasts a terminal refresh-token failure to the app router.  This is
+/// intentionally process-local: tokens remain only in secure storage.
+class SessionInvalidationNotifier extends ChangeNotifier {
+  void notifySessionInvalidated() => notifyListeners();
 }
 
 class SecureAuthSessionStore implements AuthSessionStore {
@@ -98,18 +105,24 @@ class ApiClient {
 
   final AuthSessionStore _storage;
   final http.Client _httpClient;
+  final SessionInvalidationNotifier _sessionEvents;
   Future<bool>? _refreshInFlight;
+
+  static final SessionInvalidationNotifier sessionEvents =
+      SessionInvalidationNotifier();
 
   ApiClient({
     String? baseUrl,
     AuthSessionStore? sessionStore,
     http.Client? httpClient,
+    SessionInvalidationNotifier? sessionEvents,
   }) : _baseUrl = resolveBaseUrl(
          baseUrl ?? configuredApiBaseUrl,
          releaseBuild: isReleaseBuild,
        ),
        _storage = sessionStore ?? const SecureAuthSessionStore(),
-       _httpClient = httpClient ?? http.Client();
+       _httpClient = httpClient ?? http.Client(),
+       _sessionEvents = sessionEvents ?? ApiClient.sessionEvents;
 
   Uri buildUri(String endpoint) => Uri.parse('$_baseUrl$endpoint');
 
@@ -171,8 +184,24 @@ class ApiClient {
       return true;
     } catch (_) {
       await clearSession();
+      _sessionEvents.notifySessionInvalidated();
       return false;
     }
+  }
+
+  /// A stored token pair is not considered a valid session until its refresh
+  /// token is accepted by the API. This runs once during app bootstrap.
+  Future<bool> restoreSession() async {
+    final accessToken = await _storage.read(key: accessTokenKey);
+    final refreshToken = await _storage.read(key: refreshTokenKey);
+    if (accessToken == null ||
+        accessToken.isEmpty ||
+        refreshToken == null ||
+        refreshToken.isEmpty) {
+      await clearSession();
+      return false;
+    }
+    return _refreshSession();
   }
 
   Future<void> clearSession() async {

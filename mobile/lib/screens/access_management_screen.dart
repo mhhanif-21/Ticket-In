@@ -8,7 +8,8 @@ import 'package:url_launcher/url_launcher.dart';
 class AccessManagementScreen extends StatefulWidget {
   final String eventId;
 
-  const AccessManagementScreen({Key? key, required this.eventId}) : super(key: key);
+  const AccessManagementScreen({Key? key, required this.eventId})
+    : super(key: key);
 
   @override
   _AccessManagementScreenState createState() => _AccessManagementScreenState();
@@ -29,13 +30,16 @@ class _AccessManagementScreenState extends State<AccessManagementScreen> {
   Future<void> _loadEvent() async {
     try {
       final event = await _eventService.getEventDetail(widget.eventId);
+      if (!mounted) return;
       setState(() {
         _event = event;
         _isLoading = false;
       });
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Gagal memuat acara: $e')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Gagal memuat acara: $e')));
       Navigator.pop(context);
     }
   }
@@ -45,37 +49,53 @@ class _AccessManagementScreenState extends State<AccessManagementScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Konfirmasi Regenerasi PIN'),
-        content: const Text('PIN sebelumnya tidak akan valid lagi untuk panitia login. Lanjutkan?'),
+        content: const Text(
+          'PIN sebelumnya tidak akan valid lagi untuk panitia login. Lanjutkan?',
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Batal')),
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Batal'),
+          ),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFBA1A1A)),
-            onPressed: () => Navigator.pop(context, true), 
-            child: const Text('Ya, Regenerate', style: TextStyle(color: Colors.white)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFBA1A1A),
+            ),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text(
+              'Ya, Regenerate',
+              style: TextStyle(color: Colors.white),
+            ),
           ),
         ],
-      )
+      ),
     );
 
+    if (!mounted) return;
     if (confirm != true) return;
 
     setState(() => _isLoading = true);
     try {
       final pin = await _eventService.generatePin(widget.eventId);
+      if (!mounted) return;
       setState(() {
         _newPin = pin;
         _isLoading = false;
       });
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Gagal membuat PIN: $e')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Gagal membuat PIN: $e')));
       setState(() => _isLoading = false);
     }
   }
 
   void _copyText(String text) {
     Clipboard.setData(ClipboardData(text: text));
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Tautan disalin!')));
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Tautan disalin!')));
   }
 
   @override
@@ -87,19 +107,27 @@ class _AccessManagementScreenState extends State<AccessManagementScreen> {
     const outlineVariant = Color(0xFFC4C7C7);
     const surfaceContainerLowest = Color(0xFFFFFFFF);
     const surfaceContainerLow = Color(0xFFF3F3F3);
-    
+
     if (_isLoading) {
       return Scaffold(
         backgroundColor: bgColor,
-        appBar: AppBar(title: const Text('Kelola Akses Acara'), backgroundColor: bgColor),
-        body: const Center(child: CircularProgressIndicator(color: primaryColor)),
+        appBar: AppBar(
+          title: const Text('Kelola Akses Acara'),
+          backgroundColor: bgColor,
+        ),
+        body: const Center(
+          child: CircularProgressIndicator(color: primaryColor),
+        ),
       );
     }
 
     if (_event == null) {
       return Scaffold(
         backgroundColor: bgColor,
-        appBar: AppBar(title: const Text('Kelola Akses Acara'), backgroundColor: bgColor),
+        appBar: AppBar(
+          title: const Text('Kelola Akses Acara'),
+          backgroundColor: bgColor,
+        ),
         body: const Center(child: Text('Data tidak ditemukan')),
       );
     }
@@ -107,7 +135,9 @@ class _AccessManagementScreenState extends State<AccessManagementScreen> {
     final regUrl = _event!.publicRegistrationUrl ?? 'Belum ada tautan';
     // [MOB-BUG-009] FIX: Gunakan Uri.parse untuk manipulasi URL yang aman (bukan replaceAll)
     final baseUri = Uri.parse(ApiClient.baseUrl);
-    final cleanSegments = baseUri.pathSegments.where((s) => s != 'api').toList();
+    final cleanSegments = baseUri.pathSegments
+        .where((s) => s != 'api')
+        .toList();
     final webBase = baseUri.replace(pathSegments: cleanSegments).toString();
     final scanUrl = '$webBase/${_event!.slug}/checkin';
 
@@ -157,7 +187,10 @@ class _AccessManagementScreenState extends State<AccessManagementScreen> {
                   ),
                   const SizedBox(height: 12),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
                     decoration: BoxDecoration(
                       color: surfaceContainerLow,
                       borderRadius: BorderRadius.circular(8),
@@ -180,7 +213,11 @@ class _AccessManagementScreenState extends State<AccessManagementScreen> {
                           onTap: () => _copyText(regUrl),
                           child: const Padding(
                             padding: EdgeInsets.all(4.0),
-                            child: Icon(Icons.content_copy, color: primaryColor, size: 20),
+                            child: Icon(
+                              Icons.content_copy,
+                              color: primaryColor,
+                              size: 20,
+                            ),
                           ),
                         ),
                       ],
@@ -198,7 +235,11 @@ class _AccessManagementScreenState extends State<AccessManagementScreen> {
                               borderRadius: BorderRadius.circular(8),
                               border: Border.all(color: outlineVariant),
                             ),
-                            child: Image.network(_event!.publicQrCodeUrl!, height: 96, width: 96),
+                            child: Image.network(
+                              _event!.publicQrCodeUrl!,
+                              height: 96,
+                              width: 96,
+                            ),
                           ),
                         const SizedBox(height: 16),
                         SizedBox(
@@ -208,21 +249,44 @@ class _AccessManagementScreenState extends State<AccessManagementScreen> {
                             icon: const Icon(Icons.download, size: 18),
                             label: const Text(
                               'Download QR Pendaftaran',
-                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                              ),
                             ),
                             style: OutlinedButton.styleFrom(
                               foregroundColor: primaryColor,
                               side: const BorderSide(color: primaryColor),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
                             ),
                             onPressed: () async {
                               // [BUG-069] FIX: Implementasi download/buka QR di browser via url_launcher
                               final url = _event!.publicQrCodeUrl;
-                              if (url != null && await canLaunchUrl(Uri.parse(url))) {
-                                await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
-                                if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Membuka browser untuk mengunduh QR...')));
+                              if (url != null &&
+                                  await canLaunchUrl(Uri.parse(url))) {
+                                if (!context.mounted) return;
+                                await launchUrl(
+                                  Uri.parse(url),
+                                  mode: LaunchMode.externalApplication,
+                                );
+                                if (!context.mounted) return;
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                      'Membuka browser untuk mengunduh QR...',
+                                    ),
+                                  ),
+                                );
                               } else {
-                                if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Gagal membuka tautan QR')));
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text('Gagal membuka tautan QR'),
+                                    ),
+                                  );
+                                }
                               }
                             },
                           ),
@@ -234,7 +298,7 @@ class _AccessManagementScreenState extends State<AccessManagementScreen> {
               ),
             ),
             const SizedBox(height: 16),
-            
+
             // Section B: Akses Scanner Panitia
             Container(
               padding: const EdgeInsets.all(16),
@@ -256,7 +320,10 @@ class _AccessManagementScreenState extends State<AccessManagementScreen> {
                   ),
                   const SizedBox(height: 12),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
                     decoration: BoxDecoration(
                       color: surfaceContainerLow,
                       borderRadius: BorderRadius.circular(8),
@@ -279,7 +346,11 @@ class _AccessManagementScreenState extends State<AccessManagementScreen> {
                           onTap: () => _copyText(scanUrl),
                           child: const Padding(
                             padding: EdgeInsets.all(4.0),
-                            child: Icon(Icons.content_copy, color: primaryColor, size: 20),
+                            child: Icon(
+                              Icons.content_copy,
+                              color: primaryColor,
+                              size: 20,
+                            ),
                           ),
                         ),
                       ],
@@ -369,13 +440,18 @@ class _AccessManagementScreenState extends State<AccessManagementScreen> {
                       icon: const Icon(Icons.refresh, size: 20),
                       label: const Text(
                         'Generate PIN Baru',
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: primaryColor,
                         foregroundColor: Colors.white,
                         elevation: 0,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
                       ),
                       onPressed: _generatePin,
                     ),
@@ -399,4 +475,3 @@ class _AccessManagementScreenState extends State<AccessManagementScreen> {
     );
   }
 }
-

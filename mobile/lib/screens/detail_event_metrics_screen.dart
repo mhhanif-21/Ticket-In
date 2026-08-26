@@ -454,6 +454,7 @@ class DetailEventMetricsScreen extends ConsumerWidget {
           subtitle: 'Ubah informasi dasar, tanggal, dan lokasi',
           onTap: () async {
             await context.push('/edit-event/$eventId');
+            if (!context.mounted) return;
             ref.invalidate(eventStatsProvider(eventId));
           },
         ),
@@ -464,6 +465,7 @@ class DetailEventMetricsScreen extends ConsumerWidget {
           subtitle: 'Kustomisasi field dan pertanyaan registrasi',
           onTap: () async {
             await context.push('/form-builder/$eventId');
+            if (!context.mounted) return;
             ref.invalidate(eventStatsProvider(eventId));
           },
         ),
@@ -474,6 +476,7 @@ class DetailEventMetricsScreen extends ConsumerWidget {
           subtitle: 'Terima atau tolak pendaftar yang pending',
           onTap: () async {
             await context.push('/participants/$eventId');
+            if (!context.mounted) return;
             ref.invalidate(eventStatsProvider(eventId));
           },
         ),
@@ -484,6 +487,7 @@ class DetailEventMetricsScreen extends ConsumerWidget {
           subtitle: 'Atur PIN volunteer untuk check-in',
           onTap: () async {
             await context.push('/access-management/$eventId');
+            if (!context.mounted) return;
             ref.invalidate(eventStatsProvider(eventId));
           },
         ),
@@ -494,6 +498,7 @@ class DetailEventMetricsScreen extends ConsumerWidget {
           subtitle: 'Atur tampilan tiket dan email approval Manual Review',
           onTap: () async {
             await context.push('/ticket-template/$eventId');
+            if (!context.mounted) return;
             ref.invalidate(eventStatsProvider(eventId));
           },
         ),
@@ -547,8 +552,8 @@ class DetailEventMetricsScreen extends ConsumerWidget {
                   await EventService().updateEvent(eventId, {
                     'status': 'Published',
                   });
-                  ref.invalidate(eventStatsProvider(eventId));
                   if (!context.mounted) return;
+                  ref.invalidate(eventStatsProvider(eventId));
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
                       content: Text('Acara berhasil dipublikasikan.'),

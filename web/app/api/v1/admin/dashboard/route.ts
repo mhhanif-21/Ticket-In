@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/db';
 import { events, registrations } from '@/db/schema';
-import { count, desc, eq, sql } from 'drizzle-orm';
+import { and, asc, count, desc, eq, gt, sql } from 'drizzle-orm';
 import { getAuthenticatedAdmin } from '@/lib/security/adminRoute';
 
 // Operational dashboard metrics must reflect registrations/check-ins immediately.
@@ -39,13 +39,30 @@ export async function GET(request: Request) {
     .orderBy(desc(events.createdAt))
     .limit(5);
 
+    const upcomingEvents = await db.select({
+      id: events.id,
+      name: events.name,
+      slug: events.slug,
+      date: events.date,
+      location: events.location,
+      registrants_count: sql<number>`(
+        SELECT COUNT(*)::int FROM registrations r
+        WHERE r.event_id = ${events.id}
+      )`,
+    })
+    .from(events)
+    .where(and(eq(events.status, 'Published'), gt(events.date, new Date())))
+    .orderBy(asc(events.date), asc(events.id))
+    .limit(5);
+
     return NextResponse.json({
       status: 'success',
       data: {
         total_events: totalEventsResult[0].value,
         total_registrations: totalRegistrationsResult[0].value,
         total_present: totalPresentResult[0].value,
-        recent_events: recentEvents
+        recent_events: recentEvents,
+        upcoming_events: upcomingEvents,
       }
     }, { headers: { 'Cache-Control': 'no-store' } });
   } catch (error) {

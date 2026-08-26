@@ -24,6 +24,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
   final _locationController = TextEditingController();
   final _capacityController = TextEditingController();
   final _descriptionController = TextEditingController(); // Added description
+  final _dateController = TextEditingController();
 
   DateTime? _selectedDate;
   File? _posterFile;
@@ -31,6 +32,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
   String? _posterError;
   String? _galleryError;
   late final String _idempotencyKey;
+  String? _pendingMediaEventId;
   bool _isLoading = false;
   String _registrationMode = 'Auto-Accept';
 
@@ -52,6 +54,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
     _locationController.dispose();
     _capacityController.dispose();
     _descriptionController.dispose();
+    _dateController.dispose();
     super.dispose();
   }
 
@@ -74,9 +77,11 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
         );
       },
     );
+    if (!mounted) return;
     if (date != null) {
       setState(() {
         _selectedDate = date;
+        _dateController.text = DateFormat('dd MMM yyyy').format(date);
       });
     }
   }
@@ -84,11 +89,12 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
   Future<void> _pickImage() async {
     final picker = ImagePicker();
     final picked = await picker.pickImage(source: ImageSource.gallery);
+    if (!mounted) return;
     if (picked != null) {
       final file = File(picked.path);
       final validationError = await validateEventImageFile(file);
+      if (!mounted) return;
       if (validationError != null) {
-        if (!mounted) return;
         setState(() => _posterError = validationError);
         return;
       }
@@ -103,6 +109,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
   Future<void> _pickGalleryImages() async {
     final picker = ImagePicker();
     final pickedImages = await picker.pickMultiImage();
+    if (!mounted) return;
     if (pickedImages.isEmpty) return;
 
     final remainingSlots = 5 - _galleryFiles.length;
@@ -119,14 +126,13 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
         .toList();
     for (final file in selectedFiles) {
       final validationError = await validateEventImageFile(file);
+      if (!mounted) return;
       if (validationError != null) {
-        if (!mounted) return;
         setState(() => _galleryError = validationError);
         return;
       }
     }
 
-    if (!mounted) return;
     setState(() {
       _galleryFiles.addAll(selectedFiles);
       _galleryError = null;
@@ -182,9 +188,20 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
       context.pushReplacement('/form-builder/$eventId', extra: 'first_setup');
     } on EventMediaUploadException catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(error.message)));
+      if (error.metadataPersisted && error.eventId != null) {
+        setState(() => _pendingMediaEventId = error.eventId);
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(error.message),
+          action: _pendingMediaEventId == null
+              ? null
+              : SnackBarAction(
+                  label: 'UNGGAH ULANG',
+                  onPressed: _retryPendingMedia,
+                ),
+        ),
+      );
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -192,6 +209,38 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
           content: Text('Acara belum dapat dibuat. Silakan coba lagi.'),
         ),
       );
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _retryPendingMedia() async {
+    final eventId = _pendingMediaEventId;
+    final poster = _posterFile;
+    if (eventId == null || poster == null) return;
+
+    setState(() => _isLoading = true);
+    try {
+      await _eventService.uploadEventMedia(
+        eventId,
+        coverPath: poster.path,
+        galleryPaths: _galleryFiles.map((file) => file.path).toList(),
+      );
+      if (!mounted) return;
+      setState(() => _pendingMediaEventId = null);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Media berhasil diunggah. Sekarang susun form pendaftaran.',
+          ),
+        ),
+      );
+      context.pushReplacement('/form-builder/$eventId', extra: 'first_setup');
+    } on EventMediaUploadException catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(error.message)));
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -458,11 +507,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                           ? 'Pilih Tanggal Acara'
                           : DateFormat('dd MMM yyyy').format(_selectedDate!),
                       icon: Icons.calendar_today,
-                      controller: TextEditingController(
-                        text: _selectedDate == null
-                            ? ''
-                            : DateFormat('dd MMM yyyy').format(_selectedDate!),
-                      ),
+                      controller: _dateController,
                       readOnly: true,
                       onTap: _pickDate,
                       validator: (v) =>
@@ -552,7 +597,11 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
               width: double.infinity,
               height: 48,
               child: ElevatedButton(
-                onPressed: _isLoading ? null : _submit,
+                onPressed: _isLoading
+                    ? null
+                    : _pendingMediaEventId == null
+                    ? _submit
+                    : _retryPendingMedia,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: primaryColor,
                   foregroundColor: Colors.white,
@@ -561,9 +610,14 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                     borderRadius: BorderRadius.circular(10),
                   ),
                 ),
-                child: const Text(
-                  'Simpan Acara',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                child: Text(
+                  _pendingMediaEventId == null
+                      ? 'Simpan Acara'
+                      : 'Unggah Ulang Media',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
             ),

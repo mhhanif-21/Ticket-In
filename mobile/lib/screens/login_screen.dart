@@ -1,17 +1,19 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:go_router/go_router.dart';
 import '../services/api_client.dart';
+import '../providers/admin_providers.dart';
 
-class LoginScreen extends StatefulWidget {
+class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
 
   @override
-  State<LoginScreen> createState() => _LoginScreenState();
+  ConsumerState<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _apiClient = ApiClient();
@@ -57,22 +59,30 @@ class _LoginScreenState extends State<LoginScreen> {
             accessToken.isEmpty ||
             refreshToken is! String ||
             refreshToken.isEmpty) {
-          throw const FormatException('Respons login tidak memiliki session lengkap');
+          throw const FormatException(
+            'Respons login tidak memiliki session lengkap',
+          );
         }
 
         await _storage.write(key: ApiClient.accessTokenKey, value: accessToken);
-        await _storage.write(key: ApiClient.refreshTokenKey, value: refreshToken);
-        
+        await _storage.write(
+          key: ApiClient.refreshTokenKey,
+          value: refreshToken,
+        );
+
         if (mounted) {
-          context.go('/admin-dashboard'); // [BUG-045] FIX: Arahkan ke Dashboard sebagai landing page admin
+          ref.read(authSessionProvider).markAuthenticated();
+          context.go(
+            '/admin-dashboard',
+          ); // [BUG-045] FIX: Arahkan ke Dashboard sebagai landing page admin
         }
       } else {
         final body = jsonDecode(response.body);
         final errorMessage = body['message'] ?? 'Login gagal';
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(errorMessage)),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text(errorMessage)));
         }
       }
     } catch (e) {
@@ -167,15 +177,24 @@ class _LoginScreenState extends State<LoginScreen> {
                           controller: _emailController,
                           keyboardType: TextInputType.emailAddress,
                           decoration: InputDecoration(
-                            prefixIcon: const Icon(Icons.mail_outline, color: outlineVariantColor),
+                            prefixIcon: const Icon(
+                              Icons.mail_outline,
+                              color: outlineVariantColor,
+                            ),
                             hintText: 'Email',
-                            hintStyle: const TextStyle(color: outlineVariantColor),
+                            hintStyle: const TextStyle(
+                              color: outlineVariantColor,
+                            ),
                             filled: true,
                             fillColor: surfaceContainerLowestColor,
-                            contentPadding: const EdgeInsets.symmetric(vertical: 16),
+                            contentPadding: const EdgeInsets.symmetric(
+                              vertical: 16,
+                            ),
                             enabledBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(10),
-                              borderSide: const BorderSide(color: outlineVariantColor),
+                              borderSide: const BorderSide(
+                                color: outlineVariantColor,
+                              ),
                             ),
                             focusedBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(10),
@@ -190,10 +209,15 @@ class _LoginScreenState extends State<LoginScreen> {
                           controller: _passwordController,
                           obscureText: _obscurePassword,
                           decoration: InputDecoration(
-                            prefixIcon: const Icon(Icons.lock_outline, color: outlineVariantColor),
+                            prefixIcon: const Icon(
+                              Icons.lock_outline,
+                              color: outlineVariantColor,
+                            ),
                             suffixIcon: IconButton(
                               icon: Icon(
-                                _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                                _obscurePassword
+                                    ? Icons.visibility_off
+                                    : Icons.visibility,
                                 color: outlineVariantColor,
                               ),
                               onPressed: () {
@@ -203,13 +227,19 @@ class _LoginScreenState extends State<LoginScreen> {
                               },
                             ),
                             hintText: 'Password',
-                            hintStyle: const TextStyle(color: outlineVariantColor),
+                            hintStyle: const TextStyle(
+                              color: outlineVariantColor,
+                            ),
                             filled: true,
                             fillColor: surfaceContainerLowestColor,
-                            contentPadding: const EdgeInsets.symmetric(vertical: 16),
+                            contentPadding: const EdgeInsets.symmetric(
+                              vertical: 16,
+                            ),
                             enabledBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(10),
-                              borderSide: const BorderSide(color: outlineVariantColor),
+                              borderSide: const BorderSide(
+                                color: outlineVariantColor,
+                              ),
                             ),
                             focusedBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(10),
@@ -263,17 +293,29 @@ class _LoginScreenState extends State<LoginScreen> {
                       ],
                     ),
                   ),
-                  
+
                   // Footer Links
                   const SizedBox(height: 32),
                   const Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Text('Bantuan', style: TextStyle(fontSize: 12, color: Color(0xFF747878))),
+                      Text(
+                        'Bantuan',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFF747878),
+                        ),
+                      ),
                       SizedBox(width: 16),
                       Text('•', style: TextStyle(color: outlineVariantColor)),
                       SizedBox(width: 16),
-                      Text('Privasi', style: TextStyle(fontSize: 12, color: Color(0xFF747878))),
+                      Text(
+                        'Privasi',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFF747878),
+                        ),
+                      ),
                     ],
                   ),
                 ],

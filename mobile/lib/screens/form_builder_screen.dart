@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../models/event_model.dart';
 import '../services/event_service.dart';
+import '../utils/form_field_contract.dart';
 
 class FormBuilderScreen extends StatefulWidget {
   final String eventId;
@@ -9,7 +10,12 @@ class FormBuilderScreen extends StatefulWidget {
   // [BUG-054] Flag untuk tahu apakah ini pertama kali dari create event
   final bool isFirstSetup;
 
-  const FormBuilderScreen({Key? key, required this.eventId, this.eventService, this.isFirstSetup = false}) : super(key: key);
+  const FormBuilderScreen({
+    Key? key,
+    required this.eventId,
+    this.eventService,
+    this.isFirstSetup = false,
+  }) : super(key: key);
 
   @override
   _FormBuilderScreenState createState() => _FormBuilderScreenState();
@@ -21,9 +27,21 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
   List<FormFieldModel> _fields = [];
 
   // [BUG-054] Field default yang terkunci (tidak bisa dihapus)
-  final List<FormFieldModel> _lockedFields = [
-    FormFieldModel(fieldName: 'Nama', fieldType: 'text', isRequired: true, order: 0),
-    FormFieldModel(fieldName: 'Email', fieldType: 'email', isRequired: true, order: 1),
+  List<FormFieldModel> _lockedFields = [
+    FormFieldModel(
+      fieldKind: 'static_name',
+      fieldName: 'Nama',
+      fieldType: 'text',
+      isRequired: true,
+      order: 0,
+    ),
+    FormFieldModel(
+      fieldKind: 'static_email',
+      fieldName: 'Email',
+      fieldType: 'email',
+      isRequired: true,
+      order: 1,
+    ),
   ];
 
   @override
@@ -36,24 +54,66 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
   Future<void> _loadFields() async {
     try {
       final event = await _eventService.getEventDetail(widget.eventId);
+      if (!mounted) return;
+      FormFieldModel staticField(
+        String kind,
+        String label,
+        String type,
+        int order,
+      ) {
+        for (final field in event.formFields) {
+          if (field.fieldKind == kind ||
+              (staticFormFieldKindFor(field.fieldName) == kind)) {
+            return field.copyWith(
+              fieldKind: kind,
+              fieldName: label,
+              fieldType: type,
+              isRequired: true,
+              order: order,
+            );
+          }
+        }
+        return FormFieldModel(
+          fieldKind: kind,
+          fieldName: label,
+          fieldType: type,
+          isRequired: true,
+          order: order,
+        );
+      }
+
       final existingCustomFields = event.formFields
-          .where((f) => f.fieldName != 'Nama' && f.fieldName != 'Email')
+          .where(
+            (field) => !isStaticFormField(
+              label: field.fieldName,
+              kind: field.fieldKind,
+            ),
+          )
           .toList();
       setState(() {
+        _lockedFields = [
+          staticField('static_name', 'Nama', 'text', 0),
+          staticField('static_email', 'Email', 'email', 1),
+        ];
         _fields = existingCustomFields;
         _isLoading = false;
       });
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Gagal memuat form: $e')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Gagal memuat form: $e')));
       Navigator.pop(context);
     }
   }
 
   // [BUG-056] FIX: isScrollControlled: true + DraggableScrollableSheet menghindari overflow
   void _showAddFieldSheet() {
-    if (_fields.length >= 23) { // 25 max - 2 locked fields
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Maksimal 23 field kustom diperbolehkan')));
+    if (_fields.length >= 23) {
+      // 25 max - 2 locked fields
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Maksimal 23 field kustom diperbolehkan')),
+      );
       return;
     }
 
@@ -93,12 +153,16 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
                   children: [
                     const Text(
                       'Pilih Tipe Pertanyaan',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Color(0xFF1A1C1C)),
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF1A1C1C),
+                      ),
                     ),
                     IconButton(
                       icon: const Icon(Icons.close, color: Color(0xFF444748)),
                       onPressed: () => Navigator.pop(context),
-                    )
+                    ),
                   ],
                 ),
               ),
@@ -114,13 +178,47 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
                     mainAxisSpacing: 8,
                     childAspectRatio: 1.5,
                     children: [
-                      _buildFieldTypeBtn('text', 'Teks Singkat', Icons.short_text),
-                      _buildFieldTypeBtn('textarea', 'Teks Panjang', Icons.notes),
+                      _buildFieldTypeBtn(
+                        'text',
+                        'Teks Singkat',
+                        Icons.short_text,
+                      ),
+                      _buildFieldTypeBtn(
+                        'textarea',
+                        'Teks Panjang',
+                        Icons.notes,
+                      ),
                       _buildFieldTypeBtn('number', 'Angka', Icons.numbers),
-                      _buildFieldTypeBtn('radio', 'Pilihan Ganda', Icons.radio_button_checked),
-                      _buildFieldTypeBtn('checkbox', 'Kotak Centang', Icons.check_box),
-                      _buildFieldTypeBtn('select', 'Dropdown', Icons.arrow_drop_down_circle),
-                      _buildFieldTypeBtn('file', 'Unggah Berkas', Icons.upload_file),
+                      _buildFieldTypeBtn(
+                        'radio',
+                        'Pilihan Ganda',
+                        Icons.radio_button_checked,
+                      ),
+                      _buildFieldTypeBtn(
+                        'checkbox',
+                        'Kotak Centang',
+                        Icons.check_box,
+                      ),
+                      _buildFieldTypeBtn(
+                        'select',
+                        'Dropdown',
+                        Icons.arrow_drop_down_circle,
+                      ),
+                      _buildFieldTypeBtn(
+                        'file',
+                        'Unggah Berkas',
+                        Icons.upload_file,
+                      ),
+                      _buildFieldTypeBtn(
+                        'image',
+                        'Unggah Gambar',
+                        Icons.image_outlined,
+                      ),
+                      _buildFieldTypeBtn(
+                        'email',
+                        'Email Tambahan',
+                        Icons.alternate_email,
+                      ),
                     ],
                   ),
                 ),
@@ -152,7 +250,11 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
             const SizedBox(height: 8),
             Text(
               label,
-              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: Color(0xFF1A1C1C)),
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                color: Color(0xFF1A1C1C),
+              ),
             ),
           ],
         ),
@@ -180,7 +282,10 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
                 needsOptions
                     ? 'Pertanyaan: ${_getTypeLabel(type)}'
                     : 'Pertanyaan Baru',
-                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
               content: SingleChildScrollView(
                 child: Column(
@@ -193,8 +298,13 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
                       decoration: InputDecoration(
                         labelText: 'Judul Pertanyaan',
                         hintText: 'Contoh: Jenis Kelamin',
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 10,
+                        ),
                       ),
                       autofocus: true,
                     ),
@@ -204,7 +314,11 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
                       const SizedBox(height: 16),
                       const Text(
                         'Opsi Jawaban',
-                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF444748)),
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF444748),
+                        ),
                       ),
                       const SizedBox(height: 8),
                       ...optionControllers.asMap().entries.map((entry) {
@@ -220,15 +334,24 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
                                   decoration: InputDecoration(
                                     labelText: 'Opsi ${i + 1}',
                                     hintText: 'Isi opsi jawaban...',
-                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    contentPadding: const EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                      vertical: 10,
+                                    ),
                                   ),
                                 ),
                               ),
                               // Tombol hapus opsi (minimal 2 harus ada)
                               if (optionControllers.length > 2)
                                 IconButton(
-                                  icon: const Icon(Icons.remove_circle_outline, color: Color(0xFFBA1A1A), size: 20),
+                                  icon: const Icon(
+                                    Icons.remove_circle_outline,
+                                    color: Color(0xFFBA1A1A),
+                                    size: 20,
+                                  ),
                                   onPressed: () {
                                     setDialogState(() {
                                       optionControllers.removeAt(i);
@@ -246,8 +369,18 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
                             optionControllers.add(TextEditingController());
                           });
                         },
-                        icon: const Icon(Icons.add, size: 18, color: Color(0xFF000000)),
-                        label: const Text('Tambah Opsi', style: TextStyle(color: Color(0xFF000000), fontWeight: FontWeight.w500)),
+                        icon: const Icon(
+                          Icons.add,
+                          size: 18,
+                          color: Color(0xFF000000),
+                        ),
+                        label: const Text(
+                          'Tambah Opsi',
+                          style: TextStyle(
+                            color: Color(0xFF000000),
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
                       ),
                     ],
                   ],
@@ -256,19 +389,50 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(context),
-                  child: const Text('Batal', style: TextStyle(color: Color(0xFF444748))),
+                  child: const Text(
+                    'Batal',
+                    style: TextStyle(color: Color(0xFF444748)),
+                  ),
                 ),
                 ElevatedButton(
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF000000),
                     foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
                   ),
                   onPressed: () {
                     final name = nameController.text.trim();
                     if (name.isEmpty) {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Judul pertanyaan tidak boleh kosong')),
+                        const SnackBar(
+                          content: Text('Judul pertanyaan tidak boleh kosong'),
+                        ),
+                      );
+                      return;
+                    }
+                    if (staticFormFieldKindFor(name) != null) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                            'Nama dan Email adalah field sistem dan tidak dapat dibuat ulang.',
+                          ),
+                        ),
+                      );
+                      return;
+                    }
+                    if (_fields.any(
+                      (field) =>
+                          normalizeFormFieldLabel(field.fieldName) ==
+                          normalizeFormFieldLabel(name),
+                    )) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                            'Nama field kustom tidak boleh duplikat.',
+                          ),
+                        ),
                       );
                       return;
                     }
@@ -281,11 +445,16 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
                           .toList();
                       if (validOptions.length < 2) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Minimal 2 opsi jawaban harus diisi')),
+                          const SnackBar(
+                            content: Text('Minimal 2 opsi jawaban harus diisi'),
+                          ),
                         );
                         return;
                       }
-                      Navigator.pop(context, {'name': name, 'options': validOptions});
+                      Navigator.pop(context, {
+                        'name': name,
+                        'options': validOptions,
+                      });
                     } else {
                       Navigator.pop(context, {'name': name, 'options': null});
                     }
@@ -299,28 +468,45 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
       },
     );
 
-    if (result != null && mounted) {
-      setState(() {
-        _fields.add(FormFieldModel(
+    nameController.dispose();
+    for (final controller in optionControllers) {
+      controller.dispose();
+    }
+    if (!mounted || result == null) return;
+    setState(() {
+      _fields.add(
+        FormFieldModel(
+          fieldKind: 'custom',
           fieldName: result['name'] as String,
           fieldType: type,
           isRequired: false,
           options: result['options'] as List<String>?,
           order: _fields.length + 2, // +2 karena 2 locked fields di awal
-        ));
-      });
-    }
+        ),
+      );
+    });
   }
 
   String _getTypeLabel(String type) {
     switch (type) {
-      case 'radio': return 'Pilihan Ganda';
-      case 'checkbox': return 'Kotak Centang';
-      case 'select': return 'Dropdown';
-      case 'textarea': return 'Teks Panjang';
-      case 'number': return 'Angka';
-      case 'file': return 'Unggah Berkas';
-      default: return 'Teks Singkat';
+      case 'radio':
+        return 'Pilihan Ganda';
+      case 'checkbox':
+        return 'Kotak Centang';
+      case 'select':
+        return 'Dropdown';
+      case 'textarea':
+        return 'Teks Panjang';
+      case 'number':
+        return 'Angka';
+      case 'file':
+        return 'Unggah Berkas';
+      case 'image':
+        return 'Unggah Gambar';
+      case 'email':
+        return 'Email Tambahan';
+      default:
+        return 'Teks Singkat';
     }
   }
 
@@ -329,13 +515,12 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
     try {
       // [BUG-054] FIX: Gabungkan locked fields + custom fields saat simpan
       final allFields = [
-        ..._lockedFields,
+        ..._lockedFields.asMap().entries.map(
+          (entry) => entry.value.copyWith(order: entry.key),
+        ),
         ..._fields.asMap().entries.map((e) {
-          return FormFieldModel(
-            fieldName: e.value.fieldName,
-            fieldType: e.value.fieldType,
-            isRequired: e.value.isRequired,
-            options: e.value.options,
+          return e.value.copyWith(
+            fieldKind: 'custom',
             order: e.key + 2, // +2 karena 2 locked fields di urutan 0 & 1
           );
         }),
@@ -344,7 +529,9 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
       await _eventService.saveFormFields(widget.eventId, allFields);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Form berhasil disimpan! Sekarang atur akses panitia.')),
+        const SnackBar(
+          content: Text('Form berhasil disimpan! Sekarang atur akses panitia.'),
+        ),
       );
 
       // [BUG-054] FIX: Setelah simpan form, langsung redirect ke access-management
@@ -356,7 +543,9 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(e.toString())));
       setState(() => _isLoading = false);
     }
   }
@@ -377,7 +566,11 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
         iconTheme: const IconThemeData(color: primaryColor),
         title: const Text(
           'Susun Form Pendaftaran',
-          style: TextStyle(color: Color(0xFF1A1C1C), fontSize: 16, fontWeight: FontWeight.w600),
+          style: TextStyle(
+            color: Color(0xFF1A1C1C),
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+          ),
         ),
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(1.0),
@@ -397,16 +590,25 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
                       decoration: BoxDecoration(
                         color: primaryColor.withOpacity(0.08),
                         borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: primaryColor.withOpacity(0.2)),
+                        border: Border.all(
+                          color: primaryColor.withOpacity(0.2),
+                        ),
                       ),
                       child: const Row(
                         children: [
-                          Icon(Icons.info_outline, color: Color(0xFF000000), size: 18),
+                          Icon(
+                            Icons.info_outline,
+                            color: Color(0xFF000000),
+                            size: 18,
+                          ),
                           SizedBox(width: 8),
                           Expanded(
                             child: Text(
                               'Susun form pendaftaran acara Anda. Field Nama & Email sudah otomatis terkunci.',
-                              style: TextStyle(fontSize: 12, color: Color(0xFF000000)),
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Color(0xFF000000),
+                              ),
                             ),
                           ),
                         ],
@@ -420,11 +622,19 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
                     padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
                     child: Row(
                       children: [
-                        const Icon(Icons.lock, size: 14, color: Color(0xFF747878)),
+                        const Icon(
+                          Icons.lock,
+                          size: 14,
+                          color: Color(0xFF747878),
+                        ),
                         const SizedBox(width: 6),
                         const Text(
                           'Field Wajib (Tidak dapat dihapus)',
-                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF747878)),
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF747878),
+                          ),
                         ),
                       ],
                     ),
@@ -432,7 +642,15 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
                 ),
                 SliverList(
                   delegate: SliverChildListDelegate(
-                    _lockedFields.map((field) => _buildLockedFieldCard(field, lockedBg, lockedBorder)).toList(),
+                    _lockedFields
+                        .map(
+                          (field) => _buildLockedFieldCard(
+                            field,
+                            lockedBg,
+                            lockedBorder,
+                          ),
+                        )
+                        .toList(),
                   ),
                 ),
 
@@ -442,11 +660,19 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
                     padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
                     child: Row(
                       children: [
-                        const Icon(Icons.tune, size: 14, color: Color(0xFF444748)),
+                        const Icon(
+                          Icons.tune,
+                          size: 14,
+                          color: Color(0xFF444748),
+                        ),
                         const SizedBox(width: 6),
                         Text(
                           'Field Kustom (${_fields.length} / 23)',
-                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF444748)),
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF444748),
+                          ),
                         ),
                       ],
                     ),
@@ -463,25 +689,32 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
                             alignment: Alignment.center,
                             child: Column(
                               children: [
-                                Icon(Icons.add_circle_outline, size: 48, color: Colors.grey.shade300),
+                                Icon(
+                                  Icons.add_circle_outline,
+                                  size: 48,
+                                  color: Colors.grey.shade300,
+                                ),
                                 const SizedBox(height: 12),
                                 Text(
                                   'Belum ada field kustom.\nTekan tombol + untuk menambah.',
                                   textAlign: TextAlign.center,
-                                  style: TextStyle(color: Colors.grey.shade500, fontSize: 13),
+                                  style: TextStyle(
+                                    color: Colors.grey.shade500,
+                                    fontSize: 13,
+                                  ),
                                 ),
                               ],
                             ),
                           ),
                         )
                       : SliverList(
-                          delegate: SliverChildBuilderDelegate(
-                            (context, index) {
-                              final field = _fields[index];
-                              return _buildCustomFieldCard(field, index);
-                            },
-                            childCount: _fields.length,
-                          ),
+                          delegate: SliverChildBuilderDelegate((
+                            context,
+                            index,
+                          ) {
+                            final field = _fields[index];
+                            return _buildCustomFieldCard(field, index);
+                          }, childCount: _fields.length),
                         ),
                 ),
               ],
@@ -516,17 +749,25 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
                   elevation: 0,
                   padding: EdgeInsets.zero,
                   minimumSize: const Size(72, 48),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
                 ),
                 child: _isLoading
                     ? const SizedBox(
                         width: 20,
                         height: 20,
-                        child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                        child: CircularProgressIndicator(
+                          color: Colors.white,
+                          strokeWidth: 2,
+                        ),
                       )
                     : const Text(
                         'Simpan',
-                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
               ),
             ),
@@ -536,7 +777,11 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
     );
   }
 
-  Widget _buildLockedFieldCard(FormFieldModel field, Color bgColor, Color borderColor) {
+  Widget _buildLockedFieldCard(
+    FormFieldModel field,
+    Color bgColor,
+    Color borderColor,
+  ) {
     return Container(
       margin: const EdgeInsets.fromLTRB(20, 0, 20, 8),
       padding: const EdgeInsets.all(14),
@@ -555,14 +800,26 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
               children: [
                 Text(
                   field.fieldName,
-                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: Color(0xFF1A1C1C)),
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF1A1C1C),
+                  ),
                 ),
                 const SizedBox(height: 4),
                 Row(
                   children: [
-                    _buildBadge(field.fieldType.toUpperCase(), const Color(0xFF444748), const Color(0xFFC4C7C7)),
+                    _buildBadge(
+                      field.fieldType.toUpperCase(),
+                      const Color(0xFF444748),
+                      const Color(0xFFC4C7C7),
+                    ),
                     const SizedBox(width: 6),
-                    _buildBadge('WAJIB', const Color(0xFFBA1A1A), const Color(0xFFFFDAD6)),
+                    _buildBadge(
+                      'WAJIB',
+                      const Color(0xFFBA1A1A),
+                      const Color(0xFFFFDAD6),
+                    ),
                   ],
                 ),
               ],
@@ -582,7 +839,11 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
         border: Border.all(color: const Color(0xFFC4C7C7), width: 1.5),
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 8, offset: const Offset(0, 2)),
+          BoxShadow(
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
         ],
       ),
       child: Padding(
@@ -601,15 +862,27 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
                 children: [
                   Text(
                     field.fieldName,
-                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: Color(0xFF1A1C1C)),
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF1A1C1C),
+                    ),
                   ),
                   const SizedBox(height: 6),
                   Row(
                     children: [
-                      _buildBadge(field.fieldType.toUpperCase(), const Color(0xFF444748), const Color(0xFFC4C7C7)),
+                      _buildBadge(
+                        field.fieldType.toUpperCase(),
+                        const Color(0xFF444748),
+                        const Color(0xFFC4C7C7),
+                      ),
                       if (field.isRequired) ...[
                         const SizedBox(width: 6),
-                        _buildBadge('WAJIB', const Color(0xFFBA1A1A), const Color(0xFFFFDAD6)),
+                        _buildBadge(
+                          'WAJIB',
+                          const Color(0xFFBA1A1A),
+                          const Color(0xFFFFDAD6),
+                        ),
                       ],
                     ],
                   ),
@@ -617,8 +890,14 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
                   if (field.options != null && field.options!.isNotEmpty) ...[
                     const SizedBox(height: 6),
                     Text(
-                      field.options!.take(3).join(' • ') + (field.options!.length > 3 ? ' +${field.options!.length - 3} lagi' : ''),
-                      style: const TextStyle(fontSize: 11, color: Color(0xFF747878)),
+                      field.options!.take(3).join(' • ') +
+                          (field.options!.length > 3
+                              ? ' +${field.options!.length - 3} lagi'
+                              : ''),
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: Color(0xFF747878),
+                      ),
                     ),
                   ],
                 ],
@@ -629,6 +908,9 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
               onTap: () {
                 setState(() {
                   _fields[index] = FormFieldModel(
+                    id: field.id,
+                    fieldKey: field.fieldKey,
+                    fieldKind: field.fieldKind,
                     fieldName: field.fieldName,
                     fieldType: field.fieldType,
                     isRequired: !field.isRequired,
@@ -641,7 +923,9 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
                 padding: const EdgeInsets.only(right: 4),
                 child: Icon(
                   field.isRequired ? Icons.toggle_on : Icons.toggle_off,
-                  color: field.isRequired ? const Color(0xFF000000) : const Color(0xFFC4C7C7),
+                  color: field.isRequired
+                      ? const Color(0xFF000000)
+                      : const Color(0xFFC4C7C7),
                   size: 28,
                 ),
               ),
@@ -666,7 +950,12 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
       ),
       child: Text(
         text,
-        style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: textColor, letterSpacing: 0.5),
+        style: TextStyle(
+          fontSize: 10,
+          fontWeight: FontWeight.w600,
+          color: textColor,
+          letterSpacing: 0.5,
+        ),
       ),
     );
   }

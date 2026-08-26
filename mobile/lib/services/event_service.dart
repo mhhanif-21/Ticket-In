@@ -7,11 +7,33 @@ import 'poster_validation.dart';
 
 class EventMediaUploadException implements Exception {
   final String message;
+  final String? eventId;
+  final bool metadataPersisted;
 
-  const EventMediaUploadException(this.message);
+  const EventMediaUploadException(
+    this.message, {
+    this.eventId,
+    this.metadataPersisted = false,
+  });
 
   @override
   String toString() => message;
+}
+
+class EventPage {
+  const EventPage({
+    required this.events,
+    required this.page,
+    required this.limit,
+    required this.total,
+    required this.hasNextPage,
+  });
+
+  final List<EventModel> events;
+  final int page;
+  final int limit;
+  final int total;
+  final bool hasNextPage;
 }
 
 class EventTemplateException implements Exception {
@@ -28,12 +50,42 @@ class EventService {
 
   EventService({ApiClient? apiClient}) : _apiClient = apiClient ?? ApiClient();
 
-  Future<List<EventModel>> getEvents() async {
-    final response = await _apiClient.get('/v1/events');
+  Future<EventPage> getEvents({
+    int page = 1,
+    int limit = 20,
+    String search = '',
+    String sort = 'date_desc',
+    String? status,
+  }) async {
+    final query = <String, String>{
+      'page': page.toString(),
+      'limit': limit.toString(),
+      'sort': sort,
+      if (search.trim().isNotEmpty) 'search': search.trim(),
+      if (status != null && status.isNotEmpty) 'status': status,
+    };
+    final response = await _apiClient.get(
+      '/v1/events?${Uri(queryParameters: query).query}',
+    );
     if (response.statusCode == 200) {
-      final jsonBody = jsonDecode(response.body);
-      final List data = jsonBody['data'];
-      return data.map((e) => EventModel.fromJson(e)).toList();
+      final jsonBody = jsonDecode(response.body) as Map<String, dynamic>;
+      final List data = jsonBody['data'] as List? ?? const [];
+      final meta = jsonBody['meta'] as Map<String, dynamic>? ?? const {};
+      final parsedPage = int.tryParse(meta['page']?.toString() ?? '') ?? page;
+      final parsedLimit =
+          int.tryParse(meta['limit']?.toString() ?? '') ?? limit;
+      final total =
+          int.tryParse(meta['total']?.toString() ?? '') ?? data.length;
+      return EventPage(
+        events: data
+            .map((item) => EventModel.fromJson(item as Map<String, dynamic>))
+            .toList(),
+        page: parsedPage,
+        limit: parsedLimit,
+        total: total,
+        hasNextPage:
+            meta['has_next_page'] == true || parsedPage * parsedLimit < total,
+      );
     } else {
       throw Exception('Failed to load events');
     }
@@ -70,11 +122,19 @@ class EventService {
           : jsonBody['data']['id'].toString();
 
       if (posterPath != null) {
-        await uploadEventMedia(
-          id,
-          coverPath: posterPath,
-          galleryPaths: galleryPaths,
-        );
+        try {
+          await uploadEventMedia(
+            id,
+            coverPath: posterPath,
+            galleryPaths: galleryPaths,
+          );
+        } on EventMediaUploadException catch (error) {
+          throw EventMediaUploadException(
+            'Acara sudah tersimpan, tetapi media belum terunggah. ${error.message}',
+            eventId: id,
+            metadataPersisted: true,
+          );
+        }
       }
       return id;
     } else {
