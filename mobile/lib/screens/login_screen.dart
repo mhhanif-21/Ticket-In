@@ -50,9 +50,18 @@ class _LoginScreenState extends State<LoginScreen> {
 
       if (response.statusCode == 200) {
         final body = jsonDecode(response.body);
-        final token = body['data']['access_token'];
-        
-        await _storage.write(key: 'auth_token', value: token);
+        final data = body['data'] as Map<String, dynamic>?;
+        final accessToken = data?['access_token'];
+        final refreshToken = data?['refresh_token'];
+        if (accessToken is! String ||
+            accessToken.isEmpty ||
+            refreshToken is! String ||
+            refreshToken.isEmpty) {
+          throw const FormatException('Respons login tidak memiliki session lengkap');
+        }
+
+        await _storage.write(key: ApiClient.accessTokenKey, value: accessToken);
+        await _storage.write(key: ApiClient.refreshTokenKey, value: refreshToken);
         
         if (mounted) {
           context.go('/admin-dashboard'); // [BUG-045] FIX: Arahkan ke Dashboard sebagai landing page admin

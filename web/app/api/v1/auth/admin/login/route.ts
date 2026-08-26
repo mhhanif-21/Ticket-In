@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { isAdminUser } from '@/lib/security/auth';
+import { serializeAdminSession } from '@/lib/security/adminSession';
 
 export const runtime = 'nodejs';
 
@@ -38,15 +39,7 @@ export async function POST(req: Request) {
     return NextResponse.json(
       {
         status: 'success',
-        data: {
-          access_token: data.session.access_token,
-          role: 'admin',
-          user: {
-            id: data.user.id,
-            name: data.user.user_metadata?.name || 'Admin Event Gate',
-            email: data.user.email,
-          },
-        },
+        data: serializeAdminSession(data.session, data.user),
       },
       { status: 200 }
     );
