@@ -3,6 +3,19 @@ import { Redis } from '@upstash/redis';
 let redis: Redis | undefined;
 let redisConfigSignature: string | undefined;
 
+// Redis executes a Lua script atomically. This ensures a successful INCR can
+// never leave a counter without TTL when the process is interrupted between
+// separate commands. It also repairs a legacy key whose TTL was lost.
+export const ATOMIC_INCREMENT_WITH_EXPIRY_LUA = `
+local current = redis.call('INCR', KEYS[1])
+local ttl = redis.call('TTL', KEYS[1])
+if current == 1 or ttl < 0 then
+  redis.call('EXPIRE', KEYS[1], ARGV[1])
+  ttl = tonumber(ARGV[1])
+end
+return { current, ttl }
+`;
+
 interface RateLimitRecord {
   count: number;
   resetAt: number;
@@ -50,6 +63,28 @@ function unavailableResult(now: number, windowMs: number): RateLimitResult {
   };
 }
 
+async function incrementWithExpiry(
+  client: Redis,
+  key: string,
+  windowSeconds: number,
+): Promise<{ count: number; ttl: number }> {
+  const result = await client.eval(
+    ATOMIC_INCREMENT_WITH_EXPIRY_LUA,
+    [key],
+    [windowSeconds],
+  );
+  if (!Array.isArray(result)) {
+    throw new Error('Invalid atomic rate-limit response');
+  }
+  const [rawCount, rawTtl] = result;
+  const count = Number(rawCount);
+  const ttl = Number(rawTtl);
+  if (!Number.isFinite(count) || !Number.isFinite(ttl)) {
+    throw new Error('Invalid atomic rate-limit response');
+  }
+  return { count, ttl };
+}
+
 /**
  * Checks and increments a rate-limit counter.
  *
@@ -67,11 +102,7 @@ export async function checkRateLimit(
 
   if (client) {
     try {
-      const current = Number(await client.incr(key));
-      if (current === 1) {
-        await client.expire(key, windowSeconds);
-      }
-      const ttl = Number(await client.ttl(key));
+      const { count: current, ttl } = await incrementWithExpiry(client, key, windowSeconds);
       const resetAt = now + (ttl > 0 ? ttl * 1000 : windowMs);
       return {
         allowed: current <= maxAttempts,
@@ -138,8 +169,7 @@ export async function recordFailedAttempt(
 
   if (client) {
     try {
-      const count = Number(await client.incr(key));
-      if (count === 1) await client.expire(key, windowSeconds);
+      const { count } = await incrementWithExpiry(client, key, windowSeconds);
       return count;
     } catch {
       console.error('Shared rate limit store error');

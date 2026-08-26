@@ -2,10 +2,14 @@ import { NextResponse } from 'next/server';
 import { db } from '@/db';
 import { exportJobs } from '@/db/schema';
 import { eq } from 'drizzle-orm';
+import { getAuthenticatedAdmin } from '@/lib/security/adminRoute';
 
 export async function GET(request: Request, { params }: { params: Promise<{ job_id: string }> }) {
   const { job_id: jobId } = await params;
   try {
+    if (!await getAuthenticatedAdmin(request)) {
+      return NextResponse.json({ status: 'error', message: 'Unauthorized' }, { status: 403 });
+    }
     const [job] = await db.select().from(exportJobs).where(eq(exportJobs.id, jobId));
 
     if (!job) {

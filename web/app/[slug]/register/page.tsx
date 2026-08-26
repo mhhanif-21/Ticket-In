@@ -12,6 +12,7 @@ import {
   saveRegistrationResubmitState,
   type RegistrationResubmitState,
 } from '@/lib/client/registrationResubmit';
+import { saveRegistrationStatusCapability } from '@/lib/client/registrationStatusCapability';
 
 function collectAnswerValues(formData: FormData): Record<string, unknown> {
   const answers: Record<string, unknown> = {};
@@ -114,11 +115,19 @@ export default function RegisterPage() {
       });
 
       const result = await res.json();
+      const statusToken = result.data?.status_token;
+      const statusTokenExpiresAt = result.data?.status_token_expires_at;
+      if (typeof statusToken === 'string' && typeof statusTokenExpiresAt === 'string') {
+        saveRegistrationStatusCapability(slug, { token: statusToken, expiresAt: statusTokenExpiresAt });
+      }
+
       if (!res.ok) {
-        if (result.data?.status === 'Draft' && result.data?.retryable && result.data.registrationId && result.data.resubmitToken) {
+        if (result.data?.status === 'Draft' && result.data?.retryable && result.data.registrationId && result.data.resubmitToken && statusToken && statusTokenExpiresAt) {
           const retryState: RegistrationResubmitState = {
             registrationId: result.data.registrationId,
             resubmitToken: result.data.resubmitToken,
+            statusToken,
+            statusTokenExpiresAt,
             name: formData.get('name') as string,
             email: formData.get('email') as string,
             answers: collectSerializableAnswers(formData),
@@ -138,12 +147,14 @@ export default function RegisterPage() {
       const regId = result.data?.registrationId;
 
       if (regStatus === 'Draft') {
-        if (!regId || !result.data?.resubmitToken) {
+        if (!regId || !result.data?.resubmitToken || !statusToken || !statusTokenExpiresAt) {
           throw new Error('Bukti pengiriman OTP tidak tersedia. Silakan coba lagi.');
         }
         const nextState: RegistrationResubmitState = {
           registrationId: regId,
           resubmitToken: result.data.resubmitToken,
+          statusToken,
+          statusTokenExpiresAt,
           name,
           email,
           answers: collectSerializableAnswers(formData),
@@ -154,9 +165,8 @@ export default function RegisterPage() {
         const otpParams = new URLSearchParams({ regId });
         router.push(`/${slug}/verify-otp?${otpParams.toString()}`);
       } else {
-        // Auto-Accept goes straight to status
-        const searchParams = new URLSearchParams({ name, email, registered: 'true' });
-        router.push(`/${slug}/status?${searchParams.toString()}`);
+        // The holder capability stays in session storage, never in the URL.
+        router.push(`/${slug}/status`);
       }
     } catch (err: any) {
       setError(err.message);

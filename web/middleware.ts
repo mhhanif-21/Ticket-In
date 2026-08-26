@@ -2,19 +2,11 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { isAdminUser } from '@/lib/security/auth';
+import { getApiAccessPolicy } from '@/lib/security/apiAccessPolicy';
 import { verifyVolunteerToken } from '@/lib/security/jwt';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
-const uuidPathSegment = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-function isPublicEventSlug(segment: string) {
-  try {
-    return !uuidPathSegment.test(decodeURIComponent(segment));
-  } catch {
-    return false;
-  }
-}
 
 export async function middleware(req: NextRequest) {
   const url = req.nextUrl;
@@ -69,23 +61,8 @@ export async function middleware(req: NextRequest) {
   }
 
   if (url.pathname.startsWith('/api/v1/')) {
-    if (url.pathname === '/api/v1/worker/process-ticket' || url.pathname === '/api/v1/worker/export') {
-      return NextResponse.next();
-    }
-
-    const eventDetailMatch = url.pathname.match(/^\/api\/v1\/events\/([^/]+)$/);
-    const isPublicEventSlugDetail = Boolean(eventDetailMatch && isPublicEventSlug(eventDetailMatch[1]));
-
-    // Lewati endpoint autentikasi, status pengecekan (public), dan form registrasi (public).
-    // Detail event berbasis UUID adalah kontrak Admin; detail berbasis slug adalah DTO publik.
-    if (
-      url.pathname.startsWith('/api/v1/auth/') ||
-      url.pathname.includes('/status') ||
-      url.pathname.match(/^\/api\/v1\/events\/[^\/]+\/register$/) ||
-      url.pathname.match(/^\/api\/v1\/events\/[^\/]+\/qr$/) ||
-      url.pathname.match(/^\/api\/v1\/registrations\/[^\/]+\/verify-otp$/) ||
-      (isPublicEventSlugDetail && req.method === 'GET')
-    ) {
+    const accessPolicy = getApiAccessPolicy(url.pathname, req.method);
+    if (accessPolicy === 'worker' || accessPolicy === 'cron' || accessPolicy === 'public') {
       return NextResponse.next();
     }
 
@@ -109,11 +86,10 @@ export async function middleware(req: NextRequest) {
     const sessionId = role === 'volunteer' ? (payload?.session_id as string) : '';
 
     // Role-based Access Control (RBAC)
-    const pathname = url.pathname;
-    if ((pathname.startsWith('/api/v1/events') || pathname.startsWith('/api/v1/registrations')) && role !== 'admin') {
+    if (accessPolicy === 'admin' && role !== 'admin') {
       return NextResponse.json({ status: 'error', message: 'Hanya Admin yang dapat mengakses rute ini' }, { status: 403 });
     }
-    if (pathname.startsWith('/api/v1/checkin') && role !== 'volunteer') {
+    if (accessPolicy === 'volunteer' && role !== 'volunteer') {
       return NextResponse.json({ status: 'error', message: 'Hanya Volunteer yang dapat mengakses rute ini' }, { status: 403 });
     }
 

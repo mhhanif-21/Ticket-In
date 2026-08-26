@@ -254,6 +254,7 @@ export const registrationsRelations = relations(registrations, ({ one, many }) =
   }),
   otps: many(otps),
   resubmitTokens: many(resubmitTokens),
+  statusCapabilities: many(registrationStatusCapabilities),
   checkInLogs: many(checkInLogs),
   ticketGenerationJobs: many(ticketGenerationJobs),
   participantFileUploads: many(participantFileUploads),
@@ -402,6 +403,51 @@ export const exportJobs = pgTable('export_jobs', {
     sql`${table.status} IN ('pending', 'publishing', 'published', 'processing', 'completed', 'failed')`,
   ),
 }));
+
+// Short-lived, opaque holder proofs for the public registration status page.
+// The browser receives the raw random value once; the database stores only a
+// hash, scope, expiry, and revocation marker.
+export const registrationStatusCapabilities = pgTable(
+  'registration_status_capabilities',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    registrationId: uuid('registration_id')
+      .notNull()
+      .references(() => registrations.id, { onDelete: 'cascade' }),
+    scope: varchar('scope', { length: 64 }).notNull(),
+    tokenHash: varchar('token_hash', { length: 64 }).notNull(),
+    expiresAt: timestamp('expires_at').notNull(),
+    revokedAt: timestamp('revoked_at'),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+  },
+  (table) => ({
+    tokenHashUnique: uniqueIndex('registration_status_capabilities_token_hash_unique').on(table.tokenHash),
+    activeLookupIdx: index('registration_status_capabilities_active_lookup_idx').on(
+      table.tokenHash,
+      table.scope,
+      table.expiresAt,
+      table.revokedAt,
+    ),
+    registrationActiveIdx: index('registration_status_capabilities_registration_active_idx').on(
+      table.registrationId,
+      table.revokedAt,
+    ),
+    scopeCheck: check(
+      'registration_status_capabilities_scope_check',
+      sql`${table.scope} = 'registration-status'`,
+    ),
+  }),
+);
+
+export const registrationStatusCapabilitiesRelations = relations(
+  registrationStatusCapabilities,
+  ({ one }) => ({
+    registration: one(registrations, {
+      fields: [registrationStatusCapabilities.registrationId],
+      references: [registrations.id],
+    }),
+  }),
+);
 
 export const exportJobsRelations = relations(exportJobs, ({ one }) => ({
   event: one(events, {

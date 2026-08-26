@@ -27,6 +27,11 @@ const MIGRATIONS = [
     path: resolve(process.cwd(), 'supabase/migrations/0010_s9_registration-file-lifecycle.sql'),
     lockKey: 2026082610,
   },
+  {
+    id: '0011_web-security-perimeter',
+    path: resolve(process.cwd(), 'supabase/migrations/0011_web-security-perimeter.sql'),
+    lockKey: 2026082611,
+  },
 ] as const;
 
 type SchemaRow = {
@@ -99,6 +104,20 @@ async function verifyParticipantFileLifecycleSchema(): Promise<void> {
   }
 }
 
+async function verifyRegistrationStatusCapabilitySchema(): Promise<void> {
+  const rows = await client.unsafe<SchemaRow[]>(`
+    SELECT column_name
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'registration_status_capabilities'
+      AND column_name = 'token_hash'
+  `);
+
+  if (rows.length !== 1) {
+    throw new Error('Migration verification failed: public.registration_status_capabilities.token_hash is missing');
+  }
+}
+
 async function applyMigration(migration: (typeof MIGRATIONS)[number]): Promise<void> {
   const migrationSql = await readFile(migration.path, 'utf8');
 
@@ -134,7 +153,8 @@ async function main(): Promise<void> {
   await verifyEventMediaSchema();
   await verifyTicketTemplateSchema();
   await verifyParticipantFileLifecycleSchema();
-  console.log('Database lifecycle, event media, ticket template, and participant file migrations applied and verified.');
+  await verifyRegistrationStatusCapabilitySchema();
+  console.log('Database lifecycle, event media, ticket template, participant file, and public status capability migrations applied and verified.');
 }
 
 main()

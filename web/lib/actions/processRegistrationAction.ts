@@ -3,6 +3,7 @@ import { events, formFields, registrations, otps, resubmitTokens } from '../../d
 import { eq, and, inArray, count, desc, sql, isNull, gt } from 'drizzle-orm';
 import { getRegistrationFieldKey, isStaticRegistrationField, validateRegistrationAnswers } from '../validation/registrationForm';
 import { getVerifiedResubmitToken, issueResubmitTokenRecord } from '../security/resubmit';
+import { rotateRegistrationStatusCapabilityTx } from '../security/publicStatusCapability';
 import { ensureTicketGenerationJobTx } from './ticketGenerationJob';
 import { assertEventIsPublic } from '../events/eventLifecycle';
 import { claimParticipantFileUploadsTx } from '../registration/participantFileLifecycle';
@@ -125,6 +126,8 @@ export async function processRegistrationAction(slug: string, payload: Registrat
           ticketJobId,
           ticketJobStatus,
           resubmitToken: null,
+          statusCapability: null,
+          statusCapabilityExpiresAt: null,
         };
       }
       if (existingRegistration) {
@@ -301,6 +304,8 @@ export async function processRegistrationAction(slug: string, payload: Registrat
       });
     }
 
+    const statusCapability = await rotateRegistrationStatusCapabilityTx(tx, registrationId);
+
     return {
       registrationId,
       status,
@@ -309,6 +314,8 @@ export async function processRegistrationAction(slug: string, payload: Registrat
       ticketJobId,
       ticketJobStatus,
       resubmitToken,
+      statusCapability: statusCapability.token,
+      statusCapabilityExpiresAt: statusCapability.expiresAt,
     };
   });
 

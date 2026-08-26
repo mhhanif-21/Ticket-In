@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { db } from '@/db';
 import { events, registrations } from '@/db/schema';
 import { count, desc, eq, sql } from 'drizzle-orm';
+import { getAuthenticatedAdmin } from '@/lib/security/adminRoute';
 
 // Operational dashboard metrics must reflect registrations/check-ins immediately.
 export const dynamic = 'force-dynamic';
@@ -10,7 +11,9 @@ export const runtime = 'nodejs';
 
 export async function GET(request: Request) {
   try {
-    // The middleware handles admin authentication
+    if (!await getAuthenticatedAdmin(request)) {
+      return NextResponse.json({ status: 'error', message: 'Unauthorized' }, { status: 403 });
+    }
     const totalEventsResult = await db.select({ value: count() }).from(events);
     const totalRegistrationsResult = await db.select({ value: count() }).from(registrations);
     const totalPresentResult = await db.select({ value: count() })

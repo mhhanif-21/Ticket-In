@@ -32,6 +32,8 @@ function toPublicRegistrationData(result: {
   ticketJobId: string | null;
   ticketJobStatus: string | null;
   resubmitToken: string | null;
+  statusCapability: string | null;
+  statusCapabilityExpiresAt: Date | null;
 }) {
   return {
     registrationId: result.registrationId,
@@ -40,6 +42,8 @@ function toPublicRegistrationData(result: {
     ticketJobId: result.ticketJobId,
     ticketJobStatus: result.ticketJobStatus,
     resubmitToken: result.resubmitToken,
+    status_token: result.statusCapability,
+    status_token_expires_at: result.statusCapabilityExpiresAt?.toISOString() ?? null,
   };
 }
 

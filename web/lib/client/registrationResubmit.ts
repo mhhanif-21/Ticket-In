@@ -1,6 +1,8 @@
 export interface RegistrationResubmitState {
   registrationId: string;
   resubmitToken: string;
+  statusToken: string;
+  statusTokenExpiresAt: string;
   name: string;
   email: string;
   answers: Record<string, string | string[]>;
@@ -22,6 +24,10 @@ function isValidState(value: unknown): value is RegistrationResubmitState {
     && Boolean(candidate.registrationId)
     && typeof candidate.resubmitToken === 'string'
     && Boolean(candidate.resubmitToken)
+    && typeof candidate.statusToken === 'string'
+    && /^[A-Za-z0-9_-]{43}$/.test(candidate.statusToken)
+    && typeof candidate.statusTokenExpiresAt === 'string'
+    && !Number.isNaN(new Date(candidate.statusTokenExpiresAt).getTime())
     && typeof candidate.name === 'string'
     && typeof candidate.email === 'string'
     && isStringRecord(candidate.answers);

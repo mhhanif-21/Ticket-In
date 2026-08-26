@@ -8,6 +8,7 @@ import {
   saveRegistrationResubmitState,
   type RegistrationResubmitState,
 } from '@/lib/client/registrationResubmit';
+import { saveRegistrationStatusCapability } from '@/lib/client/registrationStatusCapability';
 
 export default function VerifyOtpPage() {
   const params = useParams();
@@ -39,7 +40,6 @@ export default function VerifyOtpPage() {
   }, [regId, slug, router]);
 
   const email = resubmitState?.email || '';
-  const name = resubmitState?.name || '';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -65,9 +65,12 @@ export default function VerifyOtpPage() {
       }
 
       // Success, redirect to status page
+      saveRegistrationStatusCapability(slug, {
+        token: resubmitState!.statusToken,
+        expiresAt: resubmitState!.statusTokenExpiresAt,
+      });
       clearRegistrationResubmitState(slug);
-      const statusParams = new URLSearchParams({ email, name, registered: 'true' });
-      router.push(`/${slug}/status?${statusParams.toString()}`);
+      router.push(`/${slug}/status`);
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -96,19 +99,31 @@ export default function VerifyOtpPage() {
       const data = await res.json();
 
       if (!res.ok) {
-        if (data.data?.status === 'Draft' && data.data?.resubmitToken) {
-          const rotatedState = { ...resubmitState, resubmitToken: data.data.resubmitToken };
+        if (data.data?.status === 'Draft' && data.data?.resubmitToken && data.data?.status_token && data.data?.status_token_expires_at) {
+          const rotatedState = {
+            ...resubmitState,
+            resubmitToken: data.data.resubmitToken,
+            statusToken: data.data.status_token,
+            statusTokenExpiresAt: data.data.status_token_expires_at,
+          };
+          saveRegistrationStatusCapability(slug, { token: rotatedState.statusToken, expiresAt: rotatedState.statusTokenExpiresAt });
           saveRegistrationResubmitState(slug, rotatedState);
           setResubmitState(rotatedState);
         }
         throw new Error(data.message || 'OTP belum dapat dikirim.');
       }
 
-      if (data.data?.status !== 'Draft' || !data.data?.resubmitToken) {
+      if (data.data?.status !== 'Draft' || !data.data?.resubmitToken || !data.data?.status_token || !data.data?.status_token_expires_at) {
         throw new Error('Bukti pengiriman OTP tidak tersedia.');
       }
 
-      const rotatedState = { ...resubmitState, resubmitToken: data.data.resubmitToken };
+      const rotatedState = {
+        ...resubmitState,
+        resubmitToken: data.data.resubmitToken,
+        statusToken: data.data.status_token,
+        statusTokenExpiresAt: data.data.status_token_expires_at,
+      };
+      saveRegistrationStatusCapability(slug, { token: rotatedState.statusToken, expiresAt: rotatedState.statusTokenExpiresAt });
       saveRegistrationResubmitState(slug, rotatedState);
       setResubmitState(rotatedState);
       setNotice('OTP baru telah dikirim.');

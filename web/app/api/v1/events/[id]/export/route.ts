@@ -1,12 +1,16 @@
 import { NextResponse } from 'next/server';
 import { createExportJob, publishExportJob } from '@/lib/actions/exportJob';
 import { getCanonicalBaseUrl } from '@/lib/security/url';
+import { getAuthenticatedAdmin } from '@/lib/security/adminRoute';
 
 export const runtime = 'nodejs';
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id: eventId } = await params;
   try {
+    if (!await getAuthenticatedAdmin(request)) {
+      return NextResponse.json({ status: 'error', message: 'Unauthorized' }, { status: 403 });
+    }
     // In production this throws when no canonical URL is configured instead
     // of publishing a webhook to an untrusted Host header.
     const workerUrl = `${getCanonicalBaseUrl(request)}/api/v1/worker/export`;

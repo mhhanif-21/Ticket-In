@@ -7,6 +7,7 @@ export interface RequestWithHeaders {
 
 export const TRUSTED_PROXY_ASSERTION_HEADER = 'x-ticketin-proxy-assertion';
 export const TRUSTED_CLIENT_IP_HEADER = 'x-ticketin-client-ip';
+export const VERCEL_CLIENT_IP_HEADER = 'x-vercel-forwarded-for';
 export const UNTRUSTED_CLIENT_KEY = 'untrusted-client';
 export const TRUSTED_PROXY_UNKNOWN_KEY = 'trusted-proxy-unknown';
 
@@ -54,10 +55,23 @@ export function isTrustedProxy(req: RequestWithHeaders): boolean {
 }
 
 /**
+ * Vercel overwrites X-Forwarded-For and publishes the platform-controlled
+ * value as X-Vercel-Forwarded-For. Do not enable this path outside Vercel;
+ * local or self-hosted deployments must use the asserted proxy contract.
+ */
+function isNativeVercelRequest(req: RequestWithHeaders): boolean {
+  return process.env.VERCEL === '1' && Boolean(req.headers.get('x-vercel-id'));
+}
+
+/**
  * Resolves the rate-limit identity using an authenticated ingress contract.
  * Direct clients cannot select a bucket by sending forwarded-IP headers.
  */
 export function getClientIp(req: RequestWithHeaders): string {
+  if (isNativeVercelRequest(req)) {
+    return parseSingleIp(req.headers.get(VERCEL_CLIENT_IP_HEADER)) || TRUSTED_PROXY_UNKNOWN_KEY;
+  }
+
   if (!isTrustedProxy(req)) {
     return UNTRUSTED_CLIENT_KEY;
   }
