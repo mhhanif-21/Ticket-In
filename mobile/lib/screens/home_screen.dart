@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../models/event_model.dart';
 import '../services/event_service.dart';
+import '../widgets/adaptive_event_image.dart';
 import 'package:intl/intl.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -35,7 +36,9 @@ class _HomeScreenState extends State<HomeScreen> {
       });
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error: $e')));
       setState(() => _isLoading = false);
     }
   }
@@ -59,9 +62,11 @@ class _HomeScreenState extends State<HomeScreen> {
 
     // [BUG-047] FIX: Sort list berdasarkan _sortOrder sebelum filter search
     final sortedEvents = [..._events];
-    sortedEvents.sort((a, b) => _sortOrder == 'newest'
-        ? b.date.compareTo(a.date)
-        : a.date.compareTo(b.date));
+    sortedEvents.sort(
+      (a, b) => _sortOrder == 'newest'
+          ? b.date.compareTo(a.date)
+          : a.date.compareTo(b.date),
+    );
     final filteredEvents = sortedEvents
         .where((e) => e.name.toLowerCase().contains(_searchQuery.toLowerCase()))
         .toList();
@@ -106,13 +111,22 @@ class _HomeScreenState extends State<HomeScreen> {
                             border: Border.all(color: outlineVariantColor),
                           ),
                           child: TextField(
-                            onChanged: (val) => setState(() => _searchQuery = val),
+                            onChanged: (val) =>
+                                setState(() => _searchQuery = val),
                             decoration: const InputDecoration(
                               hintText: 'Cari nama event...',
-                              hintStyle: TextStyle(color: outlineColor, fontSize: 14),
-                              prefixIcon: Icon(Icons.search, color: outlineColor),
+                              hintStyle: TextStyle(
+                                color: outlineColor,
+                                fontSize: 14,
+                              ),
+                              prefixIcon: Icon(
+                                Icons.search,
+                                color: outlineColor,
+                              ),
                               border: InputBorder.none,
-                              contentPadding: EdgeInsets.symmetric(vertical: 14),
+                              contentPadding: EdgeInsets.symmetric(
+                                vertical: 14,
+                              ),
                             ),
                           ),
                         ),
@@ -122,7 +136,9 @@ class _HomeScreenState extends State<HomeScreen> {
                       GestureDetector(
                         onTap: () {
                           setState(() {
-                            _sortOrder = _sortOrder == 'newest' ? 'oldest' : 'newest';
+                            _sortOrder = _sortOrder == 'newest'
+                                ? 'oldest'
+                                : 'newest';
                           });
                         },
                         child: Container(
@@ -136,12 +152,20 @@ class _HomeScreenState extends State<HomeScreen> {
                           child: Row(
                             children: [
                               Text(
-                                _sortOrder == 'newest' ? 'Urutkan: Terbaru' : 'Urutkan: Terlama',
-                                style: const TextStyle(color: secondaryColor, fontSize: 12, fontWeight: FontWeight.w500),
+                                _sortOrder == 'newest'
+                                    ? 'Urutkan: Terbaru'
+                                    : 'Urutkan: Terlama',
+                                style: const TextStyle(
+                                  color: secondaryColor,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w500,
+                                ),
                               ),
                               const SizedBox(width: 8),
                               Icon(
-                                _sortOrder == 'newest' ? Icons.arrow_downward : Icons.arrow_upward,
+                                _sortOrder == 'newest'
+                                    ? Icons.arrow_downward
+                                    : Icons.arrow_upward,
                                 color: secondaryColor,
                                 size: 18,
                               ),
@@ -158,123 +182,176 @@ class _HomeScreenState extends State<HomeScreen> {
                     onRefresh: () async => _loadEvents(),
                     color: primaryColor,
                     child: filteredEvents.isEmpty
-                      ? ListView(
-                          physics: const AlwaysScrollableScrollPhysics(),
-                          children: const [
-                            SizedBox(height: 200),
-                            Center(child: Text('Belum ada acara. Silakan buat baru.', style: TextStyle(color: onSurfaceVariantColor))),
-                          ],
-                        )
-                      : ListView.builder(
-                          physics: const AlwaysScrollableScrollPhysics(),
-                          padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
-                          itemCount: filteredEvents.length,
-                          itemBuilder: (context, index) {
-                            final event = filteredEvents[index];
-                            final dateStr = DateFormat('dd MMM yyyy').format(event.date);
-
-                            Color badgeBgColor = primaryColor.withOpacity(0.1);
-                            Color badgeTextColor = primaryColor;
-                            String badgeText = 'Confirmed';
-
-                            if (event.registrationMode == 'Manual Review') {
-                              badgeBgColor = errorColor.withOpacity(0.1);
-                              badgeTextColor = errorColor;
-                              badgeText = 'Review';
-                            }
-
-                            return InkWell(
-                              // [BUG-048] FIX: Navigate ke halaman detail, bukan buka Bottom Sheet
-                              onTap: () => _navigateToEventDetail(event),
-                              borderRadius: BorderRadius.circular(12),
-                              child: Container(
-                                margin: const EdgeInsets.only(bottom: 8),
-                                padding: const EdgeInsets.all(16),
-                                decoration: BoxDecoration(
-                                  color: surfaceColor,
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(color: outlineVariantColor),
-                                ),
-                                child: Row(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Container(
-                                      width: 80,
-                                      height: 96,
-                                      decoration: BoxDecoration(
-                                        color: surfaceContainerColor,
-                                        borderRadius: BorderRadius.circular(8),
-                                      ),
-                                      child: event.posterUrl != null
-                                        ? ClipRRect(
-                                            borderRadius: BorderRadius.circular(8),
-                                            child: Image.network(event.posterUrl!, fit: BoxFit.contain),
-                                          )
-                                        : const Icon(Icons.image, color: outlineVariantColor),
-                                    ),
-                                    const SizedBox(width: 16),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            event.name,
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                            style: const TextStyle(
-                                              fontSize: 16,
-                                              fontWeight: FontWeight.w600,
-                                              color: onSurfaceColor,
-                                            ),
-                                          ),
-                                          const SizedBox(height: 4),
-                                          Row(
-                                            children: [
-                                              const Icon(Icons.calendar_today, size: 14, color: onSurfaceVariantColor),
-                                              const SizedBox(width: 4),
-                                              Text(dateStr, style: const TextStyle(fontSize: 14, color: onSurfaceVariantColor)),
-                                            ],
-                                          ),
-                                          const SizedBox(height: 2),
-                                          Row(
-                                            children: [
-                                              const Icon(Icons.location_on, size: 14, color: onSurfaceVariantColor),
-                                              const SizedBox(width: 4),
-                                              Expanded(
-                                                child: Text(
-                                                  event.location,
-                                                  maxLines: 1,
-                                                  overflow: TextOverflow.ellipsis,
-                                                  style: const TextStyle(fontSize: 14, color: onSurfaceVariantColor),
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                          const SizedBox(height: 8),
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                            decoration: BoxDecoration(
-                                              color: badgeBgColor,
-                                              borderRadius: BorderRadius.circular(4),
-                                            ),
-                                            child: Text(
-                                              badgeText,
-                                              style: TextStyle(
-                                                fontSize: 11,
-                                                fontWeight: FontWeight.w600,
-                                                color: badgeTextColor,
-                                              ),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ],
+                        ? ListView(
+                            physics: const AlwaysScrollableScrollPhysics(),
+                            children: const [
+                              SizedBox(height: 200),
+                              Center(
+                                child: Text(
+                                  'Belum ada acara. Silakan buat baru.',
+                                  style: TextStyle(
+                                    color: onSurfaceVariantColor,
+                                  ),
                                 ),
                               ),
-                            );
-                          },
-                        ),
+                            ],
+                          )
+                        : ListView.builder(
+                            physics: const AlwaysScrollableScrollPhysics(),
+                            padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+                            itemCount: filteredEvents.length,
+                            itemBuilder: (context, index) {
+                              final event = filteredEvents[index];
+                              final dateStr = DateFormat(
+                                'dd MMM yyyy',
+                              ).format(event.date);
+
+                              Color badgeBgColor = primaryColor.withOpacity(
+                                0.1,
+                              );
+                              Color badgeTextColor = primaryColor;
+                              String badgeText = 'Confirmed';
+
+                              if (event.registrationMode == 'Manual Review') {
+                                badgeBgColor = errorColor.withOpacity(0.1);
+                                badgeTextColor = errorColor;
+                                badgeText = 'Review';
+                              }
+
+                              return InkWell(
+                                // [BUG-048] FIX: Navigate ke halaman detail, bukan buka Bottom Sheet
+                                onTap: () => _navigateToEventDetail(event),
+                                borderRadius: BorderRadius.circular(12),
+                                child: Container(
+                                  margin: const EdgeInsets.only(bottom: 8),
+                                  padding: const EdgeInsets.all(16),
+                                  decoration: BoxDecoration(
+                                    color: surfaceColor,
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color: outlineVariantColor,
+                                    ),
+                                  ),
+                                  child: Row(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      SizedBox(
+                                        width: 80,
+                                        child:
+                                            event.posterUrl != null &&
+                                                event.posterUrl!.isNotEmpty
+                                            ? AdaptiveEventImage(
+                                                image: NetworkImage(
+                                                  event.posterUrl!,
+                                                ),
+                                                backgroundColor:
+                                                    surfaceContainerColor,
+                                                borderRadius:
+                                                    BorderRadius.circular(8),
+                                              )
+                                            : Container(
+                                                height: 96,
+                                                decoration: BoxDecoration(
+                                                  color: surfaceContainerColor,
+                                                  borderRadius:
+                                                      BorderRadius.circular(8),
+                                                ),
+                                                child: const Icon(
+                                                  Icons.image,
+                                                  color: outlineVariantColor,
+                                                ),
+                                              ),
+                                      ),
+                                      const SizedBox(width: 16),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              event.name,
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: const TextStyle(
+                                                fontSize: 16,
+                                                fontWeight: FontWeight.w600,
+                                                color: onSurfaceColor,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 4),
+                                            Row(
+                                              children: [
+                                                const Icon(
+                                                  Icons.calendar_today,
+                                                  size: 14,
+                                                  color: onSurfaceVariantColor,
+                                                ),
+                                                const SizedBox(width: 4),
+                                                Text(
+                                                  dateStr,
+                                                  style: const TextStyle(
+                                                    fontSize: 14,
+                                                    color:
+                                                        onSurfaceVariantColor,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                            const SizedBox(height: 2),
+                                            Row(
+                                              children: [
+                                                const Icon(
+                                                  Icons.location_on,
+                                                  size: 14,
+                                                  color: onSurfaceVariantColor,
+                                                ),
+                                                const SizedBox(width: 4),
+                                                Expanded(
+                                                  child: Text(
+                                                    event.location,
+                                                    maxLines: 1,
+                                                    overflow:
+                                                        TextOverflow.ellipsis,
+                                                    style: const TextStyle(
+                                                      fontSize: 14,
+                                                      color:
+                                                          onSurfaceVariantColor,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                            const SizedBox(height: 8),
+                                            Container(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    horizontal: 8,
+                                                    vertical: 4,
+                                                  ),
+                                              decoration: BoxDecoration(
+                                                color: badgeBgColor,
+                                                borderRadius:
+                                                    BorderRadius.circular(4),
+                                              ),
+                                              child: Text(
+                                                badgeText,
+                                                style: TextStyle(
+                                                  fontSize: 11,
+                                                  fontWeight: FontWeight.w600,
+                                                  color: badgeTextColor,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
                   ),
                 ),
               ],
@@ -309,7 +386,12 @@ class _HomeScreenState extends State<HomeScreen> {
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
                 // [BUG-044] FIX: Dari Dashboard, gunakan context.go bukan context.push
-                _buildNavItem(Icons.dashboard, 'Dashboard', false, () => context.go('/admin-dashboard')),
+                _buildNavItem(
+                  Icons.dashboard,
+                  'Dashboard',
+                  false,
+                  () => context.go('/admin-dashboard'),
+                ),
                 _buildNavItem(Icons.calendar_today, 'Event', true, () {}),
                 // [BUG-043] FIX: Settings menampilkan SnackBar "Segera Hadir"
                 _buildNavItem(Icons.settings, 'Settings', false, () {
@@ -328,7 +410,12 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildNavItem(IconData icon, String label, bool isActive, VoidCallback onTap) {
+  Widget _buildNavItem(
+    IconData icon,
+    String label,
+    bool isActive,
+    VoidCallback onTap,
+  ) {
     const primaryContainerColor = Color(0xFFE5E2E1);
     const onPrimaryContainerColor = Color(0xFF1C1B1B);
     const onSurfaceVariantColor = Color(0xFF444748);
@@ -356,7 +443,9 @@ class _HomeScreenState extends State<HomeScreen> {
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w500,
-                color: isActive ? onPrimaryContainerColor : onSurfaceVariantColor,
+                color: isActive
+                    ? onPrimaryContainerColor
+                    : onSurfaceVariantColor,
               ),
             ),
           ],

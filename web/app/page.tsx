@@ -1,5 +1,5 @@
-import Image from 'next/image';
 import Link from 'next/link';
+import { AdaptiveImage } from '@/components/media/AdaptiveImage';
 import { getPublicEventsAction } from '@/lib/actions/getPublicEventsAction';
 
 // The event catalog depends on the Preview/production database and must not
@@ -50,20 +50,20 @@ export default async function Home() {
                 href={`/${event.slug}`}
                 className="group overflow-hidden rounded-2xl border border-outline-variant bg-surface-container-lowest shadow-[0_4px_12px_rgba(0,0,0,0.05)] transition-transform duration-150 hover:-translate-y-1"
               >
-                <div className="relative aspect-[16/9] overflow-hidden bg-surface-container-highest">
-                  {event.posterUrl ? (
-                    <Image
-                      src={event.posterUrl}
-                      alt={event.name}
-                      fill
-                      className="object-contain"
-                    />
-                  ) : (
-                    <div className="flex h-full items-center justify-center px-6 text-center font-headline-md text-headline-md text-secondary">
-                      {event.name}
-                    </div>
-                  )}
-                </div>
+                {event.posterUrl ? (
+                  <AdaptiveImage
+                    src={event.posterUrl}
+                    alt={event.name}
+                    frameAspectRatio={16 / 9}
+                    blurredBackdrop
+                    sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                    containerClassName="bg-surface-container-highest"
+                  />
+                ) : (
+                  <div className="flex aspect-[16/9] items-center justify-center bg-surface-container-highest px-6 text-center font-headline-md text-headline-md text-secondary">
+                    {event.name}
+                  </div>
+                )}
                 <div className="p-6">
                   <h3 className="font-headline-md text-headline-md text-primary">{event.name}</h3>
                   <p className="mt-2 line-clamp-2 font-body-md text-body-md text-on-surface-variant">

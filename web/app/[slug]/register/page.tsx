@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import { AdaptiveImage } from '@/components/media/AdaptiveImage';
 import { RegistrationField } from '@/components/registration/RegistrationField';
 import { getRegistrationFieldKey, isStaticRegistrationField, validateRegistrationAnswers } from '@/lib/validation/registrationForm';
 import { validateParticipantFile } from '@/lib/validation/participantFile';
@@ -202,11 +203,17 @@ export default function RegisterPage() {
     <main className="flex-grow w-full max-w-[1200px] mx-auto px-margin-mobile md:px-margin-desktop py-stack-lg flex flex-col md:flex-row gap-stack-lg">
       {/* Graphic Element (Left side on desktop) */}
       <div className="hidden md:block md:w-1/2 relative overflow-hidden rounded-[16px]">
-        <div className="absolute inset-0 bg-surface-variant flex items-center justify-center">
+        <div className="bg-surface-variant flex items-center justify-center">
           {eventData.posterUrl ? (
-            <img className="object-contain w-full h-full mix-blend-multiply opacity-80" src={eventData.posterUrl} alt={eventData.name} />
+            <AdaptiveImage
+              src={eventData.posterUrl}
+              alt={eventData.name}
+              sizes="(max-width: 768px) 100vw, 50vw"
+              containerClassName="w-full"
+              imageClassName="mix-blend-multiply opacity-80"
+            />
           ) : (
-            <div className="text-secondary font-display-lg text-center px-4">{eventData.name}</div>
+            <div className="px-4 py-24 text-center font-display-lg text-secondary">{eventData.name}</div>
           )}
         </div>
       </div>

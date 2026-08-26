@@ -6,6 +6,7 @@ import '../models/event_model.dart';
 import '../services/event_service.dart';
 import '../services/poster_validation.dart';
 import '../widgets/dashed_border_painter.dart';
+import '../widgets/adaptive_event_image.dart';
 
 class EditEventScreen extends StatefulWidget {
   final String eventId;
@@ -289,30 +290,33 @@ class _EditEventScreenState extends State<EditEventScreen> {
                           strokeWidth: 2,
                           borderRadius: 10,
                         ),
-                        child: Container(
-                          width: double.infinity,
-                          height: 180, // Aspect ratio approx 16:9
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: _posterFile != null
-                              ? ClipRRect(
+                        child: _posterFile != null
+                            ? SizedBox(
+                                width: double.infinity,
+                                child: AdaptiveEventImage(
+                                  image: FileImage(_posterFile!),
+                                  backgroundColor: Colors.white,
                                   borderRadius: BorderRadius.circular(8),
-                                  child: Image.file(
-                                    _posterFile!,
-                                    fit: BoxFit.contain,
-                                  ),
-                                )
-                              : _event?.posterUrl != null
-                              ? ClipRRect(
+                                ),
+                              )
+                            : _event?.posterUrl != null &&
+                                  _event!.posterUrl!.isNotEmpty
+                            ? SizedBox(
+                                width: double.infinity,
+                                child: AdaptiveEventImage(
+                                  image: NetworkImage(_event!.posterUrl!),
+                                  backgroundColor: Colors.white,
                                   borderRadius: BorderRadius.circular(8),
-                                  child: Image.network(
-                                    _event!.posterUrl!,
-                                    fit: BoxFit.contain,
-                                  ),
-                                )
-                              : Column(
+                                ),
+                              )
+                            : Container(
+                                width: double.infinity,
+                                height: 180,
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Column(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
                                     Icon(
@@ -322,7 +326,8 @@ class _EditEventScreenState extends State<EditEventScreen> {
                                     ),
                                     const SizedBox(height: 8),
                                     const Text(
-                                      'Ubah Poster Acara (16:9)',
+                                      'Pilih poster (rasio asli dipertahankan)',
+                                      textAlign: TextAlign.center,
                                       style: TextStyle(
                                         fontSize: 12,
                                         fontWeight: FontWeight.w500,
@@ -331,7 +336,7 @@ class _EditEventScreenState extends State<EditEventScreen> {
                                     ),
                                   ],
                                 ),
-                        ),
+                              ),
                       ),
                     ),
                     const SizedBox(height: 24),

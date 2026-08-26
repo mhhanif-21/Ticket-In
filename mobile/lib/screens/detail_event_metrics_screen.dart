@@ -6,6 +6,7 @@ import '../theme/app_colors.dart';
 import '../services/event_service.dart';
 // [MOB-BUG-013] FIX: Import dari provider terpusat
 import '../providers/admin_providers.dart';
+import '../widgets/adaptive_event_image.dart';
 
 final eventStatsProvider = FutureProvider.autoDispose
     .family<Map<String, dynamic>, String>((ref, eventId) {
@@ -136,7 +137,12 @@ class DetailEventMetricsScreen extends ConsumerWidget {
           fit: StackFit.expand,
           children: [
             if (posterUrl != null && posterUrl.isNotEmpty)
-              Image.network(posterUrl, fit: BoxFit.contain)
+              AdaptiveEventImage(
+                image: NetworkImage(posterUrl),
+                fit: BoxFit.contain,
+                blurredBackdrop: true,
+                expand: true,
+              )
             else
               Container(color: AppColors.primary),
 

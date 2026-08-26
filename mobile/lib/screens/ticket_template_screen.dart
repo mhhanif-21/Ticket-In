@@ -305,9 +305,9 @@ class _TicketTemplateScreenState extends State<TicketTemplateScreen> {
                 fit: StackFit.expand,
                 children: [
                   if (_localBackground != null)
-                    Image.file(_localBackground!, fit: BoxFit.fill)
+                    Image.file(_localBackground!, fit: BoxFit.contain)
                   else if (_backgroundUrl != null)
-                    Image.network(_backgroundUrl!, fit: BoxFit.fill)
+                    Image.network(_backgroundUrl!, fit: BoxFit.contain)
                   else
                     const Center(
                       child: Text('Unggah gambar latar untuk melihat preview'),

@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation';
 import { getPublicEventAction } from '@/lib/actions/getPublicEventAction';
 import Link from 'next/link';
-import Image from 'next/image';
+import { AdaptiveImage } from '@/components/media/AdaptiveImage';
 
 export default async function PublicEventLandingPage(props: { params: Promise<{ slug: string }> }) {
   const params = await props.params;
@@ -21,21 +21,21 @@ export default async function PublicEventLandingPage(props: { params: Promise<{ 
   return (
     <main className="flex-grow w-full max-w-container-max mx-auto pb-stack-lg">
       {/* Hero Event Poster */}
-      <div className="w-full min-h-56 relative overflow-hidden bg-surface-container-highest shadow-[0_4px_12px_rgba(0,0,0,0.05)]">
+      <div className="relative w-full overflow-hidden bg-surface-container-highest shadow-[0_4px_12px_rgba(0,0,0,0.05)]">
         {event.posterUrl ? (
-          <Image
+          <AdaptiveImage
             src={event.posterUrl}
             alt={event.name}
-            fill
-            className="object-contain"
-            unoptimized
+            priority
+            sizes="100vw"
+            containerClassName="w-full"
           />
         ) : (
-          <div className="flex items-center justify-center w-full h-full absolute inset-0">
-             <span className="text-secondary text-2xl font-bold opacity-80 px-4 text-center">{event.name}</span>
+          <div className="flex min-h-56 items-center justify-center px-4 text-center text-2xl font-bold text-secondary opacity-80">
+            {event.name}
           </div>
         )}
-        <div className="absolute inset-0 bg-gradient-to-t from-primary/10 to-transparent"></div>
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-primary/10 to-transparent" />
       </div>
 
       {/* Event Details Container */}
@@ -92,9 +92,13 @@ export default async function PublicEventLandingPage(props: { params: Promise<{ 
             <h3 className="font-label-caps text-label-caps text-secondary dark:text-white/60 uppercase tracking-widest border-b border-outline-variant/30 dark:border-white/10 pb-2 mb-4">Galeri</h3>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               {event.media.filter((media) => media.role === 'gallery').map((media) => (
-                <div key={`${media.role}-${media.displayOrder}`} className="relative min-h-48 overflow-hidden rounded-xl bg-surface-container-highest">
-                  <Image src={media.publicUrl} alt={`Galeri ${event.name}`} fill className="object-contain" unoptimized />
-                </div>
+                <AdaptiveImage
+                  key={`${media.role}-${media.displayOrder}`}
+                  src={media.publicUrl}
+                  alt={`Galeri ${event.name}`}
+                  sizes="(max-width: 640px) 100vw, 50vw"
+                  containerClassName="w-full rounded-xl bg-surface-container-highest"
+                />
               ))}
             </div>
           </section>

@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import '../services/event_service.dart';
 import '../services/poster_validation.dart';
 import '../widgets/dashed_border_painter.dart';
+import '../widgets/adaptive_event_image.dart';
 
 class CreateEventScreen extends StatefulWidget {
   const CreateEventScreen({Key? key}) : super(key: key);
@@ -312,22 +313,23 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                           strokeWidth: 2,
                           borderRadius: 10,
                         ),
-                        child: Container(
-                          width: double.infinity,
-                          height: 180, // Aspect ratio approx 16:9
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: _posterFile != null
-                              ? ClipRRect(
+                        child: _posterFile != null
+                            ? SizedBox(
+                                width: double.infinity,
+                                child: AdaptiveEventImage(
+                                  image: FileImage(_posterFile!),
+                                  backgroundColor: Colors.white,
                                   borderRadius: BorderRadius.circular(8),
-                                  child: Image.file(
-                                    _posterFile!,
-                                    fit: BoxFit.contain,
-                                  ),
-                                )
-                              : Column(
+                                ),
+                              )
+                            : Container(
+                                width: double.infinity,
+                                height: 180,
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Column(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
                                     Icon(
@@ -346,7 +348,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                                     ),
                                   ],
                                 ),
-                        ),
+                              ),
                       ),
                     ),
                     if (_posterError != null) ...[
@@ -388,13 +390,12 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                             .map(
                               (entry) => Stack(
                                 children: [
-                                  Container(
+                                  SizedBox(
                                     width: 88,
-                                    height: 88,
-                                    color: Colors.white,
-                                    child: Image.file(
-                                      entry.value,
-                                      fit: BoxFit.contain,
+                                    child: AdaptiveEventImage(
+                                      image: FileImage(entry.value),
+                                      backgroundColor: Colors.white,
+                                      borderRadius: BorderRadius.circular(6),
                                     ),
                                   ),
                                   Positioned(
