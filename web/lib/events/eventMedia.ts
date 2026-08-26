@@ -1,3 +1,8 @@
+import {
+  ImageContentValidationError,
+  validateImageContent,
+} from '@/lib/storage/imageValidation';
+
 export const EVENT_MEDIA_MAX_BYTES = 5 * 1024 * 1024;
 export const EVENT_MEDIA_MAX_GALLERY_ITEMS = 5;
 
@@ -18,6 +23,9 @@ export class EventMediaValidationError extends Error {
       | 'MEDIA_FILE_MISSING'
       | 'MEDIA_FILE_TOO_LARGE'
       | 'MEDIA_FILE_TYPE_NOT_ALLOWED'
+      | 'MEDIA_FILE_CONTENT_INVALID'
+      | 'MEDIA_FILE_DIMENSIONS_INVALID'
+      | 'MEDIA_GALLERY_REPLACE_REQUIRED'
       | 'MEDIA_GALLERY_LIMIT_EXCEEDED',
     public readonly status: 400 | 413 | 415 | 422,
     message: string,
@@ -29,41 +37,6 @@ export class EventMediaValidationError extends Error {
 
 function friendlyFileName(file: EventMediaFile): string {
   return file.name.trim() || 'berkas';
-}
-
-async function detectMimeType(file: EventMediaFile): Promise<ValidatedEventMedia['mimeType']> {
-  const bytes = new Uint8Array(await file.arrayBuffer());
-
-  const isJpeg = bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
-  if (isJpeg) return 'image/jpeg';
-
-  const isPng = bytes.length >= 8
-    && bytes[0] === 0x89
-    && bytes[1] === 0x50
-    && bytes[2] === 0x4e
-    && bytes[3] === 0x47
-    && bytes[4] === 0x0d
-    && bytes[5] === 0x0a
-    && bytes[6] === 0x1a
-    && bytes[7] === 0x0a;
-  if (isPng) return 'image/png';
-
-  const isWebp = bytes.length >= 12
-    && bytes[0] === 0x52
-    && bytes[1] === 0x49
-    && bytes[2] === 0x46
-    && bytes[3] === 0x46
-    && bytes[8] === 0x57
-    && bytes[9] === 0x45
-    && bytes[10] === 0x42
-    && bytes[11] === 0x50;
-  if (isWebp) return 'image/webp';
-
-  throw new EventMediaValidationError(
-    'MEDIA_FILE_TYPE_NOT_ALLOWED',
-    415,
-    `Format ${friendlyFileName(file)} tidak didukung. Gunakan JPG, PNG, atau WebP.`,
-  );
 }
 
 async function validateOne(
@@ -79,12 +52,36 @@ async function validateOne(
     );
   }
 
-  return {
-    file,
-    role,
-    displayOrder,
-    mimeType: await detectMimeType(file),
-  };
+  try {
+    const image = await validateImageContent(Buffer.from(await file.arrayBuffer()));
+    return {
+      file,
+      role,
+      displayOrder,
+      mimeType: image.mimeType,
+    };
+  } catch (error) {
+    if (!(error instanceof ImageContentValidationError)) throw error;
+    if (error.kind === 'dimensions') {
+      throw new EventMediaValidationError(
+        'MEDIA_FILE_DIMENSIONS_INVALID',
+        422,
+        `Dimensi ${friendlyFileName(file)} terlalu besar. Maksimal 8192 px per sisi dan 20 megapiksel.`,
+      );
+    }
+    if (error.kind === 'content') {
+      throw new EventMediaValidationError(
+        'MEDIA_FILE_CONTENT_INVALID',
+        415,
+        `Isi ${friendlyFileName(file)} bukan gambar yang valid.`,
+      );
+    }
+    throw new EventMediaValidationError(
+      'MEDIA_FILE_TYPE_NOT_ALLOWED',
+      415,
+      `Format ${friendlyFileName(file)} tidak didukung. Gunakan JPG, PNG, atau WebP.`,
+    );
+  }
 }
 
 export async function validateEventMediaFiles({

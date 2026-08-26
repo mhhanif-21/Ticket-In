@@ -116,22 +116,34 @@ export function buildExportRow(
   return { ...base, ...customAnswers };
 }
 
-function csvCell(value: unknown): string {
+export function neutralizeCsvFormula(value: string): string {
+  return /^[=+\-@]/.test(value) ? `'${value}` : value;
+}
+
+export function csvCell(value: unknown): string {
   const normalized = value === null || value === undefined
     ? ''
     : typeof value === 'string'
       ? value
       : JSON.stringify(value);
-  return JSON.stringify(normalized);
+  return JSON.stringify(neutralizeCsvFormula(normalized));
+}
+
+export function getCsvHeaders(data: Record<string, unknown>[]): string[] {
+  const customHeaders = Array.from(new Set(
+    data.flatMap((row) => Object.keys(row).filter((header) => !STANDARD_EXPORT_HEADERS.includes(header as (typeof STANDARD_EXPORT_HEADERS)[number]))),
+  )).sort((left, right) => left.localeCompare(right));
+  return [...STANDARD_EXPORT_HEADERS, ...customHeaders];
+}
+
+export function csvRow(headers: readonly string[], row: Record<string, unknown>): string {
+  return headers.map((header) => csvCell(row[header])).join(',');
 }
 
 export function toCSV(data: Record<string, unknown>[]): string {
   if (data.length === 0) return '';
 
-  const customHeaders = Array.from(new Set(
-    data.flatMap((row) => Object.keys(row).filter((header) => !STANDARD_EXPORT_HEADERS.includes(header as (typeof STANDARD_EXPORT_HEADERS)[number]))),
-  )).sort((left, right) => left.localeCompare(right));
-  const headers = [...STANDARD_EXPORT_HEADERS, ...customHeaders];
-  const rows = data.map((row) => headers.map((header) => csvCell(row[header])).join(','));
+  const headers = getCsvHeaders(data);
+  const rows = data.map((row) => csvRow(headers, row));
   return [headers.map(csvCell).join(','), ...rows].join('\n');
 }

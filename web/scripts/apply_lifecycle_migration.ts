@@ -37,6 +37,11 @@ const MIGRATIONS = [
     path: resolve(process.cwd(), 'supabase/migrations/0012_registration-event-lifecycle-integrity.sql'),
     lockKey: 2026082612,
   },
+  {
+    id: '0013_storage-media-export-durability',
+    path: resolve(process.cwd(), 'supabase/migrations/0013_storage-media-export-durability.sql'),
+    lockKey: 2026082713,
+  },
 ] as const;
 
 type SchemaRow = {
@@ -137,6 +142,30 @@ async function verifyRegistrationLifecycleSchema(): Promise<void> {
   }
 }
 
+async function verifyStorageMediaExportSchema(): Promise<void> {
+  const cleanupRows = await client.unsafe<SchemaRow[]>(`
+    SELECT column_name
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'storage_cleanup_jobs'
+      AND column_name = 'storage_path'
+  `);
+  if (cleanupRows.length !== 1) {
+    throw new Error('Migration verification failed: public.storage_cleanup_jobs.storage_path is missing');
+  }
+
+  const exportRows = await client.unsafe<SchemaRow[]>(`
+    SELECT column_name
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'export_jobs'
+      AND column_name = 'storage_path'
+  `);
+  if (exportRows.length !== 1) {
+    throw new Error('Migration verification failed: public.export_jobs.storage_path is missing');
+  }
+}
+
 async function applyMigration(migration: (typeof MIGRATIONS)[number]): Promise<void> {
   const migrationSql = await readFile(migration.path, 'utf8');
 
@@ -174,7 +203,8 @@ async function main(): Promise<void> {
   await verifyParticipantFileLifecycleSchema();
   await verifyRegistrationStatusCapabilitySchema();
   await verifyRegistrationLifecycleSchema();
-  console.log('Database lifecycle, event media, ticket template, participant file, public status capability, and registration integrity migrations applied and verified.');
+  await verifyStorageMediaExportSchema();
+  console.log('Database lifecycle, event media, ticket template, participant file, status capability, registration integrity, and storage/export migrations applied and verified.');
 }
 
 main()

@@ -5,6 +5,10 @@ import {
   eventApprovalEmailTemplates,
   eventTicketTemplates,
 } from '@/db/schema';
+import {
+  ImageContentValidationError,
+  validateImageContent,
+} from '@/lib/storage/imageValidation';
 
 export const TICKET_TEMPLATE_MAX_FILE_BYTES = 5 * 1024 * 1024;
 
@@ -44,6 +48,8 @@ export class TicketTemplateValidationError extends Error {
       | 'TICKET_TEMPLATE_ELEMENT_INVALID'
       | 'TICKET_TEMPLATE_BACKGROUND_TOO_LARGE'
       | 'TICKET_TEMPLATE_BACKGROUND_TYPE_NOT_ALLOWED'
+      | 'TICKET_TEMPLATE_BACKGROUND_CONTENT_INVALID'
+      | 'TICKET_TEMPLATE_BACKGROUND_DIMENSIONS_INVALID'
       | 'EMAIL_TEMPLATE_TOKEN_INVALID',
     readonly status: number,
     message: string,
@@ -166,28 +172,31 @@ export async function validateTicketTemplateBackground(
   }
 
   const bytes = Buffer.from(await file.arrayBuffer());
-  const isJpeg = bytes.length >= 3
-    && bytes[0] === 0xff
-    && bytes[1] === 0xd8
-    && bytes[2] === 0xff;
-  const isPng = bytes.length >= 8
-    && bytes.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]));
-  const isWebp = bytes.length >= 12
-    && bytes.subarray(0, 4).toString('ascii') === 'RIFF'
-    && bytes.subarray(8, 12).toString('ascii') === 'WEBP';
-
-  if (!isJpeg && !isPng && !isWebp) {
+  try {
+    const image = await validateImageContent(bytes);
+    return { bytes, mimeType: image.mimeType };
+  } catch (error) {
+    if (!(error instanceof ImageContentValidationError)) throw error;
+    if (error.kind === 'dimensions') {
+      throw new TicketTemplateValidationError(
+        'TICKET_TEMPLATE_BACKGROUND_DIMENSIONS_INVALID',
+        422,
+        'Dimensi gambar template terlalu besar. Maksimal 8192 px per sisi dan 20 megapiksel.',
+      );
+    }
+    if (error.kind === 'content') {
+      throw new TicketTemplateValidationError(
+        'TICKET_TEMPLATE_BACKGROUND_CONTENT_INVALID',
+        415,
+        'Isi gambar template tidak valid.',
+      );
+    }
     throw new TicketTemplateValidationError(
       'TICKET_TEMPLATE_BACKGROUND_TYPE_NOT_ALLOWED',
       415,
       'Format gambar template tidak didukung. Gunakan JPG, PNG, atau WebP.',
     );
   }
-
-  return {
-    bytes,
-    mimeType: isJpeg ? 'image/jpeg' : isPng ? 'image/png' : 'image/webp',
-  };
 }
 
 export async function getTicketTemplateConfig(eventId: string): Promise<TicketTemplateConfig> {

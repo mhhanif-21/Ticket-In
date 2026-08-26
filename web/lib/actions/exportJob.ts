@@ -10,6 +10,7 @@ export interface ExportJobRecord {
   eventId: string;
   status: string;
   fileUrl: string | null;
+  storagePath: string | null;
   attempts: number;
   qstashMessageId: string | null;
   lastError: string | null;

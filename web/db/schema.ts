@@ -234,6 +234,36 @@ export const participantFileUploads = pgTable(
   }),
 );
 
+// Durable, storage-agnostic cleanup ledger. It intentionally has no event
+// foreign key: cleanup must remain retryable after the owning event is gone.
+export const storageCleanupJobs = pgTable(
+  'storage_cleanup_jobs',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    bucket: varchar('bucket', { length: 128 }).notNull(),
+    storagePath: text('storage_path').notNull(),
+    reason: varchar('reason', { length: 64 }).notNull(),
+    status: varchar('status', { length: 24 }).notNull().default('held'),
+    attempts: integer('attempts').notNull().default(0),
+    lastError: text('last_error'),
+    expiresAt: timestamp('expires_at').notNull(),
+    nextAttemptAt: timestamp('next_attempt_at').notNull().defaultNow(),
+    cleanupLeaseExpiresAt: timestamp('cleanup_lease_expires_at'),
+    cleanedAt: timestamp('cleaned_at'),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    updatedAt: timestamp('updated_at').notNull().defaultNow(),
+  },
+  (table) => ({
+    bucketPathUnique: uniqueIndex('storage_cleanup_jobs_bucket_path_unique').on(table.bucket, table.storagePath),
+    retryIdx: index('storage_cleanup_jobs_retry_idx').on(table.status, table.nextAttemptAt),
+    expiryIdx: index('storage_cleanup_jobs_expiry_idx').on(table.status, table.expiresAt),
+    statusCheck: check(
+      'storage_cleanup_jobs_status_check',
+      sql`${table.status} IN ('held', 'cleanup_pending', 'cleaning', 'cleaned')`,
+    ),
+  }),
+);
+
 // Durable ticket-generation state. A registration can have exactly one job so
 // QStash retries and duplicate deliveries remain observable and idempotent.
 export const ticketGenerationJobs = pgTable(
@@ -401,6 +431,7 @@ export const exportJobs = pgTable('export_jobs', {
     .references(() => events.id, { onDelete: 'cascade' }),
   status: varchar('status', { length: 50 }).notNull(), // pending, publishing, published, processing, completed, failed
   fileUrl: text('file_url'),
+  storagePath: text('storage_path'),
   attempts: integer('attempts').default(0).notNull(),
   qstashMessageId: varchar('qstash_message_id', { length: 255 }),
   lastError: text('last_error'),

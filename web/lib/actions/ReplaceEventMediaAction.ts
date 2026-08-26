@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto';
+
 import { and, asc, eq } from 'drizzle-orm';
 
 import { db } from '@/db';
@@ -5,8 +7,15 @@ import { eventMedia, events } from '@/db/schema';
 import {
   type EventMediaFile,
   type ValidatedEventMedia,
+  EventMediaValidationError,
   validateEventMediaFiles,
 } from '@/lib/events/eventMedia';
+import {
+  activateHeldStorageCleanupJobs,
+  holdStorageCleanupJobs,
+  queueStorageCleanupJobsTx,
+  releaseHeldStorageCleanupJobsTx,
+} from '@/lib/storage/cleanupLifecycle';
 import { STORAGE_BUCKETS } from '@/lib/storage/buckets';
 import { supabaseAdmin } from '@/lib/supabase';
 
@@ -31,23 +40,27 @@ type StoredEventMedia = {
   publicUrl: string;
 };
 
+function fileExtension(mimeType: ValidatedEventMedia['mimeType']): string {
+  if (mimeType === 'image/jpeg') return 'jpg';
+  if (mimeType === 'image/png') return 'png';
+  return 'webp';
+}
+
 function mediaPath(eventId: string, media: ValidatedEventMedia): string {
-  return media.role === 'cover'
-    ? `${eventId}/cover`
-    : `${eventId}/gallery-${media.displayOrder}`;
+  return `${eventId}/${media.role}/${randomUUID()}.${fileExtension(media.mimeType)}`;
 }
 
 async function uploadMedia(
-  eventId: string,
   media: ValidatedEventMedia,
+  storagePath: string,
+  eventId: string,
 ): Promise<StoredEventMedia> {
-  const storagePath = mediaPath(eventId, media);
   const buffer = Buffer.from(await media.file.arrayBuffer());
   const { error } = await supabaseAdmin.storage
     .from(STORAGE_BUCKETS.eventPosters)
     .upload(storagePath, buffer, {
       contentType: media.mimeType,
-      upsert: true,
+      upsert: false,
     });
 
   if (error) {
@@ -69,102 +82,139 @@ async function uploadMedia(
 
 export class ReplaceEventMediaAction {
   static async execute(input: ReplaceEventMediaInput) {
+    if (!input.replaceGallery && input.gallery.length > 0) {
+      throw new EventMediaValidationError(
+        'MEDIA_GALLERY_REPLACE_REQUIRED',
+        422,
+        'Aktifkan replace_gallery untuk mengganti foto galeri.',
+      );
+    }
+
     const validated = await validateEventMediaFiles({
       cover: input.cover,
       gallery: input.gallery,
     });
-    const existing = await db
-      .select({
-        role: eventMedia.role,
-        displayOrder: eventMedia.displayOrder,
-        storagePath: eventMedia.storagePath,
-      })
-      .from(eventMedia)
-      .where(eq(eventMedia.eventId, input.eventId));
+    const staged = validated.map((media) => ({
+      media,
+      storagePath: mediaPath(input.eventId, media),
+    }));
+    const stagedObjects = staged.map(({ storagePath }) => ({
+      bucket: STORAGE_BUCKETS.eventPosters,
+      storagePath,
+      reason: 'event_media_replace' as const,
+    }));
 
-    const uploaded = [] as StoredEventMedia[];
-    for (const media of validated) {
-      uploaded.push(await uploadMedia(input.eventId, media));
-    }
+    // The ledger is persisted before upload. A process/DB failure afterwards
+    // leaves an expiring hold that the cron worker can safely remove.
+    await holdStorageCleanupJobs(stagedObjects);
 
-    const cover = uploaded.find((media) => media.role === 'cover');
-    if (!cover) throw new EventMediaUploadError();
+    try {
+      const uploaded: StoredEventMedia[] = [];
+      for (const item of staged) {
+        uploaded.push(await uploadMedia(item.media, item.storagePath, input.eventId));
+      }
 
-    const gallery = uploaded.filter((media) => media.role === 'gallery');
-    const now = new Date();
+      const cover = uploaded.find((media) => media.role === 'cover');
+      if (!cover) throw new EventMediaUploadError();
+      const gallery = uploaded.filter((media) => media.role === 'gallery');
+      const now = new Date();
 
-    await db.transaction(async (transaction) => {
-      await transaction
-        .insert(eventMedia)
-        .values({
-          eventId: input.eventId,
-          role: cover.role,
-          displayOrder: cover.displayOrder,
-          storagePath: cover.storagePath,
-          publicUrl: cover.publicUrl,
-          updatedAt: now,
-        })
-        .onConflictDoUpdate({
-          target: [eventMedia.eventId, eventMedia.role, eventMedia.displayOrder],
-          set: {
+      await db.transaction(async (transaction) => {
+        const [event] = await transaction
+          .select({ id: events.id })
+          .from(events)
+          .where(eq(events.id, input.eventId))
+          .for('update')
+          .limit(1);
+        if (!event) throw new EventMediaUploadError();
+
+        const existing = await transaction
+          .select({
+            role: eventMedia.role,
+            displayOrder: eventMedia.displayOrder,
+            storagePath: eventMedia.storagePath,
+          })
+          .from(eventMedia)
+          .where(eq(eventMedia.eventId, input.eventId))
+          .for('update');
+
+        await transaction
+          .insert(eventMedia)
+          .values({
+            eventId: input.eventId,
+            role: cover.role,
+            displayOrder: cover.displayOrder,
             storagePath: cover.storagePath,
             publicUrl: cover.publicUrl,
             updatedAt: now,
-          },
-        });
+          })
+          .onConflictDoUpdate({
+            target: [eventMedia.eventId, eventMedia.role, eventMedia.displayOrder],
+            set: {
+              storagePath: cover.storagePath,
+              publicUrl: cover.publicUrl,
+              updatedAt: now,
+            },
+          });
 
-      if (input.replaceGallery) {
+        if (input.replaceGallery) {
+          await transaction
+            .delete(eventMedia)
+            .where(and(eq(eventMedia.eventId, input.eventId), eq(eventMedia.role, 'gallery')));
+
+          if (gallery.length > 0) {
+            await transaction.insert(eventMedia).values(gallery.map((media) => ({
+              eventId: input.eventId,
+              role: media.role,
+              displayOrder: media.displayOrder,
+              storagePath: media.storagePath,
+              publicUrl: media.publicUrl,
+              updatedAt: now,
+            })));
+          }
+        }
+
         await transaction
-          .delete(eventMedia)
-          .where(and(eq(eventMedia.eventId, input.eventId), eq(eventMedia.role, 'gallery')));
+          .update(events)
+          .set({ posterUrl: cover.publicUrl, updatedAt: now })
+          .where(eq(events.id, input.eventId));
 
-        if (gallery.length > 0) {
-          await transaction.insert(eventMedia).values(gallery.map((media) => ({
-            eventId: input.eventId,
-            role: media.role,
-            displayOrder: media.displayOrder,
-            storagePath: media.storagePath,
-            publicUrl: media.publicUrl,
-            updatedAt: now,
-          })));
-        }
-      }
+        await releaseHeldStorageCleanupJobsTx(transaction, stagedObjects);
 
-      await transaction
-        .update(events)
-        .set({ posterUrl: cover.publicUrl, updatedAt: now })
-        .where(eq(events.id, input.eventId));
-    });
+        const activePaths = new Set(uploaded.map((media) => media.storagePath));
+        const replacedPaths = existing
+          .filter((media) => (
+            (media.role === 'cover' || input.replaceGallery)
+            && media.storagePath
+            && !activePaths.has(media.storagePath)
+          ))
+          .map((media) => ({
+            bucket: STORAGE_BUCKETS.eventPosters,
+            storagePath: media.storagePath as string,
+            reason: 'event_media_replace' as const,
+          }));
+        await queueStorageCleanupJobsTx(transaction, replacedPaths);
+      });
 
-    const activeMedia = await db
-      .select({
-        role: eventMedia.role,
-        displayOrder: eventMedia.displayOrder,
-        publicUrl: eventMedia.publicUrl,
-      })
-      .from(eventMedia)
-      .where(eq(eventMedia.eventId, input.eventId))
-      .orderBy(asc(eventMedia.role), asc(eventMedia.displayOrder));
+      const activeMedia = await db
+        .select({
+          role: eventMedia.role,
+          displayOrder: eventMedia.displayOrder,
+          publicUrl: eventMedia.publicUrl,
+        })
+        .from(eventMedia)
+        .where(eq(eventMedia.eventId, input.eventId))
+        .orderBy(asc(eventMedia.role), asc(eventMedia.displayOrder));
 
-    const activePaths = new Set(uploaded.map((media) => media.storagePath));
-    if (input.replaceGallery) {
-      const removedPaths = existing
-        .filter((media) => media.role === 'gallery' && media.storagePath && !activePaths.has(media.storagePath))
-        .map((media) => media.storagePath as string);
-
-      if (removedPaths.length > 0) {
-        const { error } = await supabaseAdmin.storage
-          .from(STORAGE_BUCKETS.eventPosters)
-          .remove(removedPaths);
-        if (error) {
-          console.error('Event media cleanup failed', { eventId: input.eventId, count: removedPaths.length });
-        }
-      }
+      return {
+        posterUrl: cover.publicUrl,
+        media: activeMedia,
+      };
+    } catch (error) {
+      // Do not delete synchronously here: the durable ledger is the recovery
+      // authority even when storage is temporarily unavailable.
+      await activateHeldStorageCleanupJobs(stagedObjects).catch(() => undefined);
+      throw error;
     }
-
-    return {
-      posterUrl: cover.publicUrl,
-      media: activeMedia,
-    };
   }
 }

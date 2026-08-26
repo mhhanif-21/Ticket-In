@@ -25,6 +25,7 @@ export function getApiAccessPolicy(pathname: string, method: string): ApiAccessP
 
   if (
     pathname === '/api/v1/worker/reconcile-participant-files'
+    || pathname === '/api/v1/worker/reconcile-storage-cleanup'
     || pathname === '/api/v1/worker/expire-registration-drafts'
   ) {
     return 'cron';

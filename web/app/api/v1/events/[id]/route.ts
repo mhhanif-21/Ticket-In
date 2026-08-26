@@ -1,7 +1,15 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/db';
-import { eventMedia, events, formFields, registrations } from '@/db/schema';
-import { and, asc, count, eq, inArray } from 'drizzle-orm';
+import {
+  eventMedia,
+  events,
+  eventTicketTemplates,
+  exportJobs,
+  formFields,
+  participantFileUploads,
+  registrations,
+} from '@/db/schema';
+import { and, asc, count, eq, inArray, sql } from 'drizzle-orm';
 import { getCanonicalBaseUrl } from '@/lib/security/url';
 import { getRegistrationFieldKey } from '@/lib/validation/registrationForm';
 import {
@@ -14,6 +22,9 @@ import {
   CAPACITY_CONSUMING_REGISTRATION_STATUSES,
   expireStaleDraftRegistrationsForEventTx,
 } from '@/lib/registration/draftLifecycle';
+import { queueStorageCleanupJobsTx } from '@/lib/storage/cleanupLifecycle';
+import { EXPORT_STORAGE_BUCKET, STORAGE_BUCKETS } from '@/lib/storage/buckets';
+import { getPublicStorageObjectPath } from '@/lib/storage/publicObjectPath';
 
 export const runtime = 'nodejs';
 const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -208,7 +219,6 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   }
 }
 
-// Bug 5 FIX: DELETE endpoint untuk menghapus event beserta semua data terkait
 export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const role = req.headers.get('x-user-role');
@@ -218,15 +228,93 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
 
     const { id } = await params;
 
-    const [existing] = await db.select({ id: events.id }).from(events).where(eq(events.id, id));
-    if (!existing) {
+    const deleted = await db.transaction(async (tx) => {
+      const [existing] = await tx
+        .select({ id: events.id, posterUrl: events.posterUrl })
+        .from(events)
+        .where(eq(events.id, id))
+        .for('update')
+        .limit(1);
+      if (!existing) return false;
+
+      const media = await tx
+        .select({ storagePath: eventMedia.storagePath })
+        .from(eventMedia)
+        .where(eq(eventMedia.eventId, id));
+      const [ticketTemplate] = await tx
+        .select({ backgroundPath: eventTicketTemplates.backgroundPath })
+        .from(eventTicketTemplates)
+        .where(eq(eventTicketTemplates.eventId, id))
+        .limit(1);
+      const ticketUrls = await tx
+        .select({ qrCodeUrl: registrations.qrCodeUrl })
+        .from(registrations)
+        .where(eq(registrations.eventId, id));
+      const exports = await tx
+        .select({ storagePath: exportJobs.storagePath })
+        .from(exportJobs)
+        .where(eq(exportJobs.eventId, id));
+
+      const cleanupObjects = [
+        ...media.flatMap((item) => item.storagePath ? [{
+          bucket: STORAGE_BUCKETS.eventPosters,
+          storagePath: item.storagePath,
+          reason: 'event_delete' as const,
+        }] : []),
+        ...(ticketTemplate?.backgroundPath ? [{
+          bucket: STORAGE_BUCKETS.ticketTemplates,
+          storagePath: ticketTemplate.backgroundPath,
+          reason: 'event_delete' as const,
+        }] : []),
+        ...ticketUrls.flatMap((item) => {
+          const storagePath = getPublicStorageObjectPath(item.qrCodeUrl, STORAGE_BUCKETS.tickets);
+          return storagePath ? [{ bucket: STORAGE_BUCKETS.tickets, storagePath, reason: 'event_delete' as const }] : [];
+        }),
+        ...exports.flatMap((item) => item.storagePath ? [{
+          bucket: EXPORT_STORAGE_BUCKET,
+          storagePath: item.storagePath,
+          reason: 'event_delete' as const,
+        }] : []),
+      ];
+      const legacyPosterPath = getPublicStorageObjectPath(existing.posterUrl, STORAGE_BUCKETS.eventPosters);
+      if (legacyPosterPath) {
+        cleanupObjects.push({
+          bucket: STORAGE_BUCKETS.eventPosters,
+          storagePath: legacyPosterPath,
+          reason: 'event_delete',
+        });
+      }
+      await queueStorageCleanupJobsTx(tx, cleanupObjects);
+
+      // `registration_id` is SET NULL by the event cascade. Mark claimed
+      // participant files first so the durable file reconciler owns them.
+      const now = new Date();
+      await tx
+        .update(participantFileUploads)
+        .set({
+          registrationId: null,
+          status: 'cleanup_pending',
+          nextAttemptAt: now,
+          cleanupLeaseExpiresAt: null,
+          updatedAt: now,
+        })
+        .where(and(
+          eq(participantFileUploads.status, 'claimed'),
+          sql`${participantFileUploads.registrationId} IN (
+            SELECT ${registrations.id}
+            FROM ${registrations}
+            WHERE ${registrations.eventId} = ${id}
+          )`,
+        ));
+
+      await tx.delete(formFields).where(eq(formFields.eventId, id));
+      await tx.delete(events).where(eq(events.id, id));
+      return true;
+    });
+
+    if (!deleted) {
       return NextResponse.json({ status: 'error', message: 'Event tidak ditemukan' }, { status: 404 });
     }
-
-    // Hapus form fields dulu (foreign key constraint)
-    await db.delete(formFields).where(eq(formFields.eventId, id));
-    // Hapus event
-    await db.delete(events).where(eq(events.id, id));
 
     return NextResponse.json({ status: 'success', message: 'Event berhasil dihapus' });
   } catch (error: any) {
