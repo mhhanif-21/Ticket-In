@@ -73,6 +73,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
 
     const media = await db
       .select({
+        id: eventMedia.id,
         role: eventMedia.role,
         displayOrder: eventMedia.displayOrder,
         publicUrl: eventMedia.publicUrl,

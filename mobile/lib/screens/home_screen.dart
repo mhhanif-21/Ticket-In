@@ -7,6 +7,38 @@ import '../services/event_service.dart';
 import '../widgets/adaptive_event_image.dart';
 import 'package:intl/intl.dart';
 
+class EventStatusPresentation {
+  const EventStatusPresentation({required this.label, required this.color});
+
+  final String label;
+  final Color color;
+}
+
+EventStatusPresentation eventStatusPresentation(String status) {
+  switch (status) {
+    case 'Draft':
+      return const EventStatusPresentation(
+        label: 'Draf',
+        color: Color(0xFF8A5A00),
+      );
+    case 'Cancelled':
+      return const EventStatusPresentation(
+        label: 'Dibatalkan',
+        color: Color(0xFFBA1A1A),
+      );
+    case 'Published':
+      return const EventStatusPresentation(
+        label: 'Dipublikasikan',
+        color: Color(0xFF006E1C),
+      );
+    default:
+      return const EventStatusPresentation(
+        label: 'Status tidak diketahui',
+        color: Color(0xFF5D5D5D),
+      );
+  }
+}
+
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key, this.eventService});
 
@@ -28,6 +60,7 @@ class _HomeScreenState extends State<HomeScreen> {
   String? _loadError;
   final ScrollController _scrollController = ScrollController();
   Timer? _searchDebounce;
+  int _catalogRequestGeneration = 0;
 
   @override
   void initState() {
@@ -49,7 +82,10 @@ class _HomeScreenState extends State<HomeScreen> {
   String get _apiSort => _sortOrder == 'newest' ? 'date_desc' : 'date_asc';
 
   Future<void> _loadEvents({bool reset = true}) async {
-    if (_isLoading || _isFetchingMore) return;
+    if (!reset && (_isLoading || _isFetchingMore)) return;
+    final requestGeneration = reset
+        ? ++_catalogRequestGeneration
+        : _catalogRequestGeneration;
     final requestedPage = reset ? 1 : _page + 1;
     setState(() {
       if (reset) {
@@ -65,7 +101,7 @@ class _HomeScreenState extends State<HomeScreen> {
         search: _searchQuery,
         sort: _apiSort,
       );
-      if (!mounted) return;
+      if (!mounted || requestGeneration != _catalogRequestGeneration) return;
       setState(() {
         if (reset) {
           _events = result.events;
@@ -82,7 +118,7 @@ class _HomeScreenState extends State<HomeScreen> {
         _isFetchingMore = false;
       });
     } catch (error) {
-      if (!mounted) return;
+      if (!mounted || requestGeneration != _catalogRequestGeneration) return;
       final message = error is EventCatalogException
           ? error.message
           : 'Daftar acara belum dapat dimuat.';
@@ -136,7 +172,6 @@ class _HomeScreenState extends State<HomeScreen> {
     const onSurfaceColor = Color(0xFF1A1C1C);
     const onSurfaceVariantColor = Color(0xFF444748);
     const secondaryColor = Color(0xFF5D5D5D);
-    const errorColor = Color(0xFFBA1A1A);
 
     return Scaffold(
       // [BUG-042] FIX: Hapus extendBody:true agar Navbar tidak menutupi list event
@@ -220,8 +255,8 @@ class _HomeScreenState extends State<HomeScreen> {
                             children: [
                               Text(
                                 _sortOrder == 'newest'
-                                    ? 'Urutkan: Terbaru'
-                                    : 'Urutkan: Terlama',
+                                    ? 'Tanggal: Terbaru'
+                                    : 'Tanggal: Terlama',
                                 style: const TextStyle(
                                   color: secondaryColor,
                                   fontSize: 12,
@@ -329,17 +364,10 @@ class _HomeScreenState extends State<HomeScreen> {
                                 'dd MMM yyyy',
                               ).format(event.date);
 
-                              Color badgeBgColor = primaryColor.withOpacity(
-                                0.1,
-                              );
-                              Color badgeTextColor = primaryColor;
-                              String badgeText = 'Confirmed';
-
-                              if (event.registrationMode == 'Manual Review') {
-                                badgeBgColor = errorColor.withOpacity(0.1);
-                                badgeTextColor = errorColor;
-                                badgeText = 'Review';
-                              }
+                              final status = eventStatusPresentation(event.status);
+                              final badgeBgColor = status.color.withValues(alpha: 0.1);
+                              final badgeTextColor = status.color;
+                              final badgeText = status.label;
 
                               return InkWell(
                                 // [BUG-048] FIX: Navigate ke halaman detail, bukan buka Bottom Sheet

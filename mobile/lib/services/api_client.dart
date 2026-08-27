@@ -44,6 +44,34 @@ class MultipartUploadFile {
   const MultipartUploadFile({required this.field, required this.path});
 }
 
+String detectImageMimeType(List<int> bytes) {
+  if (bytes.length >= 3 &&
+      bytes[0] == 0xFF &&
+      bytes[1] == 0xD8 &&
+      bytes[2] == 0xFF) {
+    return 'image/jpeg';
+  }
+  if (bytes.length >= 8 &&
+      bytes[0] == 0x89 &&
+      bytes[1] == 0x50 &&
+      bytes[2] == 0x4E &&
+      bytes[3] == 0x47) {
+    return 'image/png';
+  }
+  if (bytes.length >= 12 &&
+      bytes[0] == 0x52 &&
+      bytes[1] == 0x49 &&
+      bytes[2] == 0x46 &&
+      bytes[3] == 0x46 &&
+      bytes[8] == 0x57 &&
+      bytes[9] == 0x45 &&
+      bytes[10] == 0x42 &&
+      bytes[11] == 0x50) {
+    return 'image/webp';
+  }
+  return 'application/octet-stream';
+}
+
 class ApiClient {
   // Every build must provide its endpoint explicitly. For local Android
   // debugging, pass --dart-define=API_BASE_URL=http://10.0.2.2:3000/api.
@@ -261,6 +289,16 @@ class ApiClient {
     );
   }
 
+  Future<http.Response> patch(String endpoint, Map<String, dynamic> body) async {
+    return _sendJsonRequest(
+      (headers) => _httpClient.patch(
+        buildUri(endpoint),
+        headers: headers,
+        body: jsonEncode(body),
+      ),
+    );
+  }
+
   // Bug 5 FIX: Tambah method delete
   Future<http.Response> delete(String endpoint) async {
     return _sendJsonRequest(
@@ -286,22 +324,9 @@ class ApiClient {
       if (filePath != null && fileField != null) {
         final file = File(filePath);
         final raf = file.openSync();
-        final bytes = raf.readSync(8);
+        final bytes = raf.readSync(12);
         raf.closeSync();
-
-        String mimeType = 'application/octet-stream';
-        if (bytes.length >= 3 &&
-            bytes[0] == 0xFF &&
-            bytes[1] == 0xD8 &&
-            bytes[2] == 0xFF) {
-          mimeType = 'image/jpeg';
-        } else if (bytes.length >= 8 &&
-            bytes[0] == 0x89 &&
-            bytes[1] == 0x50 &&
-            bytes[2] == 0x4E &&
-            bytes[3] == 0x47) {
-          mimeType = 'image/png';
-        }
+        final mimeType = detectImageMimeType(bytes);
 
         final mimeParts = mimeType.split('/');
         request.files.add(
@@ -336,29 +361,7 @@ class ApiClient {
         final bytes = await file
             .openRead(0, 12)
             .fold<List<int>>([], (all, chunk) => all..addAll(chunk));
-        String mimeType = 'application/octet-stream';
-        if (bytes.length >= 3 &&
-            bytes[0] == 0xFF &&
-            bytes[1] == 0xD8 &&
-            bytes[2] == 0xFF) {
-          mimeType = 'image/jpeg';
-        } else if (bytes.length >= 8 &&
-            bytes[0] == 0x89 &&
-            bytes[1] == 0x50 &&
-            bytes[2] == 0x4E &&
-            bytes[3] == 0x47) {
-          mimeType = 'image/png';
-        } else if (bytes.length >= 12 &&
-            bytes[0] == 0x52 &&
-            bytes[1] == 0x49 &&
-            bytes[2] == 0x46 &&
-            bytes[3] == 0x46 &&
-            bytes[8] == 0x57 &&
-            bytes[9] == 0x45 &&
-            bytes[10] == 0x42 &&
-            bytes[11] == 0x50) {
-          mimeType = 'image/webp';
-        }
+        final mimeType = detectImageMimeType(bytes);
 
         final mimeParts = mimeType.split('/');
         request.files.add(

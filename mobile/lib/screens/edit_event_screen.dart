@@ -8,25 +8,44 @@ import '../services/poster_validation.dart';
 import '../widgets/dashed_border_painter.dart';
 import '../widgets/adaptive_event_image.dart';
 
+class _EditableGalleryItem {
+  const _EditableGalleryItem.remote(this.remote) : file = null;
+
+  const _EditableGalleryItem.local(this.file) : remote = null;
+
+  final EventMediaModel? remote;
+  final File? file;
+
+  bool get isLocal => file != null;
+  String get id => remote?.id ?? '';
+  String get localIdentity => file?.absolute.path ?? '';
+  ImageProvider get image => file == null
+      ? NetworkImage(remote!.publicUrl)
+      : FileImage(file!);
+}
+
 class EditEventScreen extends StatefulWidget {
   final String eventId;
   final EventService? eventService;
   final Future<File?> Function()? posterPicker;
+  final Future<List<File>> Function()? galleryPicker;
 
   const EditEventScreen({
-    Key? key,
+    super.key,
     required this.eventId,
     this.eventService,
     this.posterPicker,
-  }) : super(key: key);
+    this.galleryPicker,
+  });
 
   @override
-  _EditEventScreenState createState() => _EditEventScreenState();
+  State<EditEventScreen> createState() => _EditEventScreenState();
 }
 
 class _EditEventScreenState extends State<EditEventScreen> {
   final _formKey = GlobalKey<FormState>();
   late final EventService _eventService;
+  final PageController _galleryPageController = PageController();
 
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _locationController = TextEditingController();
@@ -39,6 +58,10 @@ class _EditEventScreenState extends State<EditEventScreen> {
   bool _isLoading = true;
   EventModel? _event;
   File? _posterFile;
+  final List<_EditableGalleryItem> _galleryItems = [];
+  bool _galleryChanged = false;
+  bool _posterPending = false;
+  int _activeGalleryIndex = 0;
 
   @override
   void initState() {
@@ -60,6 +83,13 @@ class _EditEventScreenState extends State<EditEventScreen> {
         _selectedDate = event.date;
         _dateController.text = DateFormat('dd MMM yyyy').format(event.date);
         _selectedMode = event.registrationMode;
+        _galleryItems
+          ..clear()
+          ..addAll(
+            (event.media.where((item) => item.role == 'gallery').toList()
+                  ..sort((left, right) => left.displayOrder.compareTo(right.displayOrder)))
+                .map(_EditableGalleryItem.remote),
+          );
         _isLoading = false;
       });
     } catch (e) {
@@ -91,7 +121,100 @@ class _EditEventScreenState extends State<EditEventScreen> {
       return;
     }
 
-    setState(() => _posterFile = pickedFile);
+    setState(() {
+      _posterFile = pickedFile;
+      _posterPending = true;
+    });
+  }
+
+  Future<void> _pickGalleryImages() async {
+    List<File> pickedFiles;
+    if (widget.galleryPicker != null) {
+      pickedFiles = await widget.galleryPicker!();
+    } else {
+      final picked = await ImagePicker().pickMultiImage();
+      pickedFiles = picked.map((item) => File(item.path)).toList();
+    }
+    if (!mounted || pickedFiles.isEmpty) return;
+
+    final existing = _galleryItems
+        .where((item) => item.isLocal)
+        .map((item) => item.localIdentity)
+        .toSet();
+    final additions = <File>[];
+    for (final file in pickedFiles) {
+      if (existing.contains(file.absolute.path)) continue;
+      final validationError = await validateEventImageFile(file);
+      if (!mounted) return;
+      if (validationError != null) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(validationError)));
+        return;
+      }
+      existing.add(file.absolute.path);
+      additions.add(file);
+    }
+    if (additions.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Foto yang dipilih sudah ada di galeri.')),
+      );
+      return;
+    }
+    if (_galleryItems.length + additions.length > 5) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Maksimal 5 foto galeri. Sisa slot: ${5 - _galleryItems.length}.',
+          ),
+        ),
+      );
+      return;
+    }
+    setState(() {
+      _galleryItems.addAll(additions.map(_EditableGalleryItem.local));
+      _galleryChanged = true;
+      _activeGalleryIndex = _galleryItems.length - additions.length;
+    });
+    _moveToGalleryPage(_activeGalleryIndex);
+  }
+
+  void _removeGalleryAt(int index) {
+    setState(() {
+      _galleryItems.removeAt(index);
+      _galleryChanged = true;
+      _activeGalleryIndex = _galleryItems.isEmpty
+          ? 0
+          : _activeGalleryIndex.clamp(0, _galleryItems.length - 1);
+    });
+    _moveToGalleryPage(_activeGalleryIndex);
+  }
+
+  void _moveGallery(int offset) {
+    final destination = _activeGalleryIndex + offset;
+    if (destination < 0 || destination >= _galleryItems.length) return;
+    setState(() {
+      final item = _galleryItems.removeAt(_activeGalleryIndex);
+      _galleryItems.insert(destination, item);
+      _activeGalleryIndex = destination;
+      _galleryChanged = true;
+    });
+    _moveToGalleryPage(destination);
+  }
+
+  void _moveToGalleryPage(int index) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted ||
+          !_galleryPageController.hasClients ||
+          _galleryItems.isEmpty) {
+        return;
+      }
+      _galleryPageController.animateToPage(
+        index.clamp(0, _galleryItems.length - 1),
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOut,
+      );
+    });
   }
 
   Future<void> _pickDate() async {
@@ -140,12 +263,7 @@ class _EditEventScreenState extends State<EditEventScreen> {
 
       await _eventService.updateEvent(widget.eventId, data);
       metadataPersisted = true;
-      if (_posterFile != null) {
-        await _eventService.uploadEventPoster(
-          widget.eventId,
-          _posterFile!.path,
-        );
-      }
+      await _syncPendingMedia();
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -158,13 +276,13 @@ class _EditEventScreenState extends State<EditEventScreen> {
         SnackBar(
           content: Text(
             metadataPersisted
-                ? 'Data acara sudah tersimpan, tetapi poster belum diperbarui. ${error.message}'
+                ? 'Data acara sudah tersimpan, tetapi media belum diperbarui. ${error.message}'
                 : error.message,
           ),
-          action: metadataPersisted && _posterFile != null
+          action: metadataPersisted && (_posterPending || _galleryChanged)
               ? SnackBarAction(
                   label: 'UNGGAH ULANG',
-                  onPressed: _retryPosterUpload,
+                  onPressed: _retryPendingMedia,
                 )
               : null,
         ),
@@ -181,15 +299,13 @@ class _EditEventScreenState extends State<EditEventScreen> {
     }
   }
 
-  Future<void> _retryPosterUpload() async {
-    final poster = _posterFile;
-    if (poster == null) return;
+  Future<void> _retryPendingMedia() async {
     setState(() => _isLoading = true);
     try {
-      await _eventService.uploadEventPoster(widget.eventId, poster.path);
+      await _syncPendingMedia();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Poster berhasil diperbarui.')),
+        const SnackBar(content: Text('Media acara berhasil diperbarui.')),
       );
       Navigator.pop(context, true);
     } on EventMediaUploadException catch (error) {
@@ -202,14 +318,185 @@ class _EditEventScreenState extends State<EditEventScreen> {
     }
   }
 
+  Future<void> _syncPendingMedia() async {
+    if (_posterPending && _posterFile != null) {
+      await _eventService.uploadEventPoster(widget.eventId, _posterFile!.path);
+      _posterPending = false;
+    }
+    if (!_galleryChanged) return;
+
+    final localItems = _galleryItems.where((item) => item.isLocal).toList();
+    if (localItems.isNotEmpty) {
+      final added = await _eventService.appendEventGallery(
+        widget.eventId,
+        localItems.map((item) => item.file!.path).toList(),
+      );
+      if (added.length != localItems.length) {
+        throw const EventMediaUploadException(
+          'Sebagian foto galeri belum dapat diproses. Silakan unggah ulang.',
+        );
+      }
+      var nextAdded = 0;
+      for (var index = 0; index < _galleryItems.length; index += 1) {
+        if (_galleryItems[index].isLocal) {
+          _galleryItems[index] = _EditableGalleryItem.remote(added[nextAdded]);
+          nextAdded += 1;
+        }
+      }
+    }
+
+    final galleryIds = _galleryItems.map((item) => item.id).toList();
+    if (galleryIds.any((id) => id.isEmpty)) {
+      throw const EventMediaUploadException(
+        'Foto galeri belum siap diperbarui. Silakan coba lagi.',
+      );
+    }
+    await _eventService.replaceEventGallery(widget.eventId, galleryIds);
+    _galleryChanged = false;
+  }
+
   @override
   void dispose() {
+    _galleryPageController.dispose();
     _nameController.dispose();
     _locationController.dispose();
     _capacityController.dispose();
     _dateController.dispose();
     _descriptionController.dispose();
     super.dispose();
+  }
+
+  Widget _buildGallerySection() {
+    final count = _galleryItems.length;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Foto Galeri ($count/5)',
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w700,
+            color: Color(0xFF1A1C1C),
+          ),
+        ),
+        const SizedBox(height: 4),
+        const Text(
+          'Opsional. Foto lama tetap tersimpan sampai Anda menghapusnya.',
+          style: TextStyle(fontSize: 12, color: Color(0xFF5F6368)),
+        ),
+        const SizedBox(height: 8),
+        OutlinedButton.icon(
+          key: const ValueKey('edit-gallery-picker'),
+          onPressed: count == 5 ? null : _pickGalleryImages,
+          icon: const Icon(Icons.collections_outlined),
+          label: const Text('Tambah Foto Galeri'),
+        ),
+        if (count > 0) ...[
+          const SizedBox(height: 12),
+          SizedBox(
+            height: 208,
+            child: PageView.builder(
+              controller: _galleryPageController,
+              itemCount: count,
+              onPageChanged: (index) {
+                if (mounted) setState(() => _activeGalleryIndex = index);
+              },
+              itemBuilder: (context, index) {
+                final item = _galleryItems[index];
+                return Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 2),
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      AdaptiveEventImage(
+                        image: item.image,
+                        frameAspectRatio: 16 / 10,
+                        expand: true,
+                        blurredBackdrop: true,
+                        backgroundColor: Colors.white,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      Positioned(
+                        right: 8,
+                        top: 8,
+                        child: IconButton.filledTonal(
+                          key: ValueKey('edit-gallery-remove-$index'),
+                          tooltip: 'Hapus foto galeri ${index + 1}',
+                          onPressed: () => _removeGalleryAt(index),
+                          icon: const Icon(Icons.close),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              IconButton(
+                key: const ValueKey('edit-gallery-move-previous'),
+                tooltip: 'Pindahkan foto ke kiri',
+                onPressed: _activeGalleryIndex == 0
+                    ? null
+                    : () => _moveGallery(-1),
+                icon: const Icon(Icons.arrow_back),
+              ),
+              Expanded(
+                child: SizedBox(
+                  height: 56,
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: count,
+                    separatorBuilder: (_, _) => const SizedBox(width: 8),
+                    itemBuilder: (context, index) {
+                      final selected = index == _activeGalleryIndex;
+                      return InkWell(
+                        onTap: () {
+                          setState(() => _activeGalleryIndex = index);
+                          _moveToGalleryPage(index);
+                        },
+                        borderRadius: BorderRadius.circular(6),
+                        child: Container(
+                          width: 72,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(
+                              color: selected
+                                  ? Colors.black
+                                  : const Color(0xFFC4C7C7),
+                              width: selected ? 2 : 1,
+                            ),
+                          ),
+                          clipBehavior: Clip.antiAlias,
+                          child: Image(
+                            image: _galleryItems[index].image,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, _, _) => const ColoredBox(
+                              color: Color(0xFFE5E2E1),
+                              child: Icon(Icons.broken_image_outlined),
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ),
+              IconButton(
+                key: const ValueKey('edit-gallery-move-next'),
+                tooltip: 'Pindahkan foto ke kanan',
+                onPressed: _activeGalleryIndex == count - 1
+                    ? null
+                    : () => _moveGallery(1),
+                icon: const Icon(Icons.arrow_forward),
+              ),
+            ],
+          ),
+        ],
+      ],
+    );
   }
 
   Widget _buildTextField({
@@ -332,8 +619,12 @@ class _EditEventScreenState extends State<EditEventScreen> {
                         child: _posterFile != null
                             ? SizedBox(
                                 width: double.infinity,
+                                height: 260,
                                 child: AdaptiveEventImage(
                                   image: FileImage(_posterFile!),
+                                  frameAspectRatio: 4 / 3,
+                                  expand: true,
+                                  blurredBackdrop: true,
                                   backgroundColor: Colors.white,
                                   borderRadius: BorderRadius.circular(8),
                                 ),
@@ -342,8 +633,12 @@ class _EditEventScreenState extends State<EditEventScreen> {
                                   _event!.posterUrl!.isNotEmpty
                             ? SizedBox(
                                 width: double.infinity,
+                                height: 260,
                                 child: AdaptiveEventImage(
                                   image: NetworkImage(_event!.posterUrl!),
+                                  frameAspectRatio: 4 / 3,
+                                  expand: true,
+                                  blurredBackdrop: true,
                                   backgroundColor: Colors.white,
                                   borderRadius: BorderRadius.circular(8),
                                 ),
@@ -378,6 +673,8 @@ class _EditEventScreenState extends State<EditEventScreen> {
                               ),
                       ),
                     ),
+                    const SizedBox(height: 16),
+                    _buildGallerySection(),
                     const SizedBox(height: 24),
 
                     // Forms
@@ -408,8 +705,9 @@ class _EditEventScreenState extends State<EditEventScreen> {
                       validator: (v) {
                         if (v == null || v.isEmpty) return 'Harus diisi';
                         final parsed = int.tryParse(v);
-                        if (parsed == null)
+                        if (parsed == null) {
                           return 'Harus berupa angka (misal: 100)';
+                        }
                         if (parsed <= 0) return 'Kuota harus lebih dari 0';
                         return null;
                       },
@@ -452,7 +750,7 @@ class _EditEventScreenState extends State<EditEventScreen> {
                           ),
                         ),
                         DropdownButtonFormField<String>(
-                          value: _selectedMode,
+                          initialValue: _selectedMode,
                           items: ['Auto-Accept', 'Manual Review']
                               .map(
                                 (mode) => DropdownMenuItem(

@@ -113,3 +113,19 @@ export async function validateEventMediaFiles({
   }
   return result;
 }
+
+export async function validateEventGalleryFiles(
+  gallery: EventMediaFile[],
+): Promise<ValidatedEventMedia[]> {
+  if (gallery.length > EVENT_MEDIA_MAX_GALLERY_ITEMS) {
+    throw new EventMediaValidationError(
+      'MEDIA_GALLERY_LIMIT_EXCEEDED',
+      422,
+      'Maksimal 5 foto galeri per acara.',
+    );
+  }
+
+  return Promise.all(
+    gallery.map((file, displayOrder) => validateOne(file, 'gallery', displayOrder)),
+  );
+}

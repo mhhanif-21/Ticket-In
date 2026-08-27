@@ -287,6 +287,71 @@ class EventService {
     }
   }
 
+  Future<List<EventMediaModel>> appendEventGallery(
+    String id,
+    List<String> galleryPaths,
+  ) async {
+    if (galleryPaths.isEmpty) return const [];
+    if (galleryPaths.length > 5) {
+      throw const EventMediaUploadException(
+        'Maksimal 5 foto galeri per acara.',
+      );
+    }
+    for (final galleryPath in galleryPaths) {
+      final validationError = await validateEventImageFile(File(galleryPath));
+      if (validationError != null) {
+        throw EventMediaUploadException(validationError);
+      }
+    }
+
+    final response = await _apiClient.multipartFilesRequest(
+      '/v1/events/$id/media/gallery',
+      'POST',
+      const {},
+      files: galleryPaths
+          .map((path) => MultipartUploadFile(field: 'gallery', path: path))
+          .toList(),
+    );
+    final body = await response.stream.bytesToString();
+    if (response.statusCode != 200 && response.statusCode != 201) {
+      throw EventMediaUploadException(
+        _messageFromResponse(
+          body,
+          'Galeri acara belum dapat diunggah. Silakan coba lagi.',
+        ),
+      );
+    }
+    final decoded = jsonDecode(body) as Map<String, dynamic>;
+    final data = decoded['data'] as Map<String, dynamic>? ?? const {};
+    final media = data['media'] as List? ?? const [];
+    return media
+        .map((item) => EventMediaModel.fromJson(item as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<void> replaceEventGallery(
+    String id,
+    List<String> galleryMediaIds,
+  ) async {
+    if (galleryMediaIds.length > 5) {
+      throw const EventMediaUploadException(
+        'Maksimal 5 foto galeri per acara.',
+      );
+    }
+    final response = await _apiClient.patch('/v1/events/$id/media', {
+      'replace_gallery': true,
+      'gallery_media_ids': galleryMediaIds,
+    });
+    if (response.statusCode != 200) {
+      throw EventMediaUploadException(
+        _messageFromResponse(
+          response.body,
+          'Galeri acara belum dapat diperbarui. Silakan coba lagi.',
+        ),
+      );
+    }
+  }
+
   Future<void> updateEvent(String id, Map<String, dynamic> data) async {
     final response = await _apiClient.put('/v1/events/$id', data);
     if (response.statusCode != 200) {

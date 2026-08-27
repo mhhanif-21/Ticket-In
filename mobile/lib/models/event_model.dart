@@ -72,11 +72,13 @@ class FormFieldModel {
 }
 
 class EventMediaModel {
+  final String id;
   final String role;
   final int displayOrder;
   final String publicUrl;
 
   EventMediaModel({
+    required this.id,
     required this.role,
     required this.displayOrder,
     required this.publicUrl,
@@ -84,7 +86,8 @@ class EventMediaModel {
 
   factory EventMediaModel.fromJson(Map<String, dynamic> json) {
     return EventMediaModel(
-      role: json['role'] ?? '',
+      id: json['id']?.toString() ?? '',
+      role: json['role']?.toString() ?? '',
       displayOrder: json['display_order'] ?? json['displayOrder'] ?? 0,
       publicUrl: json['public_url'] ?? json['publicUrl'] ?? '',
     );
@@ -293,6 +296,7 @@ class EventModel {
       'media': media
           .map(
             (item) => {
+              'id': item.id,
               'role': item.role,
               'display_order': item.displayOrder,
               'public_url': item.publicUrl,

@@ -1,10 +1,16 @@
 import { NextResponse } from 'next/server';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 
 import { db } from '@/db';
-import { events } from '@/db/schema';
+import { eventMedia, events } from '@/db/schema';
 import { ReplaceEventMediaAction, EventMediaUploadError } from '@/lib/actions/ReplaceEventMediaAction';
 import { EventMediaValidationError } from '@/lib/events/eventMedia';
+import {
+  EventGalleryReconciliationError,
+  reconcileEventGallery,
+} from '@/lib/events/eventGallery';
+import { queueStorageCleanupJobsTx } from '@/lib/storage/cleanupLifecycle';
+import { STORAGE_BUCKETS } from '@/lib/storage/buckets';
 
 export const runtime = 'nodejs';
 
@@ -64,6 +70,103 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       status: 'error',
       code: 'MEDIA_UPLOAD_UNAVAILABLE',
       message: 'Media acara sementara tidak tersedia. Silakan coba lagi.',
+    }, { status: 503 });
+  }
+}
+
+export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    if (req.headers.get('x-user-role') !== 'admin') {
+      return NextResponse.json({ status: 'error', message: 'Unauthorized' }, { status: 403 });
+    }
+
+    const body: unknown = await req.json().catch(() => null);
+    const requestedIds = body && typeof body === 'object'
+      && 'gallery_media_ids' in body
+      && Array.isArray(body.gallery_media_ids)
+      ? body.gallery_media_ids
+      : null;
+    const replaceGallery = body && typeof body === 'object'
+      && 'replace_gallery' in body
+      && body.replace_gallery === true;
+    if (!replaceGallery || requestedIds === null || !requestedIds.every((id) => typeof id === 'string')) {
+      return NextResponse.json({
+        status: 'error',
+        code: 'MEDIA_GALLERY_PAYLOAD_INVALID',
+        message: 'Payload galeri tidak valid.',
+      }, { status: 400 });
+    }
+
+    const { id } = await params;
+    const media = await db.transaction(async (transaction) => {
+      const [event] = await transaction
+        .select({ id: events.id })
+        .from(events)
+        .where(eq(events.id, id))
+        .for('update')
+        .limit(1);
+      if (!event) return null;
+
+      const existing = await transaction
+        .select({
+          id: eventMedia.id,
+          eventId: eventMedia.eventId,
+          storagePath: eventMedia.storagePath,
+          publicUrl: eventMedia.publicUrl,
+          createdAt: eventMedia.createdAt,
+        })
+        .from(eventMedia)
+        .where(and(eq(eventMedia.eventId, id), eq(eventMedia.role, 'gallery')))
+        .for('update');
+      const plan = reconcileEventGallery(existing, requestedIds);
+      const now = new Date();
+
+      await transaction
+        .delete(eventMedia)
+        .where(and(eq(eventMedia.eventId, id), eq(eventMedia.role, 'gallery')));
+      if (plan.retained.length > 0) {
+        await transaction.insert(eventMedia).values(plan.retained.map((item, displayOrder) => ({
+          id: item.id,
+          eventId: item.eventId,
+          role: 'gallery' as const,
+          displayOrder,
+          storagePath: item.storagePath,
+          publicUrl: item.publicUrl,
+          createdAt: item.createdAt,
+          updatedAt: now,
+        })));
+      }
+      await queueStorageCleanupJobsTx(
+        transaction,
+        plan.removed
+          .filter((item) => item.storagePath)
+          .map((item) => ({
+            bucket: STORAGE_BUCKETS.eventPosters,
+            storagePath: item.storagePath as string,
+            reason: 'event_media_replace' as const,
+          })),
+      );
+
+      return plan.retained.map((item, displayOrder) => ({
+        id: item.id,
+        role: 'gallery',
+        displayOrder,
+        publicUrl: item.publicUrl,
+      }));
+    });
+    if (media === null) {
+      return NextResponse.json({ status: 'error', message: 'Event tidak ditemukan' }, { status: 404 });
+    }
+    return NextResponse.json({ status: 'success', data: { media } });
+  } catch (error) {
+    if (error instanceof EventGalleryReconciliationError) {
+      return NextResponse.json({ status: 'error', code: error.code, message: error.message }, { status: 422 });
+    }
+    console.error('event_gallery_reconcile_unavailable', { errorName: error instanceof Error ? error.name : 'unknown' });
+    return NextResponse.json({
+      status: 'error',
+      code: 'MEDIA_GALLERY_UNAVAILABLE',
+      message: 'Galeri acara sementara tidak tersedia. Silakan coba lagi.',
     }, { status: 503 });
   }
 }

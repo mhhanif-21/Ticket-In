@@ -8,6 +8,7 @@ import {
   type EventMediaFile,
   type ValidatedEventMedia,
   EventMediaValidationError,
+  validateEventGalleryFiles,
   validateEventMediaFiles,
 } from '@/lib/events/eventMedia';
 import {
@@ -213,6 +214,82 @@ export class ReplaceEventMediaAction {
     } catch (error) {
       // Do not delete synchronously here: the durable ledger is the recovery
       // authority even when storage is temporarily unavailable.
+      await activateHeldStorageCleanupJobs(stagedObjects).catch(() => undefined);
+      throw error;
+    }
+  }
+}
+
+type AppendEventGalleryInput = {
+  eventId: string;
+  gallery: EventMediaFile[];
+};
+
+export class AppendEventGalleryAction {
+  static async execute(input: AppendEventGalleryInput) {
+    const validated = await validateEventGalleryFiles(input.gallery);
+    const staged = validated.map((media) => ({
+      media,
+      storagePath: mediaPath(input.eventId, media),
+    }));
+    const stagedObjects = staged.map(({ storagePath }) => ({
+      bucket: STORAGE_BUCKETS.eventPosters,
+      storagePath,
+      reason: 'event_media_replace' as const,
+    }));
+
+    await holdStorageCleanupJobs(stagedObjects);
+    try {
+      const uploaded: StoredEventMedia[] = [];
+      for (const item of staged) {
+        uploaded.push(await uploadMedia(item.media, item.storagePath, input.eventId));
+      }
+
+      const media = await db.transaction(async (transaction) => {
+        const [event] = await transaction
+          .select({ id: events.id })
+          .from(events)
+          .where(eq(events.id, input.eventId))
+          .for('update')
+          .limit(1);
+        if (!event) throw new EventMediaUploadError();
+
+        const existingGallery = await transaction
+          .select({ id: eventMedia.id })
+          .from(eventMedia)
+          .where(and(eq(eventMedia.eventId, input.eventId), eq(eventMedia.role, 'gallery')))
+          .for('update');
+        if (existingGallery.length + uploaded.length > 5) {
+          throw new EventMediaValidationError(
+            'MEDIA_GALLERY_LIMIT_EXCEEDED',
+            422,
+            'Maksimal 5 foto galeri per acara.',
+          );
+        }
+
+        const now = new Date();
+        const inserted = uploaded.map((item, index) => ({
+          eventId: input.eventId,
+          role: 'gallery' as const,
+          displayOrder: existingGallery.length + index,
+          storagePath: item.storagePath,
+          publicUrl: item.publicUrl,
+          updatedAt: now,
+        }));
+        const created = inserted.length > 0
+          ? await transaction.insert(eventMedia).values(inserted).returning({
+            id: eventMedia.id,
+            role: eventMedia.role,
+            displayOrder: eventMedia.displayOrder,
+            publicUrl: eventMedia.publicUrl,
+          })
+          : [];
+        await releaseHeldStorageCleanupJobsTx(transaction, stagedObjects);
+        return created;
+      });
+
+      return { media };
+    } catch (error) {
       await activateHeldStorageCleanupJobs(stagedObjects).catch(() => undefined);
       throw error;
     }
