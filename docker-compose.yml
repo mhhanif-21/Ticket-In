@@ -115,6 +115,8 @@ services:
       - flutter-android-ndk:/opt/android-sdk-linux/ndk
       - flutter-android-platforms:/opt/android-sdk-linux/platforms
     working_dir: /workspace
+    environment:
+      - TICKETIN_APPLICATION_ID=${TICKETIN_APPLICATION_ID:-}
     command: tail -f /dev/null
     networks:
       - TiketIn-network

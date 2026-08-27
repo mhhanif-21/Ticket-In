@@ -26,6 +26,7 @@ val configuredApplicationId = configuredValue("TICKETIN_APPLICATION_ID")
     ?: throw GradleException(
         "TICKETIN_APPLICATION_ID wajib diisi dari environment atau -P untuk setiap Android build."
     )
+val canonicalApplicationId = "com.mhhanif.ticketin"
 
 val applicationIdPattern = Regex("^[A-Za-z][A-Za-z0-9_]*(\\.[A-Za-z][A-Za-z0-9_]*)+$")
 if (!applicationIdPattern.matches(configuredApplicationId)) {
@@ -34,6 +35,11 @@ if (!applicationIdPattern.matches(configuredApplicationId)) {
 if (configuredApplicationId == "com.example" ||
     configuredApplicationId.startsWith("com.example.")) {
     throw GradleException("TICKETIN_APPLICATION_ID tidak boleh menggunakan com.example.*.")
+}
+if (configuredApplicationId != canonicalApplicationId) {
+    throw GradleException(
+        "TICKETIN_APPLICATION_ID harus menggunakan canonical value $canonicalApplicationId."
+    )
 }
 
 fun decodeDartDefine(name: String): String? {
