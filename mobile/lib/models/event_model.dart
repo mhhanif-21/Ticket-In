@@ -97,6 +97,7 @@ class EventMediaModel {
 class TicketTemplateElementModel {
   final String type;
   final String? token;
+  final String fontSize;
   final double x;
   final double y;
   final double width;
@@ -105,6 +106,7 @@ class TicketTemplateElementModel {
   const TicketTemplateElementModel({
     required this.type,
     this.token,
+    this.fontSize = 'medium',
     required this.x,
     required this.y,
     required this.width,
@@ -115,6 +117,7 @@ class TicketTemplateElementModel {
     return TicketTemplateElementModel(
       type: json['type']?.toString() ?? '',
       token: json['token']?.toString(),
+      fontSize: _ticketTextSize(json['font_size'] ?? json['fontSize']),
       x: (json['x'] as num?)?.toDouble() ?? 0,
       y: (json['y'] as num?)?.toDouble() ?? 0,
       width: (json['width'] as num?)?.toDouble() ?? 0.2,
@@ -123,6 +126,7 @@ class TicketTemplateElementModel {
   }
 
   TicketTemplateElementModel copyWith({
+    String? fontSize,
     double? x,
     double? y,
     double? width,
@@ -131,6 +135,7 @@ class TicketTemplateElementModel {
     return TicketTemplateElementModel(
       type: type,
       token: token,
+      fontSize: fontSize ?? this.fontSize,
       x: x ?? this.x,
       y: y ?? this.y,
       width: width ?? this.width,
@@ -141,10 +146,19 @@ class TicketTemplateElementModel {
   Map<String, dynamic> toJson() => {
     'type': type,
     if (token != null) 'token': token,
+    'font_size': fontSize,
     'x': x,
     'y': y,
     'width': width,
     'height': height,
+  };
+}
+
+String _ticketTextSize(dynamic value) {
+  final candidate = value?.toString();
+  return switch (candidate) {
+    'small' || 'large' => candidate!,
+    _ => 'medium',
   };
 }
 
@@ -180,12 +194,14 @@ class TicketTemplateModel {
 }
 
 class ApprovalEmailTemplateModel {
+  final String kind;
   final bool isActive;
   final String subject;
   final String body;
   final List<String> tokenOptions;
 
   const ApprovalEmailTemplateModel({
+    this.kind = 'ticket',
     required this.isActive,
     required this.subject,
     required this.body,
@@ -194,6 +210,7 @@ class ApprovalEmailTemplateModel {
 
   factory ApprovalEmailTemplateModel.fromJson(Map<String, dynamic> json) {
     return ApprovalEmailTemplateModel(
+      kind: json['kind']?.toString() ?? json['template_kind']?.toString() ?? 'ticket',
       isActive: json['is_active'] == true,
       subject: json['subject']?.toString() ?? '',
       body: json['body']?.toString() ?? '',

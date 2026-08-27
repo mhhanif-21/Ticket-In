@@ -10,6 +10,7 @@ import {
   uniqueIndex,
   index,
   check,
+  primaryKey,
 } from 'drizzle-orm/pg-core';
 import { relations, sql } from 'drizzle-orm';
 
@@ -122,20 +123,30 @@ export const eventTicketTemplatesRelations = relations(eventTicketTemplates, ({ 
   }),
 }));
 
-// Plain-text template used only for Manual Review approval email. OTP keeps
-// the system template and never reads this table.
+// Plain-text templates used only for Manual Review. Existing rows are
+// backfilled as `ticket`; OTP gets its own row after migration 0014.
 export const eventApprovalEmailTemplates = pgTable(
   'event_approval_email_templates',
   {
     eventId: uuid('event_id')
-      .primaryKey()
       .references(() => events.id, { onDelete: 'cascade' }),
+    templateKind: varchar('template_kind', { length: 16 }).notNull().default('ticket'), // otp, ticket
     isActive: boolean('is_active').notNull().default(false),
     subject: text('subject').notNull().default(''),
     body: text('body').notNull().default(''),
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
   },
+  (table) => ({
+    primaryKey: primaryKey({
+      columns: [table.eventId, table.templateKind],
+      name: 'event_approval_email_templates_pkey',
+    }),
+    kindCheck: check(
+      'event_approval_email_templates_kind_check',
+      sql`${table.templateKind} IN ('otp', 'ticket')`,
+    ),
+  }),
 );
 
 export const eventApprovalEmailTemplatesRelations = relations(eventApprovalEmailTemplates, ({ one }) => ({

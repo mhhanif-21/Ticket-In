@@ -5,7 +5,7 @@ import { generateRandomTicketCode, generateQrCodeWithText } from '../utils/ticke
 import { supabaseAdmin } from '../supabase';
 import { STORAGE_BUCKETS } from '../storage/buckets';
 import {
-  getActiveApprovalEmailTemplate,
+  getActiveEmailTemplate,
   getTicketTemplateConfig,
   renderApprovalEmailTemplate,
 } from '../tickets/ticketTemplate';
@@ -77,7 +77,7 @@ export async function triggerTicketEmailDelivery(registrationId: string) {
     throw new Error('Ticket not fully generated');
   }
 
-  const approvalTemplate = await getActiveApprovalEmailTemplate(event.id);
+  const approvalTemplate = await getActiveEmailTemplate(event.id, 'ticket');
   const renderedEmail = approvalTemplate
     ? renderApprovalEmailTemplate(approvalTemplate, {
       name: registration.name,

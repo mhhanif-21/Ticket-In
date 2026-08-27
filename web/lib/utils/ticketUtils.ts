@@ -170,16 +170,22 @@ async function generateCustomTicket(
     const height = Math.max(1, Math.round(element.height * metadata.height));
 
     if (element.type === 'qr') {
+      const qrSize = Math.min(width, height);
       composites.push({
-        input: await sharp(qrBuffer).resize({ width, height, fit: 'contain' }).png().toBuffer(),
-        left,
-        top,
+        input: await sharp(qrBuffer).resize({ width: qrSize, height: qrSize, fit: 'contain' }).png().toBuffer(),
+        left: left + Math.floor((width - qrSize) / 2),
+        top: top + Math.floor((height - qrSize) / 2),
       });
       continue;
     }
 
     const text = escapeXml(getTemplateText(element, context));
-    const fontSize = Math.max(12, Math.min(56, Math.floor(height * 0.68)));
+    const fontScale = element.fontSize === 'small'
+      ? 0.5
+      : element.fontSize === 'large'
+        ? 0.9
+        : 0.68;
+    const fontSize = Math.max(12, Math.min(56, Math.floor(height * fontScale)));
     const textSvg = Buffer.from(
       `<svg width="${width}" height="${height}">
         <text x="0" y="${Math.max(fontSize, Math.floor(height * 0.72))}" font-family="${TICKET_FONT_FAMILY}" font-size="${fontSize}" font-weight="bold" fill="#111111">${text}</text>

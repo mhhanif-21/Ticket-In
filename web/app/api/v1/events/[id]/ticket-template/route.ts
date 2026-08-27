@@ -72,7 +72,10 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       mode: template.mode,
       background_url: backgroundUrl,
       elements: template.elements,
-      token_options: ['NAME', 'EMAIL', 'EVENT_NAME', 'CODE', ...context.tokenLabels],
+      // The editor exposes the four canonical elements. Legacy dynamic field
+      // elements remain readable/renderable, but are not offered as new palette
+      // options so a token cannot be accidentally duplicated.
+      token_options: ['NAME', 'EMAIL', 'EVENT_NAME', 'CODE'],
     },
   });
 }

@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 
 import { db } from '@/db';
 import {
@@ -12,6 +12,21 @@ import {
 
 export const TICKET_TEMPLATE_MAX_FILE_BYTES = 5 * 1024 * 1024;
 
+export type EmailTemplateKind = 'otp' | 'ticket';
+
+export const EMAIL_TEMPLATE_TOKEN_OPTIONS: Record<EmailTemplateKind, readonly string[]> = {
+  otp: ['NAME', 'EMAIL', 'EVENT_NAME', 'CODE'],
+  ticket: ['NAME', 'EMAIL', 'EVENT_NAME', 'TICKET_IMAGE'],
+};
+
+export function isEmailTemplateKind(value: unknown): value is EmailTemplateKind {
+  return value === 'otp' || value === 'ticket';
+}
+
+export function getEmailTemplateTokenOptions(kind: EmailTemplateKind): string[] {
+  return [...EMAIL_TEMPLATE_TOKEN_OPTIONS[kind]];
+}
+
 export type TicketTemplateElementType =
   | 'qr'
   | 'ticket_code'
@@ -23,6 +38,7 @@ export type TicketTemplateElementType =
 export type TicketTemplateElement = {
   type: TicketTemplateElementType;
   token?: string;
+  fontSize?: 'small' | 'medium' | 'large';
   x: number;
   y: number;
   width: number;
@@ -49,8 +65,9 @@ export class TicketTemplateValidationError extends Error {
       | 'TICKET_TEMPLATE_BACKGROUND_TOO_LARGE'
       | 'TICKET_TEMPLATE_BACKGROUND_TYPE_NOT_ALLOWED'
       | 'TICKET_TEMPLATE_BACKGROUND_CONTENT_INVALID'
-      | 'TICKET_TEMPLATE_BACKGROUND_DIMENSIONS_INVALID'
-      | 'EMAIL_TEMPLATE_TOKEN_INVALID',
+       | 'TICKET_TEMPLATE_BACKGROUND_DIMENSIONS_INVALID'
+       | 'EMAIL_TEMPLATE_TOKEN_INVALID'
+       | 'EMAIL_TEMPLATE_KIND_INVALID',
     readonly status: number,
     message: string,
   ) {
@@ -70,6 +87,10 @@ function isTemplateElementType(value: unknown): value is TicketTemplateElementTy
     || value === 'email'
     || value === 'event_name'
     || value === 'field';
+}
+
+function isTemplateFontSize(value: unknown): value is NonNullable<TicketTemplateElement['fontSize']> {
+  return value === 'small' || value === 'medium' || value === 'large';
 }
 
 function isNormalizedBox(element: TicketTemplateElement): boolean {
@@ -103,9 +124,19 @@ export function parseTicketTemplateElements(value: unknown): TicketTemplateEleme
       );
     }
 
+    const rawFontSize = item.font_size ?? item.fontSize;
+    if (rawFontSize !== undefined && !isTemplateFontSize(rawFontSize)) {
+      throw new TicketTemplateValidationError(
+        'TICKET_TEMPLATE_ELEMENT_INVALID',
+        422,
+        'Ukuran teks template tidak valid.',
+      );
+    }
+
     const element: TicketTemplateElement = {
       type: item.type,
       token: typeof item.token === 'string' ? item.token.trim() : undefined,
+      fontSize: rawFontSize as TicketTemplateElement['fontSize'],
       x: typeof item.x === 'number' ? item.x : Number.NaN,
       y: typeof item.y === 'number' ? item.y : Number.NaN,
       width: typeof item.width === 'number' ? item.width : Number.NaN,
@@ -130,6 +161,23 @@ export function parseTicketTemplateElements(value: unknown): TicketTemplateEleme
       422,
       'Template kustom wajib memiliki satu QR Code dan satu kode tiket.',
     );
+  }
+
+  const seenOptionalElements = new Set<string>();
+  for (const element of elements) {
+    const identity = element.type === 'field'
+      ? `field:${element.token}`
+      : ['name', 'email', 'event_name'].includes(element.type)
+        ? element.type
+        : null;
+    if (identity && seenOptionalElements.has(identity)) {
+      throw new TicketTemplateValidationError(
+        'TICKET_TEMPLATE_ELEMENT_INVALID',
+        422,
+        'Setiap elemen data peserta hanya boleh ditambahkan satu kali.',
+      );
+    }
+    if (identity) seenOptionalElements.add(identity);
   }
 
   return elements;
@@ -221,19 +269,27 @@ export async function getTicketTemplateConfig(eventId: string): Promise<TicketTe
   };
 }
 
-export async function getActiveApprovalEmailTemplate(eventId: string) {
+export async function getActiveEmailTemplate(eventId: string, kind: EmailTemplateKind = 'ticket') {
   const [template] = await db
     .select({
+      templateKind: eventApprovalEmailTemplates.templateKind,
       isActive: eventApprovalEmailTemplates.isActive,
       subject: eventApprovalEmailTemplates.subject,
       body: eventApprovalEmailTemplates.body,
     })
     .from(eventApprovalEmailTemplates)
-    .where(eq(eventApprovalEmailTemplates.eventId, eventId))
+    .where(and(
+      eq(eventApprovalEmailTemplates.eventId, eventId),
+      eq(eventApprovalEmailTemplates.templateKind, kind),
+    ))
     .limit(1);
 
-  return template?.isActive ? template : null;
+  return template?.isActive ? { ...template, templateKind: kind } : null;
 }
+
+// Compatibility alias for existing ticket-delivery callers.
+export const getActiveApprovalEmailTemplate = (eventId: string) =>
+  getActiveEmailTemplate(eventId, 'ticket');
 
 function escapeHtml(value: string): string {
   return value.replace(/[&<>"']/g, (character) => ({
@@ -263,16 +319,24 @@ export function resolveRegistrationFieldToken(
   return key ? answerValue(answers[key]) : '-';
 }
 
-type ApprovalEmailTemplate = { subject: string; body: string };
+export type ApprovalEmailTemplate = {
+  templateKind?: EmailTemplateKind;
+  subject: string;
+  body: string;
+};
 
 export function validateApprovalEmailTemplateTokens(
   subject: string,
   body: string,
   allowedFieldLabels: string[],
+  kind: EmailTemplateKind = 'ticket',
 ): void {
-  const allowed = new Set(['NAME', 'EMAIL', 'EVENT_NAME', 'CODE', 'TICKET_IMAGE', ...allowedFieldLabels]);
+  const allowed = new Set([
+    ...EMAIL_TEMPLATE_TOKEN_OPTIONS[kind],
+    ...(kind === 'ticket' ? allowedFieldLabels : []),
+  ]);
   const tokens = `${subject}\n${body}`.match(/\[([^\]\r\n]{1,80})\]/g) ?? [];
-  const invalid = subject.includes('[TICKET_IMAGE]')
+  const invalid = (kind === 'ticket' && subject.includes('[TICKET_IMAGE]'))
     || tokens.some((token) => !allowed.has(token.slice(1, -1)));
   if (invalid) {
     throw new TicketTemplateValidationError(
@@ -289,13 +353,14 @@ export function renderApprovalEmailTemplate(
     name: string;
     email: string;
     eventName: string;
-    ticketCode: string;
-    ticketImageUrl: string;
-    answers: unknown;
-    answerFieldLabels: unknown;
+    ticketCode?: string;
+    ticketImageUrl?: string;
+    answers?: unknown;
+    answerFieldLabels?: unknown;
   },
+  kind: EmailTemplateKind = template.templateKind ?? 'ticket',
 ): { subject: string; htmlContent: string } {
-  const dynamicValues = isRecord(input.answerFieldLabels)
+  const dynamicValues = kind === 'ticket' && isRecord(input.answerFieldLabels)
     ? Object.values(input.answerFieldLabels)
       .filter((value): value is string => typeof value === 'string')
       .map((label) => [label, resolveRegistrationFieldToken(label, input.answers, input.answerFieldLabels)] as const)
@@ -304,7 +369,9 @@ export function renderApprovalEmailTemplate(
     ['NAME', input.name],
     ['EMAIL', input.email],
     ['EVENT_NAME', input.eventName],
-    ['CODE', input.ticketCode],
+    // Kept for already-saved pre-0014 ticket templates. New ticket templates
+    // cannot use CODE because the validator exposes it only for OTP.
+    ['CODE', input.ticketCode ?? ''],
     ...dynamicValues,
   ]);
 
@@ -314,8 +381,10 @@ export function renderApprovalEmailTemplate(
     subject = subject.split(`[${token}]`).join(value);
     body = body.split(`[${token}]`).join(escapeHtml(value));
   }
-  const ticketImage = `<img src="${escapeHtml(input.ticketImageUrl)}" alt="QR Code tiket" />`;
-  body = body.split('[TICKET_IMAGE]').join(ticketImage);
+  if (kind === 'ticket') {
+    const ticketImage = `<img src="${escapeHtml(input.ticketImageUrl ?? '')}" alt="QR Code tiket" />`;
+    body = body.split('[TICKET_IMAGE]').join(ticketImage);
+  }
 
   return {
     subject: subject.replace(/[\r\n]+/g, ' ').trim(),

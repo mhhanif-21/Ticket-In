@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { processRegistrationAction } from '@/lib/actions/processRegistrationAction';
 import { supabaseAdmin } from '@/lib/supabase';
 import { db } from '@/db';
-import { events, formFields } from '@/db/schema';
-import { eq } from 'drizzle-orm';
+import { eventApprovalEmailTemplates, events, formFields } from '@/db/schema';
+import { and, eq } from 'drizzle-orm';
 import {
   getRegistrationFieldKey,
   isStaticRegistrationFieldDefinition,
@@ -102,7 +102,7 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
     const resubmitToken = formData.get('resubmit_token') as string | undefined;
     const preserveAnswers = formData.get('retry_only') === 'true';
 
-    const [event] = await db.select({ id: events.id, status: events.status }).from(events).where(eq(events.slug, slug)).limit(1);
+    const [event] = await db.select({ id: events.id, name: events.name, status: events.status }).from(events).where(eq(events.slug, slug)).limit(1);
     if (!event) {
       return NextResponse.json({ status: 'error', message: 'Event tidak ditemukan' }, { status: 404 });
     }
@@ -222,7 +222,27 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
       await resetOtpRegistrationRateLimit(result.registrationId);
       const { sendOtpEmail } = await import('@/lib/email');
       try {
-        await sendOtpEmail(identity.email, identity.name, result.otpCode);
+        const [otpTemplate] = await db
+          .select({
+            subject: eventApprovalEmailTemplates.subject,
+            body: eventApprovalEmailTemplates.body,
+            isActive: eventApprovalEmailTemplates.isActive,
+          })
+          .from(eventApprovalEmailTemplates)
+          .where(and(
+            eq(eventApprovalEmailTemplates.eventId, event.id),
+            eq(eventApprovalEmailTemplates.templateKind, 'otp'),
+          ))
+          .limit(1);
+        await sendOtpEmail(
+          identity.email,
+          identity.name,
+          result.otpCode,
+          event.name,
+          otpTemplate?.isActive
+            ? { subject: otpTemplate.subject, body: otpTemplate.body }
+            : undefined,
+        );
       } catch {
         console.error('OTP delivery failed');
         return NextResponse.json({

@@ -42,6 +42,11 @@ const MIGRATIONS = [
     path: resolve(process.cwd(), 'supabase/migrations/0013_storage-media-export-durability.sql'),
     lockKey: 2026082713,
   },
+  {
+    id: '0014_manual-review-email-template-kinds',
+    path: resolve(process.cwd(), 'supabase/migrations/0014_manual-review-email-template-kinds.sql'),
+    lockKey: 2026082714,
+  },
 ] as const;
 
 type SchemaRow = {
@@ -182,6 +187,19 @@ async function verifyStorageMediaExportSchema(): Promise<void> {
   }
 }
 
+async function verifyEmailTemplateKindSchema(): Promise<void> {
+  const rows = await client.unsafe<SchemaRow[]>(`
+    SELECT column_name
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'event_approval_email_templates'
+      AND column_name = 'template_kind'
+  `);
+  if (rows.length !== 1) {
+    throw new Error('Migration verification failed: public.event_approval_email_templates.template_kind is missing');
+  }
+}
+
 async function applyMigration(migration: (typeof MIGRATIONS)[number]): Promise<void> {
   const migrationSql = await readFile(migration.path, 'utf8');
 
@@ -220,7 +238,8 @@ async function main(): Promise<void> {
   await verifyRegistrationStatusCapabilitySchema();
   await verifyRegistrationLifecycleSchema();
   await verifyStorageMediaExportSchema();
-  console.log('Database lifecycle, event media, ticket template, participant file, status capability, registration integrity, and storage/export migrations applied and verified.');
+  await verifyEmailTemplateKindSchema();
+  console.log('Database lifecycle, event media, ticket template, participant file, status capability, registration integrity, storage/export, and email template migrations applied and verified.');
 }
 
 main()

@@ -416,8 +416,19 @@ class EventService {
   }
 
   Future<ApprovalEmailTemplateModel> getApprovalEmailTemplate(String id) async {
+    return getEmailTemplate(id, kind: 'ticket');
+  }
+
+  Future<ApprovalEmailTemplateModel> getOtpEmailTemplate(String id) async {
+    return getEmailTemplate(id, kind: 'otp');
+  }
+
+  Future<ApprovalEmailTemplateModel> getEmailTemplate(
+    String id, {
+    required String kind,
+  }) async {
     final response = await _apiClient.get(
-      '/v1/events/$id/approval-email-template',
+      '/v1/events/$id/approval-email-template?kind=$kind',
     );
     if (response.statusCode != 200) {
       throw const EventTemplateException('Template email belum dapat dimuat.');
@@ -433,10 +444,47 @@ class EventService {
     required bool isActive,
     required String subject,
     required String body,
+    String kind = 'ticket',
+  }) async {
+    return saveEmailTemplate(
+      id,
+      kind: kind,
+      isActive: isActive,
+      subject: subject,
+      body: body,
+    );
+  }
+
+  Future<void> saveOtpEmailTemplate(
+    String id, {
+    required bool isActive,
+    required String subject,
+    required String body,
+  }) async {
+    return saveEmailTemplate(
+      id,
+      kind: 'otp',
+      isActive: isActive,
+      subject: subject,
+      body: body,
+    );
+  }
+
+  Future<void> saveEmailTemplate(
+    String id, {
+    required String kind,
+    required bool isActive,
+    required String subject,
+    required String body,
   }) async {
     final response = await _apiClient.put(
       '/v1/events/$id/approval-email-template',
-      {'is_active': isActive, 'subject': subject, 'body': body},
+      {
+        'kind': kind,
+        'is_active': isActive,
+        'subject': subject,
+        'body': body,
+      },
     );
     if (response.statusCode != 200) {
       throw EventTemplateException(
