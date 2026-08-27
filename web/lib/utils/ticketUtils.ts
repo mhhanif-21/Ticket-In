@@ -3,7 +3,12 @@ import fs from 'node:fs';
 import path from 'node:path';
 import QRCode from 'qrcode';
 import sharp from 'sharp';
-import { resolveRegistrationFieldToken, type TicketTemplateConfig, type TicketTemplateElement } from '@/lib/tickets/ticketTemplate';
+import {
+  getTicketTemplateFontScale,
+  resolveRegistrationFieldToken,
+  type TicketTemplateConfig,
+  type TicketTemplateElement,
+} from '@/lib/tickets/ticketTemplate';
 import { STORAGE_BUCKETS } from '@/lib/storage/buckets';
 import { supabaseAdmin } from '@/lib/supabase';
 
@@ -180,11 +185,7 @@ async function generateCustomTicket(
     }
 
     const text = escapeXml(getTemplateText(element, context));
-    const fontScale = element.fontSize === 'small'
-      ? 0.5
-      : element.fontSize === 'large'
-        ? 0.9
-        : 0.68;
+    const fontScale = getTicketTemplateFontScale(element.fontSize);
     const fontSize = Math.max(12, Math.min(56, Math.floor(height * fontScale)));
     const textSvg = Buffer.from(
       `<svg width="${width}" height="${height}">

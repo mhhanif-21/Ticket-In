@@ -11,6 +11,9 @@ import {
 } from '@/lib/storage/imageValidation';
 
 export const TICKET_TEMPLATE_MAX_FILE_BYTES = 5 * 1024 * 1024;
+export const TICKET_TEMPLATE_MIN_FONT_SCALE = 0.45;
+export const TICKET_TEMPLATE_MAX_FONT_SCALE = 1;
+export const TICKET_TEMPLATE_DEFAULT_FONT_SCALE = 0.68;
 
 export type EmailTemplateKind = 'otp' | 'ticket';
 
@@ -38,7 +41,8 @@ export type TicketTemplateElementType =
 export type TicketTemplateElement = {
   type: TicketTemplateElementType;
   token?: string;
-  fontSize?: 'small' | 'medium' | 'large';
+  /** Numeric scale is the current contract; legacy enum values remain readable. */
+  fontSize?: number | 'small' | 'medium' | 'large';
   x: number;
   y: number;
   width: number;
@@ -90,7 +94,27 @@ function isTemplateElementType(value: unknown): value is TicketTemplateElementTy
 }
 
 function isTemplateFontSize(value: unknown): value is NonNullable<TicketTemplateElement['fontSize']> {
-  return value === 'small' || value === 'medium' || value === 'large';
+  return value === 'small'
+    || value === 'medium'
+    || value === 'large'
+    || (typeof value === 'number'
+      && Number.isFinite(value)
+      && value >= TICKET_TEMPLATE_MIN_FONT_SCALE
+      && value <= TICKET_TEMPLATE_MAX_FONT_SCALE);
+}
+
+export function getTicketTemplateFontScale(
+  fontSize: TicketTemplateElement['fontSize'],
+): number {
+  if (typeof fontSize === 'number') {
+    return Math.min(
+      TICKET_TEMPLATE_MAX_FONT_SCALE,
+      Math.max(TICKET_TEMPLATE_MIN_FONT_SCALE, fontSize),
+    );
+  }
+  if (fontSize === 'small') return 0.5;
+  if (fontSize === 'large') return 0.9;
+  return TICKET_TEMPLATE_DEFAULT_FONT_SCALE;
 }
 
 function isNormalizedBox(element: TicketTemplateElement): boolean {

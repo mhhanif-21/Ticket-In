@@ -432,19 +432,15 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                 child: Stack(
                   fit: StackFit.expand,
                   children: [
-                    Semantics(
-                      button: true,
-                      label: image == null
-                          ? 'Unggah poster acara'
-                          : 'Lihat $title layar penuh',
-                      child: InkWell(
-                        onTap: image == null
-                            ? _pickImage
-                            : () => _showImagePreview(image, title),
-                        borderRadius: BorderRadius.circular(10),
-                        child: image == null
-                            ? _buildPosterPlaceholder()
-                            : AdaptiveEventImage(
+                    image == null
+                        ? _buildPosterPlaceholder()
+                        : Semantics(
+                            button: true,
+                            label: 'Lihat $title layar penuh',
+                            child: InkWell(
+                              onTap: () => _showImagePreview(image, title),
+                              borderRadius: BorderRadius.circular(10),
+                              child: AdaptiveEventImage(
                                 image: FileImage(image),
                                 frameAspectRatio: 4 / 3,
                                 expand: true,
@@ -452,13 +448,14 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                                 backgroundColor: Colors.white,
                                 borderRadius: BorderRadius.circular(10),
                               ),
-                      ),
-                    ),
+                            ),
+                          ),
                     if (isPoster)
                       Positioned(
                         right: 8,
                         bottom: 8,
                         child: FilledButton.tonalIcon(
+                          key: const ValueKey('event-poster-upload'),
                           onPressed: _pickImage,
                           icon: Icon(
                             image == null
@@ -561,6 +558,13 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
         ),
         const SizedBox(height: 8),
         _buildMediaCarousel(),
+        const SizedBox(height: 4),
+        Text(
+          _posterFile == null
+              ? 'Poster belum dipilih.'
+              : 'Poster terpilih (1/1).',
+          style: const TextStyle(fontSize: 12, color: Color(0xFF5F6368)),
+        ),
         if (_posterError != null) ...[
           const SizedBox(height: 8),
           Text(

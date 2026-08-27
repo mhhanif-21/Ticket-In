@@ -127,6 +127,9 @@ class _EditEventScreenState extends State<EditEventScreen> {
     });
   }
 
+  bool get _hasPoster =>
+      _posterFile != null || (_event?.posterUrl?.isNotEmpty ?? false);
+
   Future<void> _pickGalleryImages() async {
     List<File> pickedFiles;
     if (widget.galleryPicker != null) {
@@ -606,71 +609,99 @@ class _EditEventScreenState extends State<EditEventScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    // Image Section
-                    GestureDetector(
+                    // Image Section: the preview is display-only; uploading
+                    // is available through one explicit action.
+                    Stack(
                       key: const ValueKey('edit-poster-picker'),
-                      onTap: _pickImage,
-                      child: CustomPaint(
-                        painter: DashedBorderPainter(
-                          color: primaryContainerColor,
-                          strokeWidth: 2,
-                          borderRadius: 10,
-                        ),
-                        child: _posterFile != null
-                            ? SizedBox(
-                                width: double.infinity,
-                                height: 260,
-                                child: AdaptiveEventImage(
-                                  image: FileImage(_posterFile!),
-                                  frameAspectRatio: 4 / 3,
-                                  expand: true,
-                                  blurredBackdrop: true,
-                                  backgroundColor: Colors.white,
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                              )
-                            : _event?.posterUrl != null &&
-                                  _event!.posterUrl!.isNotEmpty
-                            ? SizedBox(
-                                width: double.infinity,
-                                height: 260,
-                                child: AdaptiveEventImage(
-                                  image: NetworkImage(_event!.posterUrl!),
-                                  frameAspectRatio: 4 / 3,
-                                  expand: true,
-                                  blurredBackdrop: true,
-                                  backgroundColor: Colors.white,
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                              )
-                            : Container(
-                                width: double.infinity,
-                                height: 180,
-                                decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                                child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(
-                                      Icons.add_photo_alternate,
-                                      size: 40,
-                                      color: primaryContainerColor,
-                                    ),
-                                    const SizedBox(height: 8),
-                                    const Text(
-                                      'Pilih poster (rasio asli dipertahankan)',
-                                      textAlign: TextAlign.center,
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w500,
-                                        color: Color(0xFF444748),
+                      children: [
+                        CustomPaint(
+                          painter: DashedBorderPainter(
+                            color: primaryContainerColor,
+                            strokeWidth: 2,
+                            borderRadius: 10,
+                          ),
+                          child: _posterFile != null
+                              ? SizedBox(
+                                  width: double.infinity,
+                                  height: 260,
+                                  child: AdaptiveEventImage(
+                                    image: FileImage(_posterFile!),
+                                    frameAspectRatio: 4 / 3,
+                                    expand: true,
+                                    blurredBackdrop: true,
+                                    backgroundColor: Colors.white,
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                )
+                              : _event?.posterUrl != null &&
+                                    _event!.posterUrl!.isNotEmpty
+                              ? SizedBox(
+                                  width: double.infinity,
+                                  height: 260,
+                                  child: AdaptiveEventImage(
+                                    image: NetworkImage(_event!.posterUrl!),
+                                    frameAspectRatio: 4 / 3,
+                                    expand: true,
+                                    blurredBackdrop: true,
+                                    backgroundColor: Colors.white,
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                )
+                              : Container(
+                                  width: double.infinity,
+                                  height: 180,
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(
+                                        Icons.add_photo_alternate,
+                                        size: 40,
+                                        color: primaryContainerColor,
                                       ),
-                                    ),
-                                  ],
+                                      const SizedBox(height: 8),
+                                      const Text(
+                                        'Pilih poster (rasio asli dipertahankan)',
+                                        textAlign: TextAlign.center,
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w500,
+                                          color: Color(0xFF444748),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
-                              ),
+                        ),
+                        Positioned(
+                          right: 12,
+                          bottom: 12,
+                          child: FilledButton.tonalIcon(
+                            key: const ValueKey('edit-poster-upload'),
+                            onPressed: _pickImage,
+                            icon: Icon(
+                              _hasPoster
+                                  ? Icons.edit_outlined
+                                  : Icons.add_photo_alternate_outlined,
+                            ),
+                            label: Text(
+                              _hasPoster ? 'Ganti Poster' : 'Unggah Poster',
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      _hasPoster
+                          ? 'Poster terpilih (1/1).'
+                          : 'Poster belum dipilih.',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Color(0xFF5F6368),
                       ),
                     ),
                     const SizedBox(height: 16),

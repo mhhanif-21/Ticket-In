@@ -4,6 +4,202 @@ import '../models/event_model.dart';
 import '../services/event_service.dart';
 import '../utils/form_field_contract.dart';
 
+class _AddFieldDialog extends StatefulWidget {
+  const _AddFieldDialog({
+    required this.type,
+    required this.title,
+    required this.validateName,
+  });
+
+  final String type;
+  final String title;
+  final String? Function(String name) validateName;
+
+  @override
+  State<_AddFieldDialog> createState() => _AddFieldDialogState();
+}
+
+class _AddFieldDialogState extends State<_AddFieldDialog> {
+  late final TextEditingController _nameController;
+  late final List<TextEditingController> _optionControllers;
+  final List<TextEditingController> _retiredOptionControllers = [];
+
+  bool get _needsOptions =>
+      ['radio', 'checkbox', 'select'].contains(widget.type);
+
+  @override
+  void initState() {
+    super.initState();
+    _nameController = TextEditingController();
+    _optionControllers = _needsOptions
+        ? [TextEditingController(), TextEditingController()]
+        : [];
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    for (final controller in [
+      ..._optionControllers,
+      ..._retiredOptionControllers,
+    ]) {
+      controller.dispose();
+    }
+    super.dispose();
+  }
+
+  void _showValidationMessage(String message) {
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  void _submit() {
+    final name = _nameController.text.trim();
+    final nameError = widget.validateName(name);
+    if (nameError != null) {
+      _showValidationMessage(nameError);
+      return;
+    }
+
+    final validOptions = _optionControllers
+        .map((controller) => controller.text.trim())
+        .where((text) => text.isNotEmpty)
+        .toList();
+    if (_needsOptions && validOptions.length < 2) {
+      _showValidationMessage('Minimal 2 opsi jawaban harus diisi');
+      return;
+    }
+
+    Navigator.pop(context, {
+      'name': name,
+      'options': _needsOptions ? validOptions : null,
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(
+        _needsOptions ? 'Pertanyaan: ${widget.title}' : 'Pertanyaan Baru',
+        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+      ),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            TextField(
+              controller: _nameController,
+              decoration: InputDecoration(
+                labelText: 'Judul Pertanyaan',
+                hintText: 'Contoh: Jenis Kelamin',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 10,
+                ),
+              ),
+              autofocus: true,
+            ),
+            if (_needsOptions) ...[
+              const SizedBox(height: 16),
+              const Text(
+                'Opsi Jawaban',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF444748),
+                ),
+              ),
+              const SizedBox(height: 8),
+              ..._optionControllers.asMap().entries.map((entry) {
+                final index = entry.key;
+                final controller = entry.value;
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: controller,
+                          decoration: InputDecoration(
+                            labelText: 'Opsi ${index + 1}',
+                            hintText: 'Isi opsi jawaban...',
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 10,
+                            ),
+                          ),
+                        ),
+                      ),
+                      if (_optionControllers.length > 2)
+                        IconButton(
+                          icon: const Icon(
+                            Icons.remove_circle_outline,
+                            color: Color(0xFFBA1A1A),
+                            size: 20,
+                          ),
+                          onPressed: () {
+                            setState(() {
+                              _retiredOptionControllers.add(
+                                _optionControllers.removeAt(index),
+                              );
+                            });
+                          },
+                        ),
+                    ],
+                  ),
+                );
+              }),
+              TextButton.icon(
+                onPressed: () {
+                  setState(() {
+                    _optionControllers.add(TextEditingController());
+                  });
+                },
+                icon: const Icon(Icons.add, size: 18, color: Color(0xFF000000)),
+                label: const Text(
+                  'Tambah Opsi',
+                  style: TextStyle(
+                    color: Color(0xFF000000),
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text(
+            'Batal',
+            style: TextStyle(color: Color(0xFF444748)),
+          ),
+        ),
+        ElevatedButton(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF000000),
+            foregroundColor: Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+          ),
+          onPressed: _submit,
+          child: const Text('Tambah'),
+        ),
+      ],
+    );
+  }
+}
+
 class FormBuilderScreen extends StatefulWidget {
   final String eventId;
   final EventService? eventService;
@@ -108,7 +304,7 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
   }
 
   // [BUG-056] FIX: isScrollControlled: true + DraggableScrollableSheet menghindari overflow
-  void _showAddFieldSheet() {
+  Future<void> _showAddFieldSheet() async {
     if (_fields.length >= 23) {
       // 25 max - 2 locked fields
       ScaffoldMessenger.of(context).showSnackBar(
@@ -117,7 +313,7 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
       return;
     }
 
-    showModalBottomSheet(
+    final selectedType = await showModalBottomSheet<String>(
       context: context,
       backgroundColor: Colors.transparent,
       useSafeArea: true,
@@ -228,13 +424,17 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
         );
       },
     );
+
+    if (!mounted || selectedType == null) return;
+    await _addSpecificField(selectedType);
   }
 
   Widget _buildFieldTypeBtn(String type, String label, IconData icon) {
     return InkWell(
       onTap: () {
-        Navigator.pop(context);
-        _addSpecificField(type);
+        // Return the selection first. The caller waits for the sheet route to
+        // finish deactivation before opening the field dialog.
+        Navigator.pop(context, type);
       },
       borderRadius: BorderRadius.circular(8),
       child: Container(
@@ -262,216 +462,33 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
     );
   }
 
-  // [BUG-055] FIX: UX dialog dengan dynamic TextFields per opsi, bukan input koma
-  // [BUG-067] FIX: Validasi minimal 2 opsi untuk radio/checkbox/select
-  Future<void> _addSpecificField(String type) async {
-    final nameController = TextEditingController();
-    final bool needsOptions = ['radio', 'checkbox', 'select'].contains(type);
-    // [BUG-055] Mulai dengan 2 field opsi kosong (minimal requirement)
-    final List<TextEditingController> optionControllers = needsOptions
-        ? [TextEditingController(), TextEditingController()]
-        : [];
+  // Keep field-dialog controllers owned by the dialog route. Disposing them in
+  // this parent immediately after Navigator.pop races route deactivation.
+  String? _validateCustomFieldName(String name) {
+    if (name.isEmpty) return 'Judul pertanyaan tidak boleh kosong';
+    if (staticFormFieldKindFor(name) != null) {
+      return 'Nama dan Email adalah field sistem dan tidak dapat dibuat ulang.';
+    }
+    if (_fields.any(
+      (field) =>
+          normalizeFormFieldLabel(field.fieldName) ==
+          normalizeFormFieldLabel(name),
+    )) {
+      return 'Nama field kustom tidak boleh duplikat.';
+    }
+    return null;
+  }
 
+  Future<void> _addSpecificField(String type) async {
     final result = await showDialog<Map<String, dynamic>>(
       context: context,
-      builder: (dialogContext) {
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            return AlertDialog(
-              title: Text(
-                needsOptions
-                    ? 'Pertanyaan: ${_getTypeLabel(type)}'
-                    : 'Pertanyaan Baru',
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              content: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Judul pertanyaan
-                    TextField(
-                      controller: nameController,
-                      decoration: InputDecoration(
-                        labelText: 'Judul Pertanyaan',
-                        hintText: 'Contoh: Jenis Kelamin',
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 10,
-                        ),
-                      ),
-                      autofocus: true,
-                    ),
-
-                    // [BUG-055] Dynamic option fields untuk radio/checkbox/select
-                    if (needsOptions) ...[
-                      const SizedBox(height: 16),
-                      const Text(
-                        'Opsi Jawaban',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: Color(0xFF444748),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      ...optionControllers.asMap().entries.map((entry) {
-                        final i = entry.key;
-                        final ctrl = entry.value;
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 8),
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: TextField(
-                                  controller: ctrl,
-                                  decoration: InputDecoration(
-                                    labelText: 'Opsi ${i + 1}',
-                                    hintText: 'Isi opsi jawaban...',
-                                    border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    contentPadding: const EdgeInsets.symmetric(
-                                      horizontal: 12,
-                                      vertical: 10,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              // Tombol hapus opsi (minimal 2 harus ada)
-                              if (optionControllers.length > 2)
-                                IconButton(
-                                  icon: const Icon(
-                                    Icons.remove_circle_outline,
-                                    color: Color(0xFFBA1A1A),
-                                    size: 20,
-                                  ),
-                                  onPressed: () {
-                                    setDialogState(() {
-                                      optionControllers.removeAt(i);
-                                    });
-                                  },
-                                ),
-                            ],
-                          ),
-                        );
-                      }).toList(),
-                      // [BUG-055] Tombol + Tambah Opsi
-                      TextButton.icon(
-                        onPressed: () {
-                          setDialogState(() {
-                            optionControllers.add(TextEditingController());
-                          });
-                        },
-                        icon: const Icon(
-                          Icons.add,
-                          size: 18,
-                          color: Color(0xFF000000),
-                        ),
-                        label: const Text(
-                          'Tambah Opsi',
-                          style: TextStyle(
-                            color: Color(0xFF000000),
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text(
-                    'Batal',
-                    style: TextStyle(color: Color(0xFF444748)),
-                  ),
-                ),
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF000000),
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                  ),
-                  onPressed: () {
-                    final name = nameController.text.trim();
-                    if (name.isEmpty) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Judul pertanyaan tidak boleh kosong'),
-                        ),
-                      );
-                      return;
-                    }
-                    if (staticFormFieldKindFor(name) != null) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text(
-                            'Nama dan Email adalah field sistem dan tidak dapat dibuat ulang.',
-                          ),
-                        ),
-                      );
-                      return;
-                    }
-                    if (_fields.any(
-                      (field) =>
-                          normalizeFormFieldLabel(field.fieldName) ==
-                          normalizeFormFieldLabel(name),
-                    )) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text(
-                            'Nama field kustom tidak boleh duplikat.',
-                          ),
-                        ),
-                      );
-                      return;
-                    }
-
-                    if (needsOptions) {
-                      // [BUG-067] FIX: Validasi minimal 2 opsi yang tidak kosong
-                      final validOptions = optionControllers
-                          .map((c) => c.text.trim())
-                          .where((t) => t.isNotEmpty)
-                          .toList();
-                      if (validOptions.length < 2) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Minimal 2 opsi jawaban harus diisi'),
-                          ),
-                        );
-                        return;
-                      }
-                      Navigator.pop(context, {
-                        'name': name,
-                        'options': validOptions,
-                      });
-                    } else {
-                      Navigator.pop(context, {'name': name, 'options': null});
-                    }
-                  },
-                  child: const Text('Tambah'),
-                ),
-              ],
-            );
-          },
-        );
-      },
+      builder: (_) => _AddFieldDialog(
+        type: type,
+        title: _getTypeLabel(type),
+        validateName: _validateCustomFieldName,
+      ),
     );
 
-    nameController.dispose();
-    for (final controller in optionControllers) {
-      controller.dispose();
-    }
     if (!mounted || result == null) return;
     setState(() {
       _fields.add(

@@ -286,7 +286,6 @@ class _TicketTemplateScreenState extends State<TicketTemplateScreen> {
           y: y,
           width: 0.65,
           height: 0.07,
-          fontSize: 'medium',
         ),
       ];
       _selectedElementIndex = _elements.length - 1;
@@ -307,11 +306,32 @@ class _TicketTemplateScreenState extends State<TicketTemplateScreen> {
     });
   }
 
-  void _setSelectedTextSize(String fontSize) {
+  void _setSelectedFontScale(double fontScale) {
     final index = _selectedElementIndex;
     if (index == null || index < 0 || index >= _elements.length) return;
     setState(() {
-      _elements[index] = _elements[index].copyWith(fontSize: fontSize);
+      _elements[index] = _elements[index].copyWith(fontSize: fontScale);
+    });
+  }
+
+  void _setSelectedQrSize(double size) {
+    final index = _selectedElementIndex;
+    if (index == null || index < 0 || index >= _elements.length) return;
+    final element = _elements[index];
+    if (element.type != 'qr') return;
+
+    final nextSize = size
+        .clamp(ticketTemplateMinQrSize, ticketTemplateMaxQrSize)
+        .toDouble();
+    final centerX = element.x + element.width / 2;
+    final centerY = element.y + element.height / 2;
+    setState(() {
+      _elements[index] = element.copyWith(
+        x: (centerX - nextSize / 2).clamp(0.0, 1.0 - nextSize).toDouble(),
+        y: (centerY - nextSize / 2).clamp(0.0, 1.0 - nextSize).toDouble(),
+        width: nextSize,
+        height: nextSize,
+      );
     });
   }
 
@@ -546,7 +566,7 @@ class _TicketTemplateScreenState extends State<TicketTemplateScreen> {
                     const Center(
                       child: Text('Unggah gambar latar untuk melihat preview'),
                     ),
-                  if (_backgroundUrl != null || _localBackground != null)
+                  if (_customMode)
                     ..._elements.asMap().entries.map((entry) {
                       final index = entry.key;
                       final element = entry.value;
@@ -575,12 +595,19 @@ class _TicketTemplateScreenState extends State<TicketTemplateScreen> {
                           onPanUpdate: (details) =>
                               _moveElement(index, details, Size(width, height)),
                           child: Container(
+                            key: ValueKey('ticket-template-element-$index'),
                             alignment: Alignment.center,
-                            padding: EdgeInsets.all(isQr ? 4 : 3),
+                            padding: EdgeInsets.all(
+                              isQr
+                                  ? 4
+                                  : selected
+                                  ? 2
+                                  : 0,
+                            ),
                             decoration: BoxDecoration(
                               color: isQr
                                   ? Colors.white.withValues(alpha: 0.94)
-                                  : Colors.white.withValues(alpha: 0.82),
+                                  : Colors.transparent,
                               border: selected
                                   ? Border.all(
                                       color: Colors.black.withValues(
@@ -629,11 +656,9 @@ class _TicketTemplateScreenState extends State<TicketTemplateScreen> {
     TicketTemplateElementModel element,
     double canvasHeight,
   ) {
-    final scale = switch (element.fontSize) {
-      'small' => 0.5,
-      'large' => 0.9,
-      _ => 0.68,
-    };
+    final scale = element.fontSize
+        .clamp(ticketTemplateMinFontScale, ticketTemplateMaxFontScale)
+        .toDouble();
     return math.max(9, math.min(28, element.height * canvasHeight * scale));
   }
 
@@ -658,33 +683,34 @@ class _TicketTemplateScreenState extends State<TicketTemplateScreen> {
             'Elemen dipilih: ${_elementLabel(element)}',
             style: const TextStyle(fontWeight: FontWeight.w700),
           ),
-          if (element.type != 'qr') ...[
+          if (element.type == 'qr') ...[
             const SizedBox(height: 8),
-            const Text('Ukuran teks'),
+            Text('Ukuran QR: ${(element.width * 100).round()}%'),
+            Slider(
+              key: const ValueKey('ticket-template-qr-size-slider'),
+              min: ticketTemplateMinQrSize,
+              max: ticketTemplateMaxQrSize,
+              divisions: 24,
+              value: element.width
+                  .clamp(ticketTemplateMinQrSize, ticketTemplateMaxQrSize)
+                  .toDouble(),
+              label: '${(element.width * 100).round()}%',
+              onChanged: _setSelectedQrSize,
+            ),
+          ] else ...[
+            const SizedBox(height: 8),
+            Text('Ukuran teks: ${(element.fontSize * 100).round()}%'),
             const SizedBox(height: 5),
-            Wrap(
-              spacing: 6,
-              children: ['small', 'medium', 'large'].map((size) {
-                final label = switch (size) {
-                  'small' => 'Kecil',
-                  'large' => 'Besar',
-                  _ => 'Sedang',
-                };
-                return OutlinedButton(
-                  onPressed: () => _setSelectedTextSize(size),
-                  style: OutlinedButton.styleFrom(
-                    backgroundColor: element.fontSize == size
-                        ? Colors.black
-                        : Colors.transparent,
-                    foregroundColor: element.fontSize == size
-                        ? Colors.white
-                        : Colors.black,
-                    padding: const EdgeInsets.symmetric(horizontal: 10),
-                    minimumSize: const Size(0, 34),
-                  ),
-                  child: Text(label),
-                );
-              }).toList(),
+            Slider(
+              key: const ValueKey('ticket-template-text-size-slider'),
+              min: ticketTemplateMinFontScale,
+              max: ticketTemplateMaxFontScale,
+              divisions: 11,
+              value: element.fontSize
+                  .clamp(ticketTemplateMinFontScale, ticketTemplateMaxFontScale)
+                  .toDouble(),
+              label: '${(element.fontSize * 100).round()}%',
+              onChanged: _setSelectedFontScale,
             ),
           ],
           if (!isRequired) ...[

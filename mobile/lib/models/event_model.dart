@@ -1,3 +1,9 @@
+const double ticketTemplateMinFontScale = 0.45;
+const double ticketTemplateMaxFontScale = 1.0;
+const double ticketTemplateDefaultFontScale = 0.68;
+const double ticketTemplateMinQrSize = 0.12;
+const double ticketTemplateMaxQrSize = 0.60;
+
 class FormFieldModel {
   final String? id;
   final String? fieldKey;
@@ -97,7 +103,7 @@ class EventMediaModel {
 class TicketTemplateElementModel {
   final String type;
   final String? token;
-  final String fontSize;
+  final double fontSize;
   final double x;
   final double y;
   final double width;
@@ -106,7 +112,7 @@ class TicketTemplateElementModel {
   const TicketTemplateElementModel({
     required this.type,
     this.token,
-    this.fontSize = 'medium',
+    this.fontSize = ticketTemplateDefaultFontScale,
     required this.x,
     required this.y,
     required this.width,
@@ -117,7 +123,7 @@ class TicketTemplateElementModel {
     return TicketTemplateElementModel(
       type: json['type']?.toString() ?? '',
       token: json['token']?.toString(),
-      fontSize: _ticketTextSize(json['font_size'] ?? json['fontSize']),
+      fontSize: _ticketTextScale(json['font_size'] ?? json['fontSize']),
       x: (json['x'] as num?)?.toDouble() ?? 0,
       y: (json['y'] as num?)?.toDouble() ?? 0,
       width: (json['width'] as num?)?.toDouble() ?? 0.2,
@@ -126,7 +132,7 @@ class TicketTemplateElementModel {
   }
 
   TicketTemplateElementModel copyWith({
-    String? fontSize,
+    double? fontSize,
     double? x,
     double? y,
     double? width,
@@ -154,11 +160,17 @@ class TicketTemplateElementModel {
   };
 }
 
-String _ticketTextSize(dynamic value) {
-  final candidate = value?.toString();
-  return switch (candidate) {
-    'small' || 'large' => candidate!,
-    _ => 'medium',
+double _ticketTextScale(dynamic value) {
+  if (value is num && value.isFinite) {
+    return value
+        .toDouble()
+        .clamp(ticketTemplateMinFontScale, ticketTemplateMaxFontScale)
+        .toDouble();
+  }
+  return switch (value?.toString()) {
+    'small' => 0.5,
+    'large' => 0.9,
+    _ => ticketTemplateDefaultFontScale,
   };
 }
 
