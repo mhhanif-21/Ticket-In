@@ -71,4 +71,11 @@ docker-compose.override.yml
 /upstream-change-notes/
 /docs/*
 
+# Ignore all tests
+mobile/test/
+web/tests/
+
+# Ignore APK build output
+apk-output/
+
 
