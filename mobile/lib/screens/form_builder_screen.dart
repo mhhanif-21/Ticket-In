@@ -530,14 +530,19 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Form berhasil disimpan! Sekarang atur akses panitia.'),
+          content: Text(
+            'Form berhasil disimpan! Sekarang simpan konfigurasi tiket.',
+          ),
         ),
       );
 
-      // [BUG-054] FIX: Setelah simpan form, langsung redirect ke access-management
-      // Alur: Buat Acara → Form Builder → Kelola Akses ✅
+      // First setup must persist the ticket configuration before asking for a
+      // publication decision. Access controls stay unavailable while Draft.
       if (widget.isFirstSetup) {
-        context.pushReplacement('/access-management/${widget.eventId}');
+        context.pushReplacement(
+          '/ticket-template/${widget.eventId}',
+          extra: 'first_setup',
+        );
       } else {
         Navigator.pop(context);
       }

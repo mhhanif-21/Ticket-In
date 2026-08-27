@@ -82,7 +82,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       .where(eq(eventMedia.eventId, event.id))
       .orderBy(asc(eventMedia.role), asc(eventMedia.displayOrder));
 
-    const canonicalBaseUrl = getCanonicalBaseUrl(req);
+    const isPublished = event.status === 'Published';
+    const canonicalBaseUrl = isPublished ? getCanonicalBaseUrl(req) : null;
 
     const eventDetail = {
       name: event.name,
@@ -106,8 +107,15 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
           fieldKind: field.fieldKind,
         })),
       media,
-      public_registration_url: `${canonicalBaseUrl}/${event.slug}`,
-      public_qr_code_url: `${canonicalBaseUrl}/api/v1/events/${event.slug}/qr`,
+      // Public access is a lifecycle capability, not merely a UI concern.
+      // The QR endpoint and public registration route both require Published;
+      // do not advertise links that will deterministically return 404/409.
+      public_registration_url: isPublished && canonicalBaseUrl
+        ? `${canonicalBaseUrl}/${event.slug}`
+        : null,
+      public_qr_code_url: isPublished && canonicalBaseUrl
+        ? `${canonicalBaseUrl}/api/v1/events/${event.slug}/qr`
+        : null,
     };
 
     // UUID adalah kontrak detail Admin yang dijaga middleware; slug adalah DTO publik.

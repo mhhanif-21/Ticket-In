@@ -7,23 +7,31 @@ import 'package:url_launcher/url_launcher.dart';
 
 class AccessManagementScreen extends StatefulWidget {
   final String eventId;
+  final EventService? eventService;
 
-  const AccessManagementScreen({Key? key, required this.eventId})
-    : super(key: key);
+  const AccessManagementScreen({
+    Key? key,
+    required this.eventId,
+    this.eventService,
+  }) : super(key: key);
 
   @override
   _AccessManagementScreenState createState() => _AccessManagementScreenState();
 }
 
 class _AccessManagementScreenState extends State<AccessManagementScreen> {
-  final EventService _eventService = EventService();
+  late final EventService _eventService;
   bool _isLoading = true;
   EventModel? _event;
   String? _newPin;
+  int _qrAttempt = 0;
+
+  bool get _isPublished => _event?.status.trim().toLowerCase() == 'published';
 
   @override
   void initState() {
     super.initState();
+    _eventService = widget.eventService ?? EventService();
     _loadEvent();
   }
 
@@ -98,6 +106,115 @@ class _AccessManagementScreenState extends State<AccessManagementScreen> {
     ).showSnackBar(const SnackBar(content: Text('Tautan disalin!')));
   }
 
+  void _retryQr() {
+    if (!mounted) return;
+    setState(() => _qrAttempt++);
+  }
+
+  Widget _buildQrUnavailable({required VoidCallback onRetry}) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(6),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.qr_code_2, size: 30, color: Color(0xFF777777)),
+            const SizedBox(height: 4),
+            const Text(
+              'QR pendaftaran belum tersedia.',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 11, color: Color(0xFF444748)),
+            ),
+            const SizedBox(height: 4),
+            OutlinedButton(
+              onPressed: onRetry,
+              style: OutlinedButton.styleFrom(
+                minimumSize: const Size(80, 32),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+              ),
+              child: const Text('Coba Lagi'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildQrPreview(String? url) {
+    return SizedBox.square(
+      dimension: 220,
+      child: Container(
+        key: const ValueKey('registration-qr-preview'),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: const Color(0xFFC4C7C7)),
+        ),
+        child: url == null || url.isEmpty
+            ? _buildQrUnavailable(onRetry: _loadEvent)
+            : Image.network(
+                key: ValueKey('$url-$_qrAttempt'),
+                url,
+                width: double.infinity,
+                height: double.infinity,
+                fit: BoxFit.contain,
+                errorBuilder: (context, error, stackTrace) =>
+                    _buildQrUnavailable(onRetry: _retryQr),
+              ),
+      ),
+    );
+  }
+
+  Widget _buildUnpublishedState() {
+    final cancelled = _event?.status.trim().toLowerCase() == 'cancelled';
+    return Center(
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: const Color(0xFFC4C7C7)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              cancelled ? Icons.block : Icons.lock_outline,
+              size: 48,
+              color: cancelled ? const Color(0xFFBA1A1A) : Colors.black,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              cancelled ? 'Acara dibatalkan' : 'Acara belum dipublikasikan',
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF1A1C1C),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              cancelled
+                  ? 'Link pendaftaran, QR pendaftaran, dan akses scanner tidak tersedia untuk acara yang dibatalkan.'
+                  : 'Link pendaftaran, QR pendaftaran, dan akses scanner akan tersedia setelah acara dipublikasikan.',
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 14,
+                height: 1.4,
+                color: Color(0xFF444748),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     const bgColor = Color(0xFFF9F9F9);
@@ -132,7 +249,21 @@ class _AccessManagementScreenState extends State<AccessManagementScreen> {
       );
     }
 
-    final regUrl = _event!.publicRegistrationUrl ?? 'Belum ada tautan';
+    if (!_isPublished) {
+      return Scaffold(
+        backgroundColor: bgColor,
+        appBar: AppBar(
+          title: const Text('Kelola Akses Acara'),
+          backgroundColor: bgColor,
+        ),
+        body: SingleChildScrollView(
+          padding: const EdgeInsets.all(20),
+          child: _buildUnpublishedState(),
+        ),
+      );
+    }
+
+    final regUrl = _event!.publicRegistrationUrl;
     // [MOB-BUG-009] FIX: Gunakan Uri.parse untuk manipulasi URL yang aman (bukan replaceAll)
     final baseUri = Uri.parse(ApiClient.baseUrl);
     final cleanSegments = baseUri.pathSegments
@@ -140,6 +271,7 @@ class _AccessManagementScreenState extends State<AccessManagementScreen> {
         .toList();
     final webBase = baseUri.replace(pathSegments: cleanSegments).toString();
     final scanUrl = '$webBase/${_event!.slug}/checkin';
+    final qrUrl = _event!.publicQrCodeUrl;
 
     return Scaffold(
       backgroundColor: bgColor,
@@ -201,7 +333,7 @@ class _AccessManagementScreenState extends State<AccessManagementScreen> {
                       children: [
                         Expanded(
                           child: Text(
-                            regUrl,
+                            regUrl ?? 'Tautan pendaftaran belum tersedia.',
                             style: const TextStyle(
                               fontSize: 14,
                               color: onSurfaceVariant,
@@ -209,17 +341,18 @@ class _AccessManagementScreenState extends State<AccessManagementScreen> {
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
-                        InkWell(
-                          onTap: () => _copyText(regUrl),
-                          child: const Padding(
-                            padding: EdgeInsets.all(4.0),
-                            child: Icon(
-                              Icons.content_copy,
-                              color: primaryColor,
-                              size: 20,
+                        if (regUrl != null)
+                          InkWell(
+                            onTap: () => _copyText(regUrl),
+                            child: const Padding(
+                              padding: EdgeInsets.all(4.0),
+                              child: Icon(
+                                Icons.content_copy,
+                                color: primaryColor,
+                                size: 20,
+                              ),
                             ),
                           ),
-                        ),
                       ],
                     ),
                   ),
@@ -227,20 +360,7 @@ class _AccessManagementScreenState extends State<AccessManagementScreen> {
                   Center(
                     child: Column(
                       children: [
-                        if (_event!.publicQrCodeUrl != null)
-                          Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: outlineVariant),
-                            ),
-                            child: Image.network(
-                              _event!.publicQrCodeUrl!,
-                              height: 96,
-                              width: 96,
-                            ),
-                          ),
+                        _buildQrPreview(qrUrl),
                         const SizedBox(height: 16),
                         SizedBox(
                           width: double.infinity,
@@ -261,34 +381,41 @@ class _AccessManagementScreenState extends State<AccessManagementScreen> {
                                 borderRadius: BorderRadius.circular(8),
                               ),
                             ),
-                            onPressed: () async {
-                              // [BUG-069] FIX: Implementasi download/buka QR di browser via url_launcher
-                              final url = _event!.publicQrCodeUrl;
-                              if (url != null &&
-                                  await canLaunchUrl(Uri.parse(url))) {
-                                if (!context.mounted) return;
-                                await launchUrl(
-                                  Uri.parse(url),
-                                  mode: LaunchMode.externalApplication,
-                                );
-                                if (!context.mounted) return;
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text(
-                                      'Membuka browser untuk mengunduh QR...',
-                                    ),
-                                  ),
-                                );
-                              } else {
-                                if (context.mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text('Gagal membuka tautan QR'),
-                                    ),
-                                  );
-                                }
-                              }
-                            },
+                            onPressed: qrUrl == null
+                                ? null
+                                : () async {
+                                    // [BUG-069] FIX: Implementasi download/buka QR di browser via url_launcher
+                                    final url = qrUrl;
+                                    if (await canLaunchUrl(Uri.parse(url))) {
+                                      if (!context.mounted) return;
+                                      await launchUrl(
+                                        Uri.parse(url),
+                                        mode: LaunchMode.externalApplication,
+                                      );
+                                      if (!context.mounted) return;
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        const SnackBar(
+                                          content: Text(
+                                            'Membuka browser untuk mengunduh QR...',
+                                          ),
+                                        ),
+                                      );
+                                    } else {
+                                      if (context.mounted) {
+                                        ScaffoldMessenger.of(
+                                          context,
+                                        ).showSnackBar(
+                                          const SnackBar(
+                                            content: Text(
+                                              'Gagal membuka tautan QR',
+                                            ),
+                                          ),
+                                        );
+                                      }
+                                    }
+                                  },
                           ),
                         ),
                       ],

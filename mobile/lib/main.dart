@@ -109,8 +109,10 @@ GoRouter buildAppRouter(AuthSessionController authSession) => GoRouter(
     ),
     GoRoute(
       path: '/ticket-template/:id',
-      builder: (context, state) =>
-          TicketTemplateScreen(eventId: state.pathParameters['id']!),
+      builder: (context, state) => TicketTemplateScreen(
+        eventId: state.pathParameters['id']!,
+        isFirstSetup: state.extra == 'first_setup',
+      ),
     ),
     // [BUG-048] FIX: Route baru untuk halaman detail event menggantikan Bottom Sheet
     GoRoute(

@@ -4,18 +4,23 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:go_router/go_router.dart';
 
 import '../models/event_model.dart';
 import '../services/event_service.dart';
 
+enum _PublicationDecision { publishNow, later }
+
 class TicketTemplateScreen extends StatefulWidget {
   final String eventId;
   final EventService? eventService;
+  final bool isFirstSetup;
 
   const TicketTemplateScreen({
     super.key,
     required this.eventId,
     this.eventService,
+    this.isFirstSetup = false,
   });
 
   @override
@@ -38,6 +43,7 @@ class _TicketTemplateScreenState extends State<TicketTemplateScreen> {
 
   bool _isLoading = true;
   bool _isSavingTicket = false;
+  bool _isPublishing = false;
   bool _isSavingOtpEmail = false;
   bool _isSavingTicketEmail = false;
   bool _customMode = false;
@@ -48,12 +54,7 @@ class _TicketTemplateScreenState extends State<TicketTemplateScreen> {
   File? _localBackground;
   double _backgroundAspectRatio = 0.75;
   List<TicketTemplateElementModel> _elements = [];
-  List<String> _otpTokenOptions = const [
-    'NAME',
-    'EMAIL',
-    'EVENT_NAME',
-    'CODE',
-  ];
+  List<String> _otpTokenOptions = const ['NAME', 'EMAIL', 'EVENT_NAME', 'CODE'];
   List<String> _ticketEmailTokenOptions = const [
     'NAME',
     'EMAIL',
@@ -91,15 +92,19 @@ class _TicketTemplateScreenState extends State<TicketTemplateScreen> {
         _elements = List.of(ticket.elements);
         _otpEmailActive = emails.isNotEmpty && emails[0].isActive;
         _ticketEmailActive = emails.length > 1 && emails[1].isActive;
-        _otpTokenOptions = emails.isNotEmpty && emails[0].tokenOptions.isNotEmpty
+        _otpTokenOptions =
+            emails.isNotEmpty && emails[0].tokenOptions.isNotEmpty
             ? emails[0].tokenOptions
             : _otpTokenOptions;
-        _ticketEmailTokenOptions = emails.length > 1 && emails[1].tokenOptions.isNotEmpty
+        _ticketEmailTokenOptions =
+            emails.length > 1 && emails[1].tokenOptions.isNotEmpty
             ? emails[1].tokenOptions
             : _ticketEmailTokenOptions;
         _otpSubjectController.text = emails.isNotEmpty ? emails[0].subject : '';
         _otpBodyController.text = emails.isNotEmpty ? emails[0].body : '';
-        _ticketSubjectController.text = emails.length > 1 ? emails[1].subject : '';
+        _ticketSubjectController.text = emails.length > 1
+            ? emails[1].subject
+            : '';
         _ticketBodyController.text = emails.length > 1 ? emails[1].body : '';
         _isLoading = false;
       });
@@ -145,7 +150,9 @@ class _TicketTemplateScreenState extends State<TicketTemplateScreen> {
 
   void _showMessage(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   List<TicketTemplateElementModel> _requiredElements() => const [
@@ -251,10 +258,7 @@ class _TicketTemplateScreenState extends State<TicketTemplateScreen> {
   }
 
   List<String> get _availableTicketTokens {
-    final usedTokens = _elements
-        .map(_elementToken)
-        .whereType<String>()
-        .toSet();
+    final usedTokens = _elements.map(_elementToken).whereType<String>().toSet();
     return _ticketPaletteTokens
         .where((token) => !usedTokens.contains(token))
         .toList();
@@ -323,12 +327,14 @@ class _TicketTemplateScreenState extends State<TicketTemplateScreen> {
       return;
     }
     setState(() => _isSavingTicket = true);
+    var saved = false;
     try {
       await _eventService.saveTicketTemplate(
         widget.eventId,
         mode: _customMode ? 'custom' : 'default',
         elements: _customMode ? _elements : const [],
       );
+      saved = true;
       _showMessage('Template tiket berhasil disimpan.');
     } on EventTemplateException catch (error) {
       _showMessage(error.message);
@@ -336,6 +342,60 @@ class _TicketTemplateScreenState extends State<TicketTemplateScreen> {
       _showMessage('Template tiket belum dapat disimpan. Silakan coba lagi.');
     } finally {
       if (mounted) setState(() => _isSavingTicket = false);
+    }
+
+    if (saved && widget.isFirstSetup && mounted) {
+      await _showPublicationDecision();
+    }
+  }
+
+  Future<void> _showPublicationDecision() async {
+    final decision = await showDialog<_PublicationDecision>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Acara siap dipublikasikan'),
+        content: const Text(
+          'Acara sudah tersimpan. Anda dapat mempublikasikannya sekarang atau melanjutkan sebagai draft.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () =>
+                Navigator.of(dialogContext).pop(_PublicationDecision.later),
+            child: const Text('Nanti Saja'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(
+              dialogContext,
+            ).pop(_PublicationDecision.publishNow),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.black,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Publikasikan Sekarang'),
+          ),
+        ],
+      ),
+    );
+
+    if (!mounted || decision == null) return;
+    if (decision == _PublicationDecision.later) {
+      context.pushReplacement('/event-detail/${widget.eventId}');
+      return;
+    }
+
+    setState(() => _isPublishing = true);
+    try {
+      await _eventService.updateEvent(widget.eventId, {'status': 'Published'});
+      if (!mounted) return;
+      context.pushReplacement('/access-management/${widget.eventId}');
+    } catch (_) {
+      if (!mounted) return;
+      _showMessage(
+        'Acara belum dapat dipublikasikan. Periksa koneksi lalu coba lagi.',
+      );
+    } finally {
+      if (mounted) setState(() => _isPublishing = false);
     }
   }
 
@@ -386,7 +446,9 @@ class _TicketTemplateScreenState extends State<TicketTemplateScreen> {
         subject: _emailSubjectController(kind).text,
         body: _emailBodyController(kind).text,
       );
-      _showMessage('Template bawaan digunakan untuk email ${kind == 'otp' ? 'OTP' : 'ticket'}.');
+      _showMessage(
+        'Template bawaan digunakan untuk email ${kind == 'otp' ? 'OTP' : 'ticket'}.',
+      );
     } on EventTemplateException catch (error) {
       if (mounted) setState(() => _setEmailActive(kind, previous));
       _showMessage(error.message);
@@ -420,7 +482,9 @@ class _TicketTemplateScreenState extends State<TicketTemplateScreen> {
         subject: _emailSubjectController(kind).text,
         body: _emailBodyController(kind).text,
       );
-      _showMessage('Template email ${kind == 'otp' ? 'OTP' : 'ticket'} berhasil disimpan.');
+      _showMessage(
+        'Template email ${kind == 'otp' ? 'OTP' : 'ticket'} berhasil disimpan.',
+      );
     } on EventTemplateException catch (error) {
       _showMessage(error.message);
     } catch (_) {
@@ -492,25 +556,24 @@ class _TicketTemplateScreenState extends State<TicketTemplateScreen> {
                       final elementWidth = isQr
                           ? math.min(rawWidth, rawHeight)
                           : rawWidth;
-                      final elementHeight = isQr
-                          ? elementWidth
-                          : rawHeight;
+                      final elementHeight = isQr ? elementWidth : rawHeight;
                       final selected = index == _selectedElementIndex;
                       return Positioned(
-                        left: element.x * width +
+                        left:
+                            element.x * width +
                             (isQr ? (rawWidth - elementWidth) / 2 : 0),
-                        top: element.y * height +
+                        top:
+                            element.y * height +
                             (isQr ? (rawHeight - elementHeight) / 2 : 0),
                         width: elementWidth,
                         height: elementHeight,
                         child: GestureDetector(
-                          onTap: () => setState(() => _selectedElementIndex = index),
-                          onPanStart: (_) => setState(() => _selectedElementIndex = index),
-                          onPanUpdate: (details) => _moveElement(
-                            index,
-                            details,
-                            Size(width, height),
-                          ),
+                          onTap: () =>
+                              setState(() => _selectedElementIndex = index),
+                          onPanStart: (_) =>
+                              setState(() => _selectedElementIndex = index),
+                          onPanUpdate: (details) =>
+                              _moveElement(index, details, Size(width, height)),
                           child: Container(
                             alignment: Alignment.center,
                             padding: EdgeInsets.all(isQr ? 4 : 3),
@@ -520,7 +583,9 @@ class _TicketTemplateScreenState extends State<TicketTemplateScreen> {
                                   : Colors.white.withValues(alpha: 0.82),
                               border: selected
                                   ? Border.all(
-                                      color: Colors.black.withValues(alpha: 0.45),
+                                      color: Colors.black.withValues(
+                                        alpha: 0.45,
+                                      ),
                                       width: 1,
                                     )
                                   : null,
@@ -529,7 +594,10 @@ class _TicketTemplateScreenState extends State<TicketTemplateScreen> {
                             child: isQr
                                 ? const FittedBox(
                                     fit: BoxFit.contain,
-                                    child: Icon(Icons.qr_code_2, color: Colors.black),
+                                    child: Icon(
+                                      Icons.qr_code_2,
+                                      color: Colors.black,
+                                    ),
                                   )
                                 : Text(
                                     _elementLabel(element),
@@ -538,7 +606,10 @@ class _TicketTemplateScreenState extends State<TicketTemplateScreen> {
                                     style: TextStyle(
                                       color: Colors.black,
                                       fontWeight: FontWeight.w700,
-                                      fontSize: _previewFontSize(element, height),
+                                      fontSize: _previewFontSize(
+                                        element,
+                                        height,
+                                      ),
                                     ),
                                   ),
                           ),
@@ -554,7 +625,10 @@ class _TicketTemplateScreenState extends State<TicketTemplateScreen> {
     );
   }
 
-  double _previewFontSize(TicketTemplateElementModel element, double canvasHeight) {
+  double _previewFontSize(
+    TicketTemplateElementModel element,
+    double canvasHeight,
+  ) {
     final scale = switch (element.fontSize) {
       'small' => 0.5,
       'large' => 0.9,
@@ -821,13 +895,17 @@ class _TicketTemplateScreenState extends State<TicketTemplateScreen> {
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
-                    onPressed: _isSavingTicket ? null : _saveTicketTemplate,
+                    onPressed: _isSavingTicket || _isPublishing
+                        ? null
+                        : _saveTicketTemplate,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.black,
                       foregroundColor: Colors.white,
                     ),
                     child: Text(
-                      _isSavingTicket
+                      _isPublishing
+                          ? 'Mempublikasikan...'
+                          : _isSavingTicket
                           ? 'Menyimpan...'
                           : 'Simpan Template Tiket',
                     ),
@@ -847,7 +925,8 @@ class _TicketTemplateScreenState extends State<TicketTemplateScreen> {
             _buildEmailEditor(
               kind: 'ticket',
               title: 'Email Ticket / Persetujuan',
-              description: 'Dikirim setelah peserta Manual Review diterima dan ticket tersedia.',
+              description:
+                  'Dikirim setelah peserta Manual Review diterima dan ticket tersedia.',
             ),
           ],
         ],
