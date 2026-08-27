@@ -8,6 +8,48 @@ export const runtime = 'nodejs';
 
 const EVENT_STATUSES = new Set(['Draft', 'Published', 'Cancelled']);
 const EVENT_SORTS = new Set(['date_desc', 'date_asc', 'created_desc', 'created_asc']);
+const POSTGRES_ERROR_CODE_PATTERN = /^[0-9A-Z]{5}$/;
+
+function findPostgresErrorCode(error: unknown, visited = new Set<unknown>()): string | undefined {
+  if (typeof error !== 'object' || error === null || visited.has(error)) return undefined;
+  visited.add(error);
+
+  const candidate = error as { code?: unknown; cause?: unknown };
+  if (typeof candidate.code === 'string' && POSTGRES_ERROR_CODE_PATTERN.test(candidate.code)) {
+    return candidate.code;
+  }
+  return findPostgresErrorCode(candidate.cause, visited);
+}
+
+function catalogFailureResponse(request: Request, error: unknown) {
+  const databaseCode = findPostgresErrorCode(error);
+  const requestId = request.headers.get('x-vercel-id');
+
+  if (databaseCode) {
+    console.error('event_catalog_database_failure', { requestId, databaseCode });
+    return NextResponse.json(
+      {
+        status: 'error',
+        code: 'EVENT_CATALOG_UNAVAILABLE',
+        message: 'Daftar acara sementara tidak tersedia. Silakan coba lagi.',
+      },
+      { status: 503 },
+    );
+  }
+
+  console.error('event_catalog_failure', {
+    requestId,
+    errorName: error instanceof Error ? error.name : typeof error,
+  });
+  return NextResponse.json(
+    {
+      status: 'error',
+      code: 'EVENT_CATALOG_FAILED',
+      message: 'Daftar acara sementara tidak tersedia. Silakan coba lagi.',
+    },
+    { status: 500 },
+  );
+}
 
 function readPositiveInteger(value: string | null, fallback: number, maximum: number) {
   if (value === null) return fallback;
@@ -189,11 +231,7 @@ export async function GET(req: Request) {
         has_next_page: page * limit < total,
       },
     });
-  } catch (error: any) {
-    console.error('Error fetching events:', error);
-    return NextResponse.json(
-      { status: 'error', message: 'Internal server error' },
-      { status: 500 }
-    );
+  } catch (error: unknown) {
+    return catalogFailureResponse(req, error);
   }
 }

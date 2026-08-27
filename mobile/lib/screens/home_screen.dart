@@ -8,14 +8,16 @@ import '../widgets/adaptive_event_image.dart';
 import 'package:intl/intl.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  const HomeScreen({super.key, this.eventService});
+
+  final EventService? eventService;
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  final EventService _eventService = EventService();
+  late final EventService _eventService;
   List<EventModel> _events = [];
   bool _isLoading = false;
   bool _isFetchingMore = false;
@@ -23,12 +25,14 @@ class _HomeScreenState extends State<HomeScreen> {
   int _page = 0;
   String _searchQuery = '';
   String _sortOrder = 'newest'; // 'newest' | 'oldest'
+  String? _loadError;
   final ScrollController _scrollController = ScrollController();
   Timer? _searchDebounce;
 
   @override
   void initState() {
     super.initState();
+    _eventService = widget.eventService ?? EventService();
     _loadEvents();
     _scrollController.addListener(_loadMoreWhenNeeded);
   }
@@ -65,6 +69,7 @@ class _HomeScreenState extends State<HomeScreen> {
       setState(() {
         if (reset) {
           _events = result.events;
+          _loadError = null;
         } else {
           final knownIds = _events.map((event) => event.id).toSet();
           _events.addAll(
@@ -76,15 +81,21 @@ class _HomeScreenState extends State<HomeScreen> {
         _isLoading = false;
         _isFetchingMore = false;
       });
-    } catch (e) {
+    } catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Error: $e')));
+      final message = error is EventCatalogException
+          ? error.message
+          : 'Daftar acara belum dapat dimuat.';
       setState(() {
+        _loadError = message;
         _isLoading = false;
         _isFetchingMore = false;
       });
+      if (!reset && _events.isNotEmpty) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(message)));
+      }
     }
   }
 
@@ -150,7 +161,7 @@ class _HomeScreenState extends State<HomeScreen> {
           child: Container(color: outlineVariantColor, height: 1.0),
         ),
       ),
-      body: _isLoading
+      body: _isLoading && _events.isEmpty
           ? const Center(child: CircularProgressIndicator(color: primaryColor))
           : Column(
               children: [
@@ -238,20 +249,66 @@ class _HomeScreenState extends State<HomeScreen> {
                     onRefresh: () => _loadEvents(),
                     color: primaryColor,
                     child: _events.isEmpty
-                        ? ListView(
-                            physics: const AlwaysScrollableScrollPhysics(),
-                            children: const [
-                              SizedBox(height: 200),
-                              Center(
-                                child: Text(
-                                  'Belum ada acara. Silakan buat baru.',
-                                  style: TextStyle(
-                                    color: onSurfaceVariantColor,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          )
+                        ? _loadError != null
+                              ? ListView(
+                                  physics:
+                                      const AlwaysScrollableScrollPhysics(),
+                                  children: [
+                                    const SizedBox(height: 160),
+                                    const Icon(
+                                      Icons.cloud_off_outlined,
+                                      size: 40,
+                                      color: outlineColor,
+                                    ),
+                                    const SizedBox(height: 16),
+                                    const Center(
+                                      child: Text(
+                                        'Daftar acara belum dapat dimuat',
+                                        style: TextStyle(
+                                          color: onSurfaceColor,
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 36,
+                                      ),
+                                      child: Text(
+                                        _loadError!,
+                                        textAlign: TextAlign.center,
+                                        style: const TextStyle(
+                                          color: onSurfaceVariantColor,
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 16),
+                                    Center(
+                                      child: OutlinedButton.icon(
+                                        onPressed: _loadEvents,
+                                        icon: const Icon(Icons.refresh),
+                                        label: const Text('Coba lagi'),
+                                      ),
+                                    ),
+                                  ],
+                                )
+                              : ListView(
+                                  physics:
+                                      const AlwaysScrollableScrollPhysics(),
+                                  children: const [
+                                    SizedBox(height: 200),
+                                    Center(
+                                      child: Text(
+                                        'Belum ada acara. Silakan buat baru.',
+                                        style: TextStyle(
+                                          color: onSurfaceVariantColor,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                )
                         : ListView.builder(
                             controller: _scrollController,
                             physics: const AlwaysScrollableScrollPhysics(),

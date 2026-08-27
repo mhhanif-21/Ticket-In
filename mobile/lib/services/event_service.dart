@@ -20,6 +20,21 @@ class EventMediaUploadException implements Exception {
   String toString() => message;
 }
 
+class EventCatalogException implements Exception {
+  final String message;
+  final int statusCode;
+  final bool isRetryable;
+
+  const EventCatalogException(
+    this.message, {
+    required this.statusCode,
+    required this.isRetryable,
+  });
+
+  @override
+  String toString() => message;
+}
+
 class EventPage {
   const EventPage({
     required this.events,
@@ -86,9 +101,23 @@ class EventService {
         hasNextPage:
             meta['has_next_page'] == true || parsedPage * parsedLimit < total,
       );
-    } else {
-      throw Exception('Failed to load events');
     }
+
+    final serviceMessage = _messageFromResponse(response.body, '');
+    final isServerFailure = response.statusCode >= 500;
+    final message = isServerFailure || serviceMessage == 'Internal server error'
+        ? 'Daftar acara sementara tidak tersedia. Silakan coba lagi.'
+        : serviceMessage.isNotEmpty
+        ? serviceMessage
+        : 'Daftar acara belum dapat dimuat.';
+    throw EventCatalogException(
+      message,
+      statusCode: response.statusCode,
+      isRetryable:
+          response.statusCode == 408 ||
+          response.statusCode == 429 ||
+          response.statusCode >= 500,
+    );
   }
 
   Future<EventModel> getEventDetail(String id) async {
