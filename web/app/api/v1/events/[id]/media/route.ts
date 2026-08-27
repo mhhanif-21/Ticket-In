@@ -59,7 +59,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       return NextResponse.json({ status: 'error', code: 'MEDIA_UPLOAD_FAILED', message: error.message }, { status: 502 });
     }
 
-    console.error('Event media route failed', { error: error instanceof Error ? error.name : 'unknown' });
-    return NextResponse.json({ status: 'error', message: 'Internal server error' }, { status: 500 });
+    console.error('event_media_unavailable', { errorName: error instanceof Error ? error.name : 'unknown' });
+    return NextResponse.json({
+      status: 'error',
+      code: 'MEDIA_UPLOAD_UNAVAILABLE',
+      message: 'Media acara sementara tidak tersedia. Silakan coba lagi.',
+    }, { status: 503 });
   }
 }

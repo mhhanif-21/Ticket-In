@@ -1,6 +1,11 @@
+import 'dart:typed_data';
+import 'dart:ui' as ui;
 import 'dart:io';
 
 const int maxEventImageBytes = 5 * 1024 * 1024;
+const int maxEventImageDimension = 8192;
+const int maxEventImagePixels = 20000000;
+const int maxEventGalleryImages = 5;
 
 Future<String?> validateEventImageFile(File file) async {
   final fileSize = await file.length();
@@ -13,7 +18,45 @@ Future<String?> validateEventImageFile(File file) async {
     return 'Format ${file.uri.pathSegments.last} tidak didukung. Gunakan JPG, PNG, atau WebP.';
   }
 
+  final bytes = await file.readAsBytes();
+  final imageError = await validateEventImageBytes(bytes);
+  if (imageError != null) return '${file.uri.pathSegments.last}: $imageError';
+
   return null;
+}
+
+Future<String?> validateEventImageBytes(Uint8List bytes) async {
+  try {
+    final codec = await ui.instantiateImageCodec(bytes);
+    try {
+      final frame = await codec.getNextFrame();
+      final image = frame.image;
+      final pixelCount = image.width * image.height;
+      try {
+        if (image.width > maxEventImageDimension ||
+            image.height > maxEventImageDimension ||
+            pixelCount > maxEventImagePixels) {
+          return 'Dimensi gambar terlalu besar. Maksimal 8192 px per sisi dan 20 megapiksel.';
+        }
+      } finally {
+        image.dispose();
+      }
+    } finally {
+      codec.dispose();
+    }
+  } catch (_) {
+    return 'Isi berkas bukan gambar yang valid.';
+  }
+  return null;
+}
+
+String eventImageFileIdentity(File file) => file.absolute.path;
+
+List<File> uniqueEventImageFiles(Iterable<File> files) {
+  final identities = <String>{};
+  return files
+      .where((file) => identities.add(eventImageFileIdentity(file)))
+      .toList();
 }
 
 Future<bool> hasSupportedPosterSignature(File file) async {

@@ -51,6 +51,27 @@ function catalogFailureResponse(request: Request, error: unknown) {
   );
 }
 
+function eventCreationFailureResponse(request: Request, error: unknown) {
+  const databaseCode = findPostgresErrorCode(error);
+  const requestId = request.headers.get('x-vercel-id');
+  const body = {
+    status: 'error',
+    code: databaseCode ? 'EVENT_CREATE_UNAVAILABLE' : 'EVENT_CREATE_FAILED',
+    message: 'Acara belum dapat dibuat. Silakan coba lagi.',
+  };
+
+  if (databaseCode) {
+    console.error('event_creation_database_failure', { requestId, databaseCode });
+    return NextResponse.json(body, { status: 503 });
+  }
+
+  console.error('event_creation_failure', {
+    requestId,
+    errorName: error instanceof Error ? error.name : typeof error,
+  });
+  return NextResponse.json(body, { status: 500 });
+}
+
 function readPositiveInteger(value: string | null, fallback: number, maximum: number) {
   if (value === null) return fallback;
   if (!/^\d+$/.test(value)) return null;
@@ -158,11 +179,7 @@ export async function POST(req: Request) {
         { status: 422 },
       );
     }
-    console.error('Error creating event:', error);
-    return NextResponse.json(
-      { status: 'error', message: 'Internal server error' },
-      { status: 500 }
-    );
+    return eventCreationFailureResponse(req, error);
   }
 }
 

@@ -20,6 +20,23 @@ class EventMediaUploadException implements Exception {
   String toString() => message;
 }
 
+class EventCreationException implements Exception {
+  final String message;
+  final int statusCode;
+  final bool isRetryable;
+  final bool metadataPersisted;
+
+  const EventCreationException(
+    this.message, {
+    required this.statusCode,
+    required this.isRetryable,
+    this.metadataPersisted = false,
+  });
+
+  @override
+  String toString() => message;
+}
+
 class EventCatalogException implements Exception {
   final String message;
   final int statusCode;
@@ -166,14 +183,22 @@ class EventService {
         }
       }
       return id;
-    } else {
-      throw EventMediaUploadException(
-        _messageFromResponse(
-          createResponse.body,
-          'Acara belum dapat dibuat. Silakan coba lagi.',
-        ),
-      );
     }
+
+    final serviceMessage = _messageFromResponse(createResponse.body, '');
+    final isServerFailure = createResponse.statusCode >= 500;
+    throw EventCreationException(
+      isServerFailure || serviceMessage == 'Internal server error'
+          ? 'Acara belum dapat dibuat. Silakan coba lagi.'
+          : serviceMessage.isNotEmpty
+          ? serviceMessage
+          : 'Acara belum dapat dibuat. Silakan coba lagi.',
+      statusCode: createResponse.statusCode,
+      isRetryable:
+          createResponse.statusCode == 408 ||
+          createResponse.statusCode == 429 ||
+          createResponse.statusCode >= 500,
+    );
   }
 
   String _generateIdempotencyKey() {
