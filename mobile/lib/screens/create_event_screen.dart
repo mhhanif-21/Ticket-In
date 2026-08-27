@@ -15,11 +15,15 @@ class CreateEventScreen extends StatefulWidget {
     this.eventService,
     this.initialPosterFile,
     this.initialGalleryFiles = const [],
+    this.galleryPicker,
+    this.imageValidator,
   });
 
   final EventService? eventService;
   final File? initialPosterFile;
   final List<File> initialGalleryFiles;
+  final Future<List<XFile>> Function()? galleryPicker;
+  final Future<String?> Function(File file)? imageValidator;
 
   @override
   State<CreateEventScreen> createState() => _CreateEventScreenState();
@@ -28,7 +32,7 @@ class CreateEventScreen extends StatefulWidget {
 class _CreateEventScreenState extends State<CreateEventScreen> {
   final _formKey = GlobalKey<FormState>();
   late final EventService _eventService;
-  final _galleryPageController = PageController();
+  final _mediaPageController = PageController();
 
   final _nameController = TextEditingController();
   final _locationController = TextEditingController();
@@ -44,8 +48,11 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
   late final String _idempotencyKey;
   String? _pendingMediaEventId;
   bool _isLoading = false;
-  int _activeGalleryIndex = 0;
+  int _activeMediaIndex = 0;
   String _registrationMode = 'Auto-Accept';
+
+  int? get _activeGalleryIndex =>
+      _activeMediaIndex == 0 ? null : _activeMediaIndex - 1;
 
   // [MOB-BUG-005] FIX: Dispose controllers untuk mencegah memory leak
   @override
@@ -68,7 +75,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
 
   @override
   void dispose() {
-    _galleryPageController.dispose();
+    _mediaPageController.dispose();
     _nameController.dispose();
     _locationController.dispose();
     _capacityController.dispose();
@@ -111,7 +118,8 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
     if (!mounted) return;
     if (picked != null) {
       final file = File(picked.path);
-      final validationError = await validateEventImageFile(file);
+      final validationError =
+          await (widget.imageValidator ?? validateEventImageFile)(file);
       if (!mounted) return;
       if (validationError != null) {
         setState(() => _posterError = validationError);
@@ -122,12 +130,13 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
         _posterFile = file;
         _posterError = null;
       });
+      _moveToMediaPage(0);
     }
   }
 
   Future<void> _pickGalleryImages() async {
-    final picker = ImagePicker();
-    final pickedImages = await picker.pickMultiImage();
+    final pickedImages =
+        await (widget.galleryPicker?.call() ?? ImagePicker().pickMultiImage());
     if (!mounted) return;
     if (pickedImages.isEmpty) return;
 
@@ -155,7 +164,8 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
     }
 
     for (final file in selectedFiles) {
-      final validationError = await validateEventImageFile(file);
+      final validationError =
+          await (widget.imageValidator ?? validateEventImageFile)(file);
       if (!mounted) return;
       if (validationError != null) {
         setState(() => _galleryError = validationError);
@@ -163,12 +173,13 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
       }
     }
 
+    final firstNewGalleryIndex = _galleryFiles.length;
     setState(() {
       _galleryFiles.addAll(selectedFiles);
       _galleryError = null;
-      _activeGalleryIndex = _galleryFiles.length - selectedFiles.length;
+      _activeMediaIndex = firstNewGalleryIndex + 1;
     });
-    _moveToGalleryPage(_activeGalleryIndex);
+    _moveToMediaPage(_activeMediaIndex);
   }
 
   bool _validateMediaSelection() {
@@ -293,15 +304,13 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
     }
   }
 
-  void _moveToGalleryPage(int index) {
+  void _moveToMediaPage(int index) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted ||
-          !_galleryPageController.hasClients ||
-          _galleryFiles.isEmpty) {
+      if (!mounted || !_mediaPageController.hasClients) {
         return;
       }
-      _galleryPageController.animateToPage(
-        index.clamp(0, _galleryFiles.length - 1),
+      _mediaPageController.animateToPage(
+        index.clamp(0, _galleryFiles.length).toInt(),
         duration: const Duration(milliseconds: 180),
         curve: Curves.easeOut,
       );
@@ -309,26 +318,33 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
   }
 
   void _removeGalleryAt(int index) {
+    if (index < 0 || index >= _galleryFiles.length) return;
+    final removedMediaIndex = index + 1;
     setState(() {
       _galleryFiles.removeAt(index);
-      _activeGalleryIndex = _galleryFiles.isEmpty
-          ? 0
-          : _activeGalleryIndex.clamp(0, _galleryFiles.length - 1);
+      if (_activeMediaIndex > removedMediaIndex) {
+        _activeMediaIndex -= 1;
+      }
+      _activeMediaIndex = _activeMediaIndex
+          .clamp(0, _galleryFiles.length)
+          .toInt();
       _galleryError = null;
     });
-    _moveToGalleryPage(_activeGalleryIndex);
+    _moveToMediaPage(_activeMediaIndex);
   }
 
   void _moveGallery(int offset) {
-    final destination = _activeGalleryIndex + offset;
+    final activeGalleryIndex = _activeGalleryIndex;
+    if (activeGalleryIndex == null) return;
+    final destination = activeGalleryIndex + offset;
     if (destination < 0 || destination >= _galleryFiles.length) return;
 
     setState(() {
-      final image = _galleryFiles.removeAt(_activeGalleryIndex);
+      final image = _galleryFiles.removeAt(activeGalleryIndex);
       _galleryFiles.insert(destination, image);
-      _activeGalleryIndex = destination;
+      _activeMediaIndex = destination + 1;
     });
-    _moveToGalleryPage(destination);
+    _moveToMediaPage(_activeMediaIndex);
   }
 
   Future<void> _showImagePreview(File image, String title) async {
@@ -349,10 +365,184 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
     );
   }
 
-  Widget _buildPosterSection() {
+  Widget _buildPosterPlaceholder() {
     const primaryContainerColor = Color(0xFFE5E2E1);
-    final poster = _posterFile;
+    return CustomPaint(
+      painter: DashedBorderPainter(
+        color: primaryContainerColor,
+        strokeWidth: 2,
+        borderRadius: 10,
+      ),
+      child: Container(
+        width: double.infinity,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: const Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.add_photo_alternate_outlined,
+              size: 40,
+              color: primaryContainerColor,
+            ),
+            SizedBox(height: 8),
+            Text(
+              'Unggah Poster Acara',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF444748),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
+  Widget _buildMediaCarousel() {
+    final mediaCount = _galleryFiles.length + 1;
+
+    return Column(
+      children: [
+        SizedBox(
+          key: const ValueKey('event-poster-preview'),
+          height: 260,
+          width: double.infinity,
+          child: PageView.builder(
+            controller: _mediaPageController,
+            itemCount: mediaCount,
+            onPageChanged: (index) {
+              if (mounted) setState(() => _activeMediaIndex = index);
+            },
+            itemBuilder: (context, index) {
+              final isPoster = index == 0;
+              final galleryIndex = index - 1;
+              final image = isPoster
+                  ? _posterFile
+                  : _galleryFiles[galleryIndex];
+              final title = isPoster
+                  ? 'Poster Acara'
+                  : 'Foto Galeri ${galleryIndex + 1}';
+
+              return Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 2),
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    Semantics(
+                      button: true,
+                      label: image == null
+                          ? 'Unggah poster acara'
+                          : 'Lihat $title layar penuh',
+                      child: InkWell(
+                        onTap: image == null
+                            ? _pickImage
+                            : () => _showImagePreview(image, title),
+                        borderRadius: BorderRadius.circular(10),
+                        child: image == null
+                            ? _buildPosterPlaceholder()
+                            : AdaptiveEventImage(
+                                image: FileImage(image),
+                                frameAspectRatio: 4 / 3,
+                                expand: true,
+                                blurredBackdrop: true,
+                                backgroundColor: Colors.white,
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                      ),
+                    ),
+                    if (isPoster)
+                      Positioned(
+                        right: 8,
+                        bottom: 8,
+                        child: FilledButton.tonalIcon(
+                          onPressed: _pickImage,
+                          icon: Icon(
+                            image == null
+                                ? Icons.add_photo_alternate_outlined
+                                : Icons.edit_outlined,
+                          ),
+                          label: Text(image == null ? 'Unggah' : 'Ganti'),
+                        ),
+                      )
+                    else
+                      Positioned(
+                        right: 8,
+                        top: 8,
+                        child: IconButton.filledTonal(
+                          key: ValueKey('gallery-remove-$galleryIndex'),
+                          tooltip: 'Hapus foto galeri ${galleryIndex + 1}',
+                          onPressed: () => _removeGalleryAt(galleryIndex),
+                          icon: const Icon(Icons.close),
+                        ),
+                      ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: List.generate(
+            mediaCount,
+            (index) => AnimatedContainer(
+              key: ValueKey('event-media-dot-$index'),
+              duration: const Duration(milliseconds: 150),
+              margin: const EdgeInsets.symmetric(horizontal: 3),
+              width: index == _activeMediaIndex ? 18 : 7,
+              height: 7,
+              decoration: BoxDecoration(
+                color: index == _activeMediaIndex
+                    ? Colors.black
+                    : const Color(0xFFC4C7C7),
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+          ),
+        ),
+        if (_galleryFiles.isNotEmpty) ...[
+          const SizedBox(height: 4),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              IconButton(
+                key: const ValueKey('gallery-move-previous'),
+                tooltip: 'Pindahkan foto ke kiri',
+                onPressed:
+                    _activeGalleryIndex == null || _activeGalleryIndex == 0
+                    ? null
+                    : () => _moveGallery(-1),
+                icon: const Icon(Icons.arrow_back),
+              ),
+              Text(
+                _activeGalleryIndex == null
+                    ? 'Poster'
+                    : 'Galeri ${_activeGalleryIndex! + 1} dari ${_galleryFiles.length}',
+                style: const TextStyle(fontSize: 12, color: Color(0xFF5F6368)),
+              ),
+              IconButton(
+                key: const ValueKey('gallery-move-next'),
+                tooltip: 'Pindahkan foto ke kanan',
+                onPressed:
+                    _activeGalleryIndex == null ||
+                        _activeGalleryIndex == _galleryFiles.length - 1
+                    ? null
+                    : () => _moveGallery(1),
+                icon: const Icon(Icons.arrow_forward),
+              ),
+            ],
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildPosterSection() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -370,80 +560,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
           style: TextStyle(fontSize: 12, color: Color(0xFF5F6368)),
         ),
         const SizedBox(height: 8),
-        if (poster == null)
-          GestureDetector(
-            onTap: _pickImage,
-            child: CustomPaint(
-              painter: DashedBorderPainter(
-                color: primaryContainerColor,
-                strokeWidth: 2,
-                borderRadius: 10,
-              ),
-              child: Container(
-                width: double.infinity,
-                height: 180,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.add_photo_alternate_outlined,
-                      size: 40,
-                      color: primaryContainerColor,
-                    ),
-                    SizedBox(height: 8),
-                    Text(
-                      'Unggah Poster Acara',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFF444748),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          )
-        else
-          SizedBox(
-            key: const ValueKey('event-poster-preview'),
-            height: 260,
-            width: double.infinity,
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                Semantics(
-                  button: true,
-                  label: 'Lihat poster layar penuh',
-                  child: InkWell(
-                    onTap: () => _showImagePreview(poster, 'Poster Acara'),
-                    borderRadius: BorderRadius.circular(10),
-                    child: AdaptiveEventImage(
-                      image: FileImage(poster),
-                      frameAspectRatio: 4 / 3,
-                      expand: true,
-                      blurredBackdrop: true,
-                      backgroundColor: Colors.white,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                ),
-                Positioned(
-                  right: 8,
-                  bottom: 8,
-                  child: FilledButton.tonalIcon(
-                    onPressed: _pickImage,
-                    icon: const Icon(Icons.edit_outlined),
-                    label: const Text('Ganti'),
-                  ),
-                ),
-              ],
-            ),
-          ),
+        _buildMediaCarousel(),
         if (_posterError != null) ...[
           const SizedBox(height: 8),
           Text(
@@ -487,121 +604,6 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
           Text(
             _galleryError!,
             style: const TextStyle(color: Color(0xFFBA1A1A), fontSize: 12),
-          ),
-        ],
-        if (galleryCount > 0) ...[
-          const SizedBox(height: 12),
-          SizedBox(
-            height: 208,
-            child: PageView.builder(
-              controller: _galleryPageController,
-              itemCount: galleryCount,
-              onPageChanged: (index) {
-                if (mounted) setState(() => _activeGalleryIndex = index);
-              },
-              itemBuilder: (context, index) {
-                final image = _galleryFiles[index];
-                return Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 2),
-                  child: Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      InkWell(
-                        onTap: () => _showImagePreview(
-                          image,
-                          'Foto Galeri ${index + 1}',
-                        ),
-                        borderRadius: BorderRadius.circular(10),
-                        child: AdaptiveEventImage(
-                          image: FileImage(image),
-                          frameAspectRatio: 16 / 10,
-                          expand: true,
-                          blurredBackdrop: true,
-                          backgroundColor: Colors.white,
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                      ),
-                      Positioned(
-                        right: 8,
-                        top: 8,
-                        child: IconButton.filledTonal(
-                          key: ValueKey('gallery-remove-$index'),
-                          tooltip: 'Hapus foto galeri ${index + 1}',
-                          onPressed: () => _removeGalleryAt(index),
-                          icon: const Icon(Icons.close),
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              },
-            ),
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              IconButton(
-                key: const ValueKey('gallery-move-previous'),
-                tooltip: 'Pindahkan foto ke kiri',
-                onPressed: _activeGalleryIndex == 0
-                    ? null
-                    : () => _moveGallery(-1),
-                icon: const Icon(Icons.arrow_back),
-              ),
-              Expanded(
-                child: SizedBox(
-                  height: 56,
-                  child: ListView.separated(
-                    scrollDirection: Axis.horizontal,
-                    itemCount: galleryCount,
-                    separatorBuilder: (_, _) => const SizedBox(width: 8),
-                    itemBuilder: (context, index) {
-                      final selected = index == _activeGalleryIndex;
-                      return Semantics(
-                        button: true,
-                        label: 'Foto galeri ${index + 1}',
-                        child: InkWell(
-                          onTap: () {
-                            setState(() => _activeGalleryIndex = index);
-                            _moveToGalleryPage(index);
-                          },
-                          borderRadius: BorderRadius.circular(6),
-                          child: Container(
-                            width: 72,
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(6),
-                              border: Border.all(
-                                color: selected
-                                    ? Colors.black
-                                    : const Color(0xFFC4C7C7),
-                                width: selected ? 2 : 1,
-                              ),
-                            ),
-                            clipBehavior: Clip.antiAlias,
-                            child: Image.file(
-                              _galleryFiles[index],
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, _, _) => const ColoredBox(
-                                color: Color(0xFFE5E2E1),
-                                child: Icon(Icons.broken_image_outlined),
-                              ),
-                            ),
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                ),
-              ),
-              IconButton(
-                key: const ValueKey('gallery-move-next'),
-                tooltip: 'Pindahkan foto ke kanan',
-                onPressed: _activeGalleryIndex == galleryCount - 1
-                    ? null
-                    : () => _moveGallery(1),
-                icon: const Icon(Icons.arrow_forward),
-              ),
-            ],
           ),
         ],
       ],

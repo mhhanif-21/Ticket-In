@@ -57,17 +57,33 @@ function wait(milliseconds: number): Promise<void> {
 }
 
 async function verifyLifecycleSchema(): Promise<void> {
+  const requiredEventColumns = [
+    'status',
+    'creation_key',
+    'volunteer_session_version',
+    'form_version',
+  ];
   const columns = await client.unsafe<SchemaRow[]>(`
     SELECT column_name
     FROM information_schema.columns
     WHERE table_schema = 'public'
       AND table_name = 'events'
-      AND column_name = 'status'
+      AND column_name IN (
+        'status',
+        'creation_key',
+        'volunteer_session_version',
+        'form_version'
+      )
   `);
 
-  if (columns.length !== 1) {
+  const presentColumns = new Set(columns.map((row) => row.column_name));
+  const missingColumns = requiredEventColumns.filter(
+    (column) => !presentColumns.has(column),
+  );
+
+  if (missingColumns.length > 0) {
     throw new Error(
-      'Migration verification failed: public.events.status is missing',
+      `Migration verification failed: public.events columns are missing: ${missingColumns.join(', ')}`,
     );
   }
 }
