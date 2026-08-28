@@ -5,7 +5,14 @@ import 'dart:io';
 const int maxEventImageBytes = 5 * 1024 * 1024;
 const int maxEventImageDimension = 8192;
 const int maxEventImagePixels = 20000000;
-const int maxEventGalleryImages = 5;
+
+/// An event has one poster collection. The first image is the primary cover
+/// when it is persisted through the legacy cover/gallery API.
+const int maxEventPosterImages = 5;
+
+// Kept as a source-compatible alias for older service/test callers. Gallery
+// is no longer a separate user-facing collection.
+const int maxEventGalleryImages = maxEventPosterImages;
 
 Future<String?> validateEventImageFile(File file) async {
   final fileSize = await file.length();

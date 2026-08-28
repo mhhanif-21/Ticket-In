@@ -229,9 +229,9 @@ class EventService {
     final coverError = await validateEventImageFile(File(coverPath));
     if (coverError != null) throw EventMediaUploadException(coverError);
 
-    if (galleryPaths.length > 5) {
+    if (galleryPaths.length > maxEventPosterImages - 1) {
       throw const EventMediaUploadException(
-        'Maksimal 5 foto galeri per acara.',
+        'Maksimal 5 poster acara, termasuk poster utama.',
       );
     }
     for (final galleryPath in galleryPaths) {
@@ -292,9 +292,9 @@ class EventService {
     List<String> galleryPaths,
   ) async {
     if (galleryPaths.isEmpty) return const [];
-    if (galleryPaths.length > 5) {
+    if (galleryPaths.length > maxEventPosterImages - 1) {
       throw const EventMediaUploadException(
-        'Maksimal 5 foto galeri per acara.',
+        'Maksimal 5 poster acara, termasuk poster utama.',
       );
     }
     for (final galleryPath in galleryPaths) {
@@ -333,9 +333,9 @@ class EventService {
     String id,
     List<String> galleryMediaIds,
   ) async {
-    if (galleryMediaIds.length > 5) {
+    if (galleryMediaIds.length > maxEventPosterImages - 1) {
       throw const EventMediaUploadException(
-        'Maksimal 5 foto galeri per acara.',
+        'Maksimal 5 poster acara, termasuk poster utama.',
       );
     }
     final response = await _apiClient.patch('/v1/events/$id/media', {

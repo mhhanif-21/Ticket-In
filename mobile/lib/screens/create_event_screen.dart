@@ -41,29 +41,26 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
   final _dateController = TextEditingController();
 
   DateTime? _selectedDate;
-  File? _posterFile;
-  final List<File> _galleryFiles = [];
+  // One user-facing collection. The first item is persisted as the legacy
+  // cover and the rest as legacy gallery rows by EventService.
+  final List<File> _posterFiles = [];
   String? _posterError;
-  String? _galleryError;
   late final String _idempotencyKey;
   String? _pendingMediaEventId;
   bool _isLoading = false;
   int _activeMediaIndex = 0;
   String _registrationMode = 'Auto-Accept';
 
-  int? get _activeGalleryIndex =>
-      _activeMediaIndex == 0 ? null : _activeMediaIndex - 1;
-
   // [MOB-BUG-005] FIX: Dispose controllers untuk mencegah memory leak
   @override
   void initState() {
     super.initState();
     _eventService = widget.eventService ?? EventService();
-    _posterFile = widget.initialPosterFile;
-    _galleryFiles.addAll(
-      uniqueEventImageFiles(
-        widget.initialGalleryFiles,
-      ).take(maxEventGalleryImages),
+    _posterFiles.addAll(
+      uniqueEventImageFiles([
+        if (widget.initialPosterFile != null) widget.initialPosterFile!,
+        ...widget.initialGalleryFiles,
+      ]).take(maxEventPosterImages),
     );
     final random = Random.secure();
     final randomPart = List.generate(
@@ -112,35 +109,13 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
     }
   }
 
-  Future<void> _pickImage() async {
-    final picker = ImagePicker();
-    final picked = await picker.pickImage(source: ImageSource.gallery);
-    if (!mounted) return;
-    if (picked != null) {
-      final file = File(picked.path);
-      final validationError =
-          await (widget.imageValidator ?? validateEventImageFile)(file);
-      if (!mounted) return;
-      if (validationError != null) {
-        setState(() => _posterError = validationError);
-        return;
-      }
-
-      setState(() {
-        _posterFile = file;
-        _posterError = null;
-      });
-      _moveToMediaPage(0);
-    }
-  }
-
-  Future<void> _pickGalleryImages() async {
+  Future<void> _pickPosterImages() async {
     final pickedImages =
         await (widget.galleryPicker?.call() ?? ImagePicker().pickMultiImage());
     if (!mounted) return;
     if (pickedImages.isEmpty) return;
 
-    final existingFiles = _galleryFiles.map(eventImageFileIdentity).toSet();
+    final existingFiles = _posterFiles.map(eventImageFileIdentity).toSet();
     final selectedFiles =
         uniqueEventImageFiles(pickedImages.map((picked) => File(picked.path)))
             .where(
@@ -149,15 +124,15 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
             .toList();
 
     if (selectedFiles.isEmpty) {
-      setState(() => _galleryError = 'Foto yang dipilih sudah ada di galeri.');
+      setState(() => _posterError = 'Foto yang dipilih sudah ada.');
       return;
     }
 
-    final remainingSlots = maxEventGalleryImages - _galleryFiles.length;
+    final remainingSlots = maxEventPosterImages - _posterFiles.length;
     if (selectedFiles.length > remainingSlots) {
       setState(
-        () => _galleryError =
-            'Maksimal $maxEventGalleryImages foto galeri tambahan. '
+        () => _posterError =
+            'Maksimal $maxEventPosterImages poster. '
             'Anda memilih ${selectedFiles.length}, sisa slot: $remainingSlots.',
       );
       return;
@@ -168,33 +143,32 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
           await (widget.imageValidator ?? validateEventImageFile)(file);
       if (!mounted) return;
       if (validationError != null) {
-        setState(() => _galleryError = validationError);
+        setState(() => _posterError = validationError);
         return;
       }
     }
 
-    final firstNewGalleryIndex = _galleryFiles.length;
+    final firstNewMediaIndex = _posterFiles.length;
     setState(() {
-      _galleryFiles.addAll(selectedFiles);
-      _galleryError = null;
-      _activeMediaIndex = firstNewGalleryIndex + 1;
+      _posterFiles.addAll(selectedFiles);
+      _posterError = null;
+      _activeMediaIndex = firstNewMediaIndex;
     });
     _moveToMediaPage(_activeMediaIndex);
   }
 
   bool _validateMediaSelection() {
-    final posterError = _posterFile == null
+    final posterError = _posterFiles.isEmpty
         ? 'Poster acara wajib diunggah.'
         : null;
-    final galleryError = _galleryFiles.length > maxEventGalleryImages
-        ? 'Maksimal $maxEventGalleryImages foto galeri tambahan.'
+    final tooManyError = _posterFiles.length > maxEventPosterImages
+        ? 'Maksimal $maxEventPosterImages poster acara.'
         : null;
 
     setState(() {
-      _posterError = posterError;
-      _galleryError = galleryError;
+      _posterError = posterError ?? tooManyError;
     });
-    return posterError == null && galleryError == null;
+    return posterError == null && tooManyError == null;
   }
 
   Future<void> _submit() async {
@@ -222,8 +196,8 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
 
       final eventId = await _eventService.createEvent(
         data,
-        posterPath: _posterFile?.path,
-        galleryPaths: _galleryFiles.map((file) => file.path).toList(),
+        posterPath: _posterFiles.first.path,
+        galleryPaths: _posterFiles.skip(1).map((file) => file.path).toList(),
         idempotencyKey: _idempotencyKey,
       );
 
@@ -274,15 +248,14 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
 
   Future<void> _retryPendingMedia() async {
     final eventId = _pendingMediaEventId;
-    final poster = _posterFile;
-    if (eventId == null || poster == null) return;
+    if (eventId == null || _posterFiles.isEmpty) return;
 
     setState(() => _isLoading = true);
     try {
       await _eventService.uploadEventMedia(
         eventId,
-        coverPath: poster.path,
-        galleryPaths: _galleryFiles.map((file) => file.path).toList(),
+        coverPath: _posterFiles.first.path,
+        galleryPaths: _posterFiles.skip(1).map((file) => file.path).toList(),
       );
       if (!mounted) return;
       setState(() => _pendingMediaEventId = null);
@@ -310,39 +283,39 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
         return;
       }
       _mediaPageController.animateToPage(
-        index.clamp(0, _galleryFiles.length).toInt(),
+        index
+            .clamp(0, _posterFiles.isEmpty ? 0 : _posterFiles.length - 1)
+            .toInt(),
         duration: const Duration(milliseconds: 180),
         curve: Curves.easeOut,
       );
     });
   }
 
-  void _removeGalleryAt(int index) {
-    if (index < 0 || index >= _galleryFiles.length) return;
-    final removedMediaIndex = index + 1;
+  void _removePosterAt(int index) {
+    if (index < 0 || index >= _posterFiles.length) return;
+    if (_posterFiles.length == 1) {
+      setState(() => _posterError = 'Minimal satu poster acara harus dipilih.');
+      return;
+    }
     setState(() {
-      _galleryFiles.removeAt(index);
-      if (_activeMediaIndex > removedMediaIndex) {
-        _activeMediaIndex -= 1;
-      }
+      _posterFiles.removeAt(index);
       _activeMediaIndex = _activeMediaIndex
-          .clamp(0, _galleryFiles.length)
+          .clamp(0, _posterFiles.length - 1)
           .toInt();
-      _galleryError = null;
+      _posterError = null;
     });
     _moveToMediaPage(_activeMediaIndex);
   }
 
-  void _moveGallery(int offset) {
-    final activeGalleryIndex = _activeGalleryIndex;
-    if (activeGalleryIndex == null) return;
-    final destination = activeGalleryIndex + offset;
-    if (destination < 0 || destination >= _galleryFiles.length) return;
+  void _movePoster(int offset) {
+    final destination = _activeMediaIndex + offset;
+    if (destination < 0 || destination >= _posterFiles.length) return;
 
     setState(() {
-      final image = _galleryFiles.removeAt(activeGalleryIndex);
-      _galleryFiles.insert(destination, image);
-      _activeMediaIndex = destination + 1;
+      final image = _posterFiles.removeAt(_activeMediaIndex);
+      _posterFiles.insert(destination, image);
+      _activeMediaIndex = destination;
     });
     _moveToMediaPage(_activeMediaIndex);
   }
@@ -403,7 +376,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
   }
 
   Widget _buildMediaCarousel() {
-    final mediaCount = _galleryFiles.length + 1;
+    final mediaCount = _posterFiles.isEmpty ? 1 : _posterFiles.length;
 
     return Column(
       children: [
@@ -418,14 +391,8 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
               if (mounted) setState(() => _activeMediaIndex = index);
             },
             itemBuilder: (context, index) {
-              final isPoster = index == 0;
-              final galleryIndex = index - 1;
-              final image = isPoster
-                  ? _posterFile
-                  : _galleryFiles[galleryIndex];
-              final title = isPoster
-                  ? 'Poster Acara'
-                  : 'Foto Galeri ${galleryIndex + 1}';
+              final image = _posterFiles.isEmpty ? null : _posterFiles[index];
+              final title = 'Poster ${index + 1}';
 
               return Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 2),
@@ -450,29 +417,14 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                               ),
                             ),
                           ),
-                    if (isPoster)
-                      Positioned(
-                        right: 8,
-                        bottom: 8,
-                        child: FilledButton.tonalIcon(
-                          key: const ValueKey('event-poster-upload'),
-                          onPressed: _pickImage,
-                          icon: Icon(
-                            image == null
-                                ? Icons.add_photo_alternate_outlined
-                                : Icons.edit_outlined,
-                          ),
-                          label: Text(image == null ? 'Unggah' : 'Ganti'),
-                        ),
-                      )
-                    else
+                    if (image != null && _posterFiles.length > 1)
                       Positioned(
                         right: 8,
                         top: 8,
                         child: IconButton.filledTonal(
-                          key: ValueKey('gallery-remove-$galleryIndex'),
-                          tooltip: 'Hapus foto galeri ${galleryIndex + 1}',
-                          onPressed: () => _removeGalleryAt(galleryIndex),
+                          key: ValueKey('event-poster-remove-$index'),
+                          tooltip: 'Hapus $title',
+                          onPressed: () => _removePosterAt(index),
                           icon: const Icon(Icons.close),
                         ),
                       ),
@@ -502,34 +454,31 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
             ),
           ),
         ),
-        if (_galleryFiles.isNotEmpty) ...[
+        if (_posterFiles.length > 1) ...[
           const SizedBox(height: 4),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               IconButton(
-                key: const ValueKey('gallery-move-previous'),
-                tooltip: 'Pindahkan foto ke kiri',
-                onPressed:
-                    _activeGalleryIndex == null || _activeGalleryIndex == 0
+                key: const ValueKey('event-poster-move-previous'),
+                tooltip: 'Pindahkan poster ke kiri',
+                onPressed: _activeMediaIndex == 0
                     ? null
-                    : () => _moveGallery(-1),
+                    : () => _movePoster(-1),
                 icon: const Icon(Icons.arrow_back),
               ),
               Text(
-                _activeGalleryIndex == null
-                    ? 'Poster'
-                    : 'Galeri ${_activeGalleryIndex! + 1} dari ${_galleryFiles.length}',
+                _activeMediaIndex == 0
+                    ? 'Poster utama'
+                    : 'Poster ${_activeMediaIndex + 1} dari ${_posterFiles.length}',
                 style: const TextStyle(fontSize: 12, color: Color(0xFF5F6368)),
               ),
               IconButton(
-                key: const ValueKey('gallery-move-next'),
-                tooltip: 'Pindahkan foto ke kanan',
-                onPressed:
-                    _activeGalleryIndex == null ||
-                        _activeGalleryIndex == _galleryFiles.length - 1
+                key: const ValueKey('event-poster-move-next'),
+                tooltip: 'Pindahkan poster ke kanan',
+                onPressed: _activeMediaIndex == _posterFiles.length - 1
                     ? null
-                    : () => _moveGallery(1),
+                    : () => _movePoster(1),
                 icon: const Icon(Icons.arrow_forward),
               ),
             ],
@@ -543,8 +492,8 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Poster Acara (Wajib)',
+        Text(
+          'Poster Acara (${_posterFiles.length}/$maxEventPosterImages)',
           style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w700,
@@ -553,60 +502,32 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
         ),
         const SizedBox(height: 4),
         const Text(
-          'JPG, PNG, atau WebP · maks. 5 MB · gambar lengkap tetap terlihat.',
+          'Wajib 1 gambar, maksimal 5 · JPG, PNG, atau WebP · maks. 5 MB.',
           style: TextStyle(fontSize: 12, color: Color(0xFF5F6368)),
         ),
         const SizedBox(height: 8),
         _buildMediaCarousel(),
         const SizedBox(height: 4),
         Text(
-          _posterFile == null
+          _posterFiles.isEmpty
               ? 'Poster belum dipilih.'
-              : 'Poster terpilih (1/1).',
+              : 'Poster terpilih (${_posterFiles.length}/$maxEventPosterImages). '
+                    'Gambar pertama menjadi poster utama.',
           style: const TextStyle(fontSize: 12, color: Color(0xFF5F6368)),
+        ),
+        const SizedBox(height: 8),
+        OutlinedButton.icon(
+          key: const ValueKey('event-poster-upload'),
+          onPressed: _posterFiles.length == maxEventPosterImages
+              ? null
+              : _pickPosterImages,
+          icon: const Icon(Icons.add_photo_alternate_outlined),
+          label: Text(_posterFiles.isEmpty ? 'Pilih Poster' : 'Tambah Poster'),
         ),
         if (_posterError != null) ...[
           const SizedBox(height: 8),
           Text(
             _posterError!,
-            style: const TextStyle(color: Color(0xFFBA1A1A), fontSize: 12),
-          ),
-        ],
-      ],
-    );
-  }
-
-  Widget _buildGallerySection() {
-    final galleryCount = _galleryFiles.length;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Foto Galeri ($galleryCount/$maxEventGalleryImages)',
-          style: const TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w700,
-            color: Color(0xFF1A1C1C),
-          ),
-        ),
-        const SizedBox(height: 4),
-        const Text(
-          'Opsional · maksimal 5 foto tambahan. Poster tidak dihitung.',
-          style: TextStyle(fontSize: 12, color: Color(0xFF5F6368)),
-        ),
-        const SizedBox(height: 8),
-        OutlinedButton.icon(
-          onPressed: galleryCount == maxEventGalleryImages
-              ? null
-              : _pickGalleryImages,
-          icon: const Icon(Icons.collections_outlined),
-          label: const Text('Tambah Foto Galeri'),
-        ),
-        if (_galleryError != null) ...[
-          const SizedBox(height: 8),
-          Text(
-            _galleryError!,
             style: const TextStyle(color: Color(0xFFBA1A1A), fontSize: 12),
           ),
         ],
@@ -721,8 +642,6 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     _buildPosterSection(),
-                    const SizedBox(height: 20),
-                    _buildGallerySection(),
                     const SizedBox(height: 24),
 
                     // Forms
