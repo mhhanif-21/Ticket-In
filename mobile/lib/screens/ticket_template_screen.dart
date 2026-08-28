@@ -8,6 +8,7 @@ import 'package:go_router/go_router.dart';
 
 import '../models/event_model.dart';
 import '../services/event_service.dart';
+import 'ticket_template_editor_screen.dart';
 
 enum _PublicationDecision { publishNow, later }
 
@@ -28,22 +29,6 @@ class TicketTemplateScreen extends StatefulWidget {
 }
 
 class _TicketTemplateScreenState extends State<TicketTemplateScreen> {
-  static const _ticketPaletteTokens = <String>[
-    'NAME',
-    'EMAIL',
-    'EVENT_NAME',
-    'CODE',
-  ];
-  static const _textColorPresets = <String>[
-    '#111111',
-    '#FFFFFF',
-    '#6B7280',
-    '#DC2626',
-    '#2563EB',
-    '#16A34A',
-    '#EAB308',
-  ];
-
   late final EventService _eventService;
   final _otpSubjectController = TextEditingController();
   final _otpBodyController = TextEditingController();
@@ -70,9 +55,6 @@ class _TicketTemplateScreenState extends State<TicketTemplateScreen> {
     'EVENT_NAME',
     'TICKET_IMAGE',
   ];
-  int? _selectedElementIndex;
-  bool _isEditingTemplate = false;
-
   bool get _isManualReview => _registrationMode == 'Manual Review';
 
   @override
@@ -116,7 +98,6 @@ class _TicketTemplateScreenState extends State<TicketTemplateScreen> {
             ? emails[1].subject
             : '';
         _ticketBodyController.text = emails.length > 1 ? emails[1].body : '';
-        _isEditingTemplate = false;
         _isLoading = false;
       });
 
@@ -187,10 +168,39 @@ class _TicketTemplateScreenState extends State<TicketTemplateScreen> {
     if (!mounted) return;
     setState(() {
       _customMode = enabled;
-      _isEditingTemplate = enabled;
-      _selectedElementIndex = null;
+      // Editing is a dedicated full-screen flow. Toggling the mode only
+      // changes which template is used and never turns the settings page
+      // into an accidental scrollable canvas.
       if (enabled && _elements.isEmpty) _elements = _requiredElements();
     });
+  }
+
+  Future<void> _openFullscreenEditor() async {
+    if (!_customMode) return;
+    if (_backgroundUrl == null && _localBackground == null) {
+      _showMessage('Unggah gambar latar sebelum mengedit template tiket.');
+      return;
+    }
+
+    final editedElements = await Navigator.of(context)
+        .push<List<TicketTemplateElementModel>>(
+          MaterialPageRoute<List<TicketTemplateElementModel>>(
+            fullscreenDialog: true,
+            builder: (_) => TicketTemplateEditorScreen(
+              eventId: widget.eventId,
+              eventService: _eventService,
+              backgroundUrl: _backgroundUrl,
+              localBackground: _localBackground,
+              backgroundAspectRatio: _backgroundAspectRatio,
+              initialElements: _elements,
+            ),
+          ),
+        );
+    if (!mounted || editedElements == null) return;
+    setState(() {
+      _elements = List<TicketTemplateElementModel>.of(editedElements);
+    });
+    _showMessage('Perubahan template tiket berhasil disimpan.');
   }
 
   Future<void> _pickBackground() async {
@@ -218,77 +228,6 @@ class _TicketTemplateScreenState extends State<TicketTemplateScreen> {
     }
   }
 
-  void _moveElement(int index, DragUpdateDetails details, Size canvasSize) {
-    if (!_isEditingTemplate ||
-        index < 0 ||
-        index >= _elements.length ||
-        !mounted) {
-      return;
-    }
-    final current = _elements[index];
-    final x = (current.x + details.delta.dx / canvasSize.width)
-        .clamp(0.0, 1.0 - current.width)
-        .toDouble();
-    final y = (current.y + details.delta.dy / canvasSize.height)
-        .clamp(0.0, 1.0 - current.height)
-        .toDouble();
-    setState(() {
-      _selectedElementIndex = index;
-      _elements[index] = current.copyWith(x: x, y: y);
-    });
-  }
-
-  void _resizeElement(int index, DragUpdateDetails details, Size canvasSize) {
-    if (!_isEditingTemplate ||
-        index < 0 ||
-        index >= _elements.length ||
-        !mounted) {
-      return;
-    }
-    final current = _elements[index];
-    final deltaX = details.delta.dx / canvasSize.width;
-    final deltaY = details.delta.dy / canvasSize.height;
-
-    if (current.type == 'qr') {
-      final sizeDelta = deltaX.abs() >= deltaY.abs() ? deltaX : deltaY;
-      final requestedSize = current.width + sizeDelta;
-      final maxSize = math.min(1 - current.x, 1 - current.y);
-      final nextSize = requestedSize
-          .clamp(
-            ticketTemplateMinQrSize,
-            math.min(ticketTemplateMaxQrSize, maxSize),
-          )
-          .toDouble();
-      setState(() {
-        _selectedElementIndex = index;
-        _elements[index] = current.copyWith(width: nextSize, height: nextSize);
-      });
-      return;
-    }
-
-    final nextWidth = (current.width + deltaX)
-        .clamp(0.08, 1 - current.x)
-        .toDouble();
-    final nextHeight = (current.height + deltaY)
-        .clamp(0.04, 1 - current.y)
-        .toDouble();
-    final scale = math.max(
-      nextWidth / current.width,
-      nextHeight / current.height,
-    );
-    final nextFontSize = (current.fontSize * scale)
-        .clamp(ticketTemplateMinFontSize, ticketTemplateMaxFontSize)
-        .toDouble();
-    setState(() {
-      _selectedElementIndex = index;
-      _elements[index] = current.copyWith(
-        width: nextWidth,
-        height: nextHeight,
-        fontSize: nextFontSize,
-      );
-    });
-  }
-
   String _elementLabel(TicketTemplateElementModel element) {
     switch (element.type) {
       case 'qr':
@@ -306,80 +245,6 @@ class _TicketTemplateScreenState extends State<TicketTemplateScreen> {
       default:
         return 'Data';
     }
-  }
-
-  String? _elementToken(TicketTemplateElementModel element) {
-    switch (element.type) {
-      case 'name':
-        return 'NAME';
-      case 'email':
-        return 'EMAIL';
-      case 'event_name':
-        return 'EVENT_NAME';
-      case 'ticket_code':
-        return 'CODE';
-      case 'field':
-        return element.token;
-      default:
-        return null;
-    }
-  }
-
-  List<String> get _availableTicketTokens {
-    final usedTokens = _elements.map(_elementToken).whereType<String>().toSet();
-    return _ticketPaletteTokens
-        .where((token) => !usedTokens.contains(token))
-        .toList();
-  }
-
-  void _addElement(String token) {
-    if (!_ticketPaletteTokens.contains(token) ||
-        _elements.any((element) => _elementToken(element) == token)) {
-      return;
-    }
-    final type = switch (token) {
-      'NAME' => 'name',
-      'EMAIL' => 'email',
-      'EVENT_NAME' => 'event_name',
-      'CODE' => 'ticket_code',
-      _ => 'field',
-    };
-    final y = (0.76 + (_elements.length * 0.06)).clamp(0.0, 0.88).toDouble();
-    setState(() {
-      _elements = [
-        ..._elements,
-        TicketTemplateElementModel(
-          type: type,
-          x: 0.12,
-          y: y,
-          width: 0.65,
-          height: 0.07,
-        ),
-      ];
-      _selectedElementIndex = _elements.length - 1;
-    });
-  }
-
-  void _removeSelectedElement() {
-    final index = _selectedElementIndex;
-    if (index == null || index < 0 || index >= _elements.length) return;
-    final element = _elements[index];
-    if (element.type == 'qr' || element.type == 'ticket_code') {
-      _showMessage('QR dan Kode Tiket wajib tersedia.');
-      return;
-    }
-    setState(() {
-      _elements = [..._elements]..removeAt(index);
-      _selectedElementIndex = null;
-    });
-  }
-
-  void _setSelectedTextColor(String color) {
-    final index = _selectedElementIndex;
-    if (index == null || index < 0 || index >= _elements.length) return;
-    final element = _elements[index];
-    if (element.type == 'qr') return;
-    setState(() => _elements[index] = element.copyWith(color: color));
   }
 
   Color _colorFromHex(String value) {
@@ -621,7 +486,6 @@ class _TicketTemplateScreenState extends State<TicketTemplateScreen> {
                     ),
                   if (_customMode && _elements.isNotEmpty)
                     ..._elements.asMap().entries.map((entry) {
-                      final index = entry.key;
                       final element = entry.value;
                       final rawWidth = element.width * width;
                       final rawHeight = element.height * height;
@@ -630,7 +494,6 @@ class _TicketTemplateScreenState extends State<TicketTemplateScreen> {
                           ? math.min(rawWidth, rawHeight)
                           : rawWidth;
                       final elementHeight = isQr ? elementWidth : rawHeight;
-                      final selected = index == _selectedElementIndex;
                       return Positioned(
                         left:
                             element.x * width +
@@ -640,101 +503,34 @@ class _TicketTemplateScreenState extends State<TicketTemplateScreen> {
                             (isQr ? (rawHeight - elementHeight) / 2 : 0),
                         width: elementWidth,
                         height: elementHeight,
-                        child: Stack(
-                          clipBehavior: Clip.none,
-                          children: [
-                            GestureDetector(
-                              onTap: _isEditingTemplate
-                                  ? () => setState(
-                                      () => _selectedElementIndex = index,
-                                    )
-                                  : null,
-                              onPanStart: _isEditingTemplate
-                                  ? (_) => setState(
-                                      () => _selectedElementIndex = index,
-                                    )
-                                  : null,
-                              onPanUpdate: _isEditingTemplate
-                                  ? (details) => _moveElement(
-                                      index,
-                                      details,
-                                      Size(width, height),
-                                    )
-                                  : null,
-                              child: Container(
-                                key: ValueKey('ticket-template-element-$index'),
-                                alignment: Alignment.center,
-                                padding: EdgeInsets.all(isQr ? 4 : 0),
-                                decoration: BoxDecoration(
-                                  color: isQr
-                                      ? Colors.white.withValues(alpha: 0.94)
-                                      : Colors.transparent,
-                                  border: selected && _isEditingTemplate
-                                      ? Border.all(
-                                          color: Colors.black.withValues(
-                                            alpha: 0.45,
-                                          ),
-                                          width: 1,
-                                        )
-                                      : null,
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                                child: isQr
-                                    ? const FittedBox(
-                                        fit: BoxFit.contain,
-                                        child: Icon(
-                                          Icons.qr_code_2,
-                                          color: Colors.black,
-                                        ),
-                                      )
-                                    : Text(
-                                        _elementLabel(element),
-                                        textAlign: TextAlign.center,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: TextStyle(
-                                          color: _colorFromHex(element.color),
-                                          fontWeight: FontWeight.w700,
-                                          fontSize: _previewFontSize(
-                                            element,
-                                            width,
-                                          ),
-                                        ),
-                                      ),
-                              ),
-                            ),
-                            if (selected && _isEditingTemplate)
-                              Positioned(
-                                right: -7,
-                                bottom: -7,
-                                child: GestureDetector(
-                                  key: ValueKey(
-                                    'ticket-template-resize-handle-$index',
+                        child: Container(
+                          key: ValueKey('ticket-template-element-${entry.key}'),
+                          alignment: Alignment.center,
+                          padding: EdgeInsets.all(isQr ? 4 : 0),
+                          decoration: BoxDecoration(
+                            color: isQr
+                                ? Colors.white.withValues(alpha: 0.94)
+                                : Colors.transparent,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: isQr
+                              ? const FittedBox(
+                                  fit: BoxFit.contain,
+                                  child: Icon(
+                                    Icons.qr_code_2,
+                                    color: Colors.black,
                                   ),
-                                  behavior: HitTestBehavior.opaque,
-                                  onPanStart: (_) => setState(
-                                    () => _selectedElementIndex = index,
-                                  ),
-                                  onPanUpdate: (details) => _resizeElement(
-                                    index,
-                                    details,
-                                    Size(width, height),
-                                  ),
-                                  child: Container(
-                                    width: 20,
-                                    height: 20,
-                                    decoration: BoxDecoration(
-                                      color: Colors.white,
-                                      shape: BoxShape.circle,
-                                      border: Border.all(color: Colors.black54),
-                                    ),
-                                    child: const Icon(
-                                      Icons.open_in_full,
-                                      size: 11,
-                                    ),
+                                )
+                              : Text(
+                                  _elementLabel(element),
+                                  textAlign: TextAlign.center,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    color: _colorFromHex(element.color),
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: _previewFontSize(element, width),
                                   ),
                                 ),
-                              ),
-                          ],
                         ),
                       );
                     }),
@@ -763,100 +559,6 @@ class _TicketTemplateScreenState extends State<TicketTemplateScreen> {
                 .clamp(ticketTemplateMinFontSize, ticketTemplateMaxFontSize)
                 .toDouble() *
             canvasScale,
-      ),
-    );
-  }
-
-  Widget _buildSelectedElementControls() {
-    final index = _selectedElementIndex;
-    if (!_isEditingTemplate ||
-        index == null ||
-        index < 0 ||
-        index >= _elements.length) {
-      return const SizedBox.shrink();
-    }
-    final element = _elements[index];
-    final isRequired = element.type == 'qr' || element.type == 'ticket_code';
-    return Container(
-      margin: const EdgeInsets.only(top: 10),
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF7F7F7),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Elemen dipilih: ${_elementLabel(element)}',
-            style: const TextStyle(fontWeight: FontWeight.w700),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            element.type == 'qr'
-                ? 'Seret handle sudut untuk mengubah ukuran QR.'
-                : 'Seret handle sudut untuk mengubah ukuran teks.',
-            style: const TextStyle(fontSize: 12),
-          ),
-          if (element.type != 'qr') ...[
-            const SizedBox(height: 10),
-            const Text('Warna teks'),
-            const SizedBox(height: 6),
-            Wrap(
-              spacing: 10,
-              runSpacing: 8,
-              children: _textColorPresets.map((color) {
-                final selectedColor =
-                    element.color.toLowerCase() == color.toLowerCase();
-                return Tooltip(
-                  message: color,
-                  child: InkWell(
-                    key: ValueKey('ticket-template-color-$color'),
-                    borderRadius: BorderRadius.circular(20),
-                    onTap: () => _setSelectedTextColor(color),
-                    child: Container(
-                      width: 30,
-                      height: 30,
-                      decoration: BoxDecoration(
-                        color: _colorFromHex(color),
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: selectedColor ? Colors.black : Colors.black26,
-                          width: selectedColor ? 2 : 1,
-                        ),
-                      ),
-                      child: selectedColor
-                          ? Icon(
-                              Icons.check,
-                              size: 16,
-                              color: color == '#FFFFFF' || color == '#EAB308'
-                                  ? Colors.black
-                                  : Colors.white,
-                            )
-                          : null,
-                    ),
-                  ),
-                );
-              }).toList(),
-            ),
-          ],
-          if (!isRequired) ...[
-            const SizedBox(height: 5),
-            TextButton.icon(
-              onPressed: _removeSelectedElement,
-              icon: const Icon(Icons.delete_outline),
-              label: const Text('Hapus elemen'),
-              style: TextButton.styleFrom(foregroundColor: Colors.black),
-            ),
-          ] else
-            const Padding(
-              padding: EdgeInsets.only(top: 6),
-              child: Text(
-                'Elemen wajib tidak dapat dihapus.',
-                style: TextStyle(fontSize: 12),
-              ),
-            ),
-        ],
       ),
     );
   }
@@ -1023,50 +725,13 @@ class _TicketTemplateScreenState extends State<TicketTemplateScreen> {
                     alignment: Alignment.centerLeft,
                     child: TextButton.icon(
                       key: const ValueKey('ticket-template-edit-toggle'),
-                      onPressed: () {
-                        setState(() {
-                          _isEditingTemplate = !_isEditingTemplate;
-                          if (!_isEditingTemplate) {
-                            _selectedElementIndex = null;
-                          }
-                        });
-                      },
-                      icon: Icon(
-                        _isEditingTemplate ? Icons.check : Icons.edit_outlined,
-                      ),
-                      label: Text(
-                        _isEditingTemplate
-                            ? 'Selesai mengedit'
-                            : 'Edit template',
-                      ),
+                      onPressed: _openFullscreenEditor,
+                      icon: const Icon(Icons.open_in_full),
+                      label: const Text('Edit Template Tiket'),
                     ),
                   ),
                   const SizedBox(height: 12),
                   _buildTemplatePreview(),
-                  if (_isEditingTemplate) ...[
-                    _buildSelectedElementControls(),
-                    const SizedBox(height: 12),
-                    const Text('Elemen tersedia'),
-                    const SizedBox(height: 6),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: _availableTicketTokens.map((token) {
-                        return ActionChip(
-                          label: Text('[$token]'),
-                          onPressed: () => _addElement(token),
-                        );
-                      }).toList(),
-                    ),
-                    if (_availableTicketTokens.isEmpty)
-                      const Padding(
-                        padding: EdgeInsets.only(top: 6),
-                        child: Text(
-                          'Semua elemen tersedia sudah digunakan pada canvas.',
-                          style: TextStyle(fontSize: 12),
-                        ),
-                      ),
-                  ],
                 ],
                 const SizedBox(height: 12),
                 SizedBox(

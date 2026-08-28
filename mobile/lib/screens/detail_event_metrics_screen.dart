@@ -27,8 +27,8 @@ class DetailEventMetricsScreen extends ConsumerStatefulWidget {
 
 class _DetailEventMetricsScreenState
     extends ConsumerState<DetailEventMetricsScreen> {
-  final PageController _heroMediaController = PageController();
-  int _heroMediaIndex = 0;
+  final PageController _posterMediaController = PageController();
+  int _posterMediaIndex = 0;
 
   String get eventId => widget.eventId;
 
@@ -54,7 +54,7 @@ class _DetailEventMetricsScreenState
 
   @override
   void dispose() {
-    _heroMediaController.dispose();
+    _posterMediaController.dispose();
     super.dispose();
   }
 
@@ -74,6 +74,8 @@ class _DetailEventMetricsScreenState
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _buildEventMetadata(data),
+                const SizedBox(height: 32),
+                _buildPosterSection(data),
                 const SizedBox(height: 32),
                 const Text(
                   'Dashboard Metrik',
@@ -158,50 +160,45 @@ class _DetailEventMetricsScreenState
 
   Widget _buildEventMetadata(Map<String, dynamic> data) {
     final status = _metadataValue(data['status']);
-    return Container(
+    return Column(
       key: const ValueKey('event-metadata-section'),
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.outlineVariant),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Informasi Acara',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: AppColors.onBackground,
-            ),
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Informasi Acara',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: AppColors.onBackground,
           ),
-          const SizedBox(height: 14),
-          _buildMetadataRow('Nama Acara', _metadataValue(data['name'])),
-          _buildMetadataRow('Deskripsi', _metadataValue(data['description'])),
-          _buildMetadataRow('Lokasi', _metadataValue(data['location'])),
-          _buildMetadataRow('Tanggal & Waktu', _formatEventDate(data['date'])),
-          _buildMetadataRow(
-            'Kapasitas',
-            '${_metadataValue(data['total_capacity'])} peserta',
-          ),
-          _buildMetadataRow(
-            'Mode Registrasi',
-            _metadataValue(
-              data['registrationMode'] ?? data['registration_mode'],
-            ),
-          ),
-          _buildMetadataRow('Status', status),
-        ],
-      ),
+        ),
+        const SizedBox(height: 14),
+        _buildMetadataRow('Nama Acara', _metadataValue(data['name'])),
+        const Divider(height: 1),
+        _buildMetadataRow('Deskripsi', _metadataValue(data['description'])),
+        const Divider(height: 1),
+        _buildMetadataRow('Lokasi', _metadataValue(data['location'])),
+        const Divider(height: 1),
+        _buildMetadataRow('Tanggal & Waktu', _formatEventDate(data['date'])),
+        const Divider(height: 1),
+        _buildMetadataRow(
+          'Kapasitas',
+          '${_metadataValue(data['total_capacity'] ?? data['capacity'])} peserta',
+        ),
+        const Divider(height: 1),
+        _buildMetadataRow(
+          'Mode Registrasi',
+          _metadataValue(data['registrationMode'] ?? data['registration_mode']),
+        ),
+        const Divider(height: 1),
+        _buildMetadataRow('Status', status),
+      ],
     );
   }
 
   Widget _buildMetadataRow(String label, String value) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.symmetric(vertical: 11),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -223,10 +220,86 @@ class _DetailEventMetricsScreenState
     );
   }
 
+  Widget _buildPosterSection(Map<String, dynamic> data) {
+    final mediaUrls = _heroMediaUrls(data);
+    final posterAspectRatio = posterAspectModeFromJson(
+      data['posterAspectMode'] ?? data['poster_aspect_mode'],
+    ).ratio;
+
+    return Column(
+      key: const ValueKey('event-poster-section'),
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            const Text(
+              'Poster Acara',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: AppColors.onBackground,
+              ),
+            ),
+            if (mediaUrls.isNotEmpty)
+              Text(
+                '${(_posterMediaIndex.clamp(0, mediaUrls.length - 1)) + 1} / ${mediaUrls.length}',
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.onSurfaceVariant,
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        if (mediaUrls.isEmpty)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: AppColors.surfaceVariant,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Text(
+              'Poster acara belum tersedia.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: AppColors.onSurfaceVariant),
+            ),
+          )
+        else
+          ClipRRect(
+            borderRadius: BorderRadius.circular(14),
+            child: AspectRatio(
+              key: const ValueKey('event-detail-media-carousel'),
+              aspectRatio: posterAspectRatio,
+              child: PageView.builder(
+                controller: _posterMediaController,
+                itemCount: mediaUrls.length,
+                onPageChanged: (index) {
+                  if (mounted) setState(() => _posterMediaIndex = index);
+                },
+                itemBuilder: (context, index) => AdaptiveEventImage(
+                  image: NetworkImage(mediaUrls[index]),
+                  frameAspectRatio: posterAspectRatio,
+                  fit: BoxFit.contain,
+                  blurredBackdrop: false,
+                  expand: true,
+                  backgroundColor: AppColors.surface,
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
   Widget _buildHeroSection(BuildContext context, Map<String, dynamic> data) {
     final title = _metadataValue(data['name']);
     final formattedDate = _formatEventDate(data['date']);
     final mediaUrls = _heroMediaUrls(data);
+    final primaryMediaUrl = mediaUrls.isEmpty ? null : mediaUrls.first;
     final posterAspectRatio = posterAspectModeFromJson(
       data['posterAspectMode'] ?? data['poster_aspect_mode'],
     ).ratio;
@@ -242,144 +315,97 @@ class _DetailEventMetricsScreenState
       _ => Colors.orange,
     };
 
-    return SliverAppBar(
-      expandedHeight: 280,
-      pinned: true,
-      backgroundColor: AppColors.surface,
-      leading: Padding(
-        padding: const EdgeInsets.all(8.0),
-        child: CircleAvatar(
-          backgroundColor: Colors.black.withValues(alpha: 0.5),
-          child: IconButton(
-            icon: const Icon(Icons.arrow_back, color: Colors.white),
-            onPressed: () => Navigator.of(context).pop(),
-          ),
-        ),
-      ),
-      flexibleSpace: FlexibleSpaceBar(
-        background: Stack(
-          fit: StackFit.expand,
-          children: [
-            if (mediaUrls.isNotEmpty)
-              PageView.builder(
-                key: const ValueKey('event-detail-media-carousel'),
-                controller: _heroMediaController,
-                itemCount: mediaUrls.length,
-                onPageChanged: (index) {
-                  if (mounted) setState(() => _heroMediaIndex = index);
-                },
-                itemBuilder: (context, index) => AdaptiveEventImage(
-                  image: NetworkImage(mediaUrls[index]),
-                  frameAspectRatio: posterAspectRatio,
-                  fit: BoxFit.contain,
-                  blurredBackdrop: false,
-                  expand: true,
-                  backgroundColor: AppColors.surfaceVariant,
-                ),
-              )
-            else
-              Container(color: AppColors.primary),
-
-            if (mediaUrls.length > 1)
+    return SliverToBoxAdapter(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Stack(
+            children: [
+              AspectRatio(
+                aspectRatio: posterAspectRatio,
+                child: primaryMediaUrl == null
+                    ? ColoredBox(color: AppColors.surfaceVariant)
+                    : AdaptiveEventImage(
+                        image: NetworkImage(primaryMediaUrl),
+                        frameAspectRatio: posterAspectRatio,
+                        fit: BoxFit.contain,
+                        blurredBackdrop: false,
+                        expand: true,
+                        backgroundColor: AppColors.surface,
+                      ),
+              ),
               Positioned(
-                top: 18,
-                right: 18,
-                child: Container(
+                top: MediaQuery.paddingOf(context).top + 8,
+                left: 12,
+                child: CircleAvatar(
+                  backgroundColor: Colors.black.withValues(alpha: 0.55),
+                  child: IconButton(
+                    icon: const Icon(Icons.arrow_back, color: Colors.white),
+                    onPressed: () => Navigator.of(context).pop(),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          Container(
+            color: AppColors.surface,
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 10,
-                    vertical: 5,
+                    vertical: 4,
                   ),
                   decoration: BoxDecoration(
-                    color: Colors.black.withValues(alpha: 0.55),
+                    color: statusColor,
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
-                    '${(_heroMediaIndex.clamp(0, mediaUrls.length - 1)) + 1} / ${mediaUrls.length}',
+                    statusLabel,
                     style: const TextStyle(
                       color: Colors.white,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 1.0,
                     ),
                   ),
                 ),
-              ),
-
-            // Gradient Overlay
-            Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    Colors.black.withValues(alpha: 0.2),
-                    Colors.black.withValues(alpha: 0.8),
+                const SizedBox(height: 10),
+                Text(
+                  title,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: AppColors.onSurface,
+                    fontSize: 26,
+                    fontWeight: FontWeight.bold,
+                    height: 1.2,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    const Icon(
+                      Icons.calendar_today,
+                      color: AppColors.onSurfaceVariant,
+                      size: 14,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      formattedDate,
+                      style: const TextStyle(
+                        color: AppColors.onSurfaceVariant,
+                        fontSize: 14,
+                      ),
+                    ),
                   ],
                 ),
-              ),
+              ],
             ),
-
-            // Content
-            Positioned(
-              bottom: 20,
-              left: 20,
-              right: 20,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: statusColor,
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Text(
-                      statusLabel,
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 1.0,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    title,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 26,
-                      fontWeight: FontWeight.bold,
-                      height: 1.2,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Row(
-                    children: [
-                      const Icon(
-                        Icons.calendar_today,
-                        color: Colors.white70,
-                        size: 14,
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        formattedDate,
-                        style: const TextStyle(
-                          color: Colors.white70,
-                          fontSize: 14,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -450,7 +476,7 @@ class _DetailEventMetricsScreenState
         border: Border.all(color: AppColors.outlineVariant),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
+            color: Colors.black.withValues(alpha: 0.03),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -466,7 +492,7 @@ class _DetailEventMetricsScreenState
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: iconColor.withOpacity(0.1),
+                  color: iconColor.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Icon(icon, color: iconColor, size: 20),
@@ -478,7 +504,7 @@ class _DetailEventMetricsScreenState
                     vertical: 4,
                   ),
                   decoration: BoxDecoration(
-                    color: Colors.red.withOpacity(0.1),
+                    color: Colors.red.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: const Text(
@@ -540,7 +566,7 @@ class _DetailEventMetricsScreenState
         border: Border.all(color: AppColors.outlineVariant),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
+            color: Colors.black.withValues(alpha: 0.03),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -552,7 +578,7 @@ class _DetailEventMetricsScreenState
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: iconColor.withOpacity(0.1),
+              color: iconColor.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Icon(icon, color: iconColor, size: 20),
@@ -582,7 +608,7 @@ class _DetailEventMetricsScreenState
             borderRadius: BorderRadius.circular(4),
             child: LinearProgressIndicator(
               value: percentage,
-              backgroundColor: iconColor.withOpacity(0.1),
+              backgroundColor: iconColor.withValues(alpha: 0.1),
               valueColor: AlwaysStoppedAnimation<Color>(iconColor),
               minHeight: 6,
             ),
@@ -680,7 +706,7 @@ class _DetailEventMetricsScreenState
       decoration: BoxDecoration(
         color: AppColors.primaryContainer,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.primary.withOpacity(0.25)),
+        border: Border.all(color: AppColors.primary.withValues(alpha: 0.25)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -776,9 +802,9 @@ class _DetailEventMetricsScreenState
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.red.withOpacity(0.05),
+        color: Colors.red.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.red.withOpacity(0.2)),
+        border: Border.all(color: Colors.red.withValues(alpha: 0.2)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

@@ -63,6 +63,7 @@ class _EditEventScreenState extends State<EditEventScreen> {
   bool _coverPending = false;
   int _activeMediaIndex = 0;
   PosterAspectMode _posterAspectMode = PosterAspectMode.landscape;
+  bool _isChangingPosterAspect = false;
 
   @override
   void initState() {
@@ -87,8 +88,8 @@ class _EditEventScreenState extends State<EditEventScreen> {
         _mediaItems
           ..clear()
           ..addAll(_mediaItemsForEvent(event));
-        _mediaChanged = _mediaItems.isNotEmpty &&
-            _mediaItems.first.remote?.role != 'cover';
+        _mediaChanged =
+            _mediaItems.isNotEmpty && _mediaItems.first.remote?.role != 'cover';
         _coverPending = false;
         _activeMediaIndex = 0;
         _isLoading = false;
@@ -130,7 +131,8 @@ class _EditEventScreenState extends State<EditEventScreen> {
       );
     }
 
-    final media = event.media
+    final media =
+        event.media
             .where((item) => item.publicUrl.trim().isNotEmpty)
             .where((item) => item.id != persistedCover?.id)
             .where((item) => item.role != 'cover')
@@ -219,9 +221,12 @@ class _EditEventScreenState extends State<EditEventScreen> {
     _moveToMediaPage(_activeMediaIndex);
   }
 
-  Future<File?> _cropPoster(File file) {
+  Future<File?> _cropPoster(File file, {double? aspectRatio}) {
     if (widget.posterCropper != null) {
-      return widget.posterCropper!(file, _posterAspectMode.ratio);
+      return widget.posterCropper!(
+        file,
+        aspectRatio ?? _posterAspectMode.ratio,
+      );
     }
     // Injected pickers are deterministic test seams. Production uses the
     // crop editor; tests can opt into it explicitly via posterCropper.
@@ -231,8 +236,112 @@ class _EditEventScreenState extends State<EditEventScreen> {
     return PosterCropEditor.show(
       context: context,
       file: file,
-      aspectRatio: _posterAspectMode.ratio,
+      aspectRatio: aspectRatio ?? _posterAspectMode.ratio,
     );
+  }
+
+  Future<void> _changePosterAspectMode(PosterAspectMode? nextMode) async {
+    if (nextMode == null || nextMode == _posterAspectMode) return;
+    if (_isChangingPosterAspect) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Ubah format poster?'),
+        content: const Text(
+          'Format poster berubah. Poster yang sudah ada perlu disesuaikan.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Batal'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.black,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Sesuaikan Poster'),
+          ),
+        ],
+      ),
+    );
+    if (!mounted || confirmed != true) return;
+
+    final currentItems = List<_EditableMediaItem>.of(_mediaItems);
+    if (currentItems.isEmpty) {
+      setState(() {
+        _posterAspectMode = nextMode;
+        _mediaChanged = true;
+      });
+      return;
+    }
+
+    setState(() => _isChangingPosterAspect = true);
+    final temporaryFiles = <File>[];
+    final recroppedItems = <_EditableMediaItem>[];
+    try {
+      for (final item in currentItems) {
+        final source = item.file ?? await _downloadMediaForCrop(item);
+        if (item.file == null) temporaryFiles.add(source);
+
+        final cropped = await _cropPoster(source, aspectRatio: nextMode.ratio);
+        if (!mounted) return;
+        if (cropped == null) {
+          _showAspectChangeMessage(
+            'Penyesuaian poster dibatalkan. Format lama tetap digunakan.',
+          );
+          return;
+        }
+        final validationError = await validateEventImageFile(cropped);
+        if (!mounted) return;
+        if (validationError != null) {
+          _showAspectChangeMessage(
+            'Poster tidak valid setelah disesuaikan. Format lama tetap digunakan.',
+          );
+          return;
+        }
+        recroppedItems.add(_EditableMediaItem.local(cropped));
+      }
+
+      if (!mounted) return;
+      setState(() {
+        _posterAspectMode = nextMode;
+        _mediaItems
+          ..clear()
+          ..addAll(recroppedItems);
+        _mediaChanged = true;
+        _coverPending = recroppedItems.isNotEmpty;
+        _activeMediaIndex = 0;
+      });
+      _moveToMediaPage(0);
+      _showAspectChangeMessage(
+        'Format poster diperbarui. Semua poster siap disimpan ulang.',
+      );
+    } catch (_) {
+      if (mounted) {
+        _showAspectChangeMessage(
+          'Poster belum dapat disesuaikan. Format lama tetap digunakan.',
+        );
+      }
+    } finally {
+      for (final file in temporaryFiles) {
+        try {
+          if (await file.exists()) await file.delete();
+        } catch (_) {
+          // Temporary crop sources are best-effort cleanup only.
+        }
+      }
+      if (mounted) setState(() => _isChangingPosterAspect = false);
+    }
+  }
+
+  void _showAspectChangeMessage(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   Future<void> _editMediaAt(int index) async {
@@ -244,7 +353,9 @@ class _EditEventScreenState extends State<EditEventScreen> {
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Poster belum dapat dibuka untuk diedit.')),
+        const SnackBar(
+          content: Text('Poster belum dapat dibuka untuk diedit.'),
+        ),
       );
       return;
     }
@@ -272,7 +383,9 @@ class _EditEventScreenState extends State<EditEventScreen> {
     final client = HttpClient();
     try {
       final request = await client.getUrl(Uri.parse(url));
-      final response = await request.close().timeout(const Duration(seconds: 15));
+      final response = await request.close().timeout(
+        const Duration(seconds: 15),
+      );
       if (response.statusCode < 200 || response.statusCode >= 300) {
         throw StateError('Media HTTP ${response.statusCode}');
       }
@@ -306,10 +419,7 @@ class _EditEventScreenState extends State<EditEventScreen> {
         _activeMediaIndex = 0;
       } else {
         if (_activeMediaIndex > index) _activeMediaIndex -= 1;
-        _activeMediaIndex = _activeMediaIndex.clamp(
-          0,
-          _mediaItems.length - 1,
-        );
+        _activeMediaIndex = _activeMediaIndex.clamp(0, _mediaItems.length - 1);
       }
     });
     _moveToMediaPage(_activeMediaIndex);
@@ -360,7 +470,9 @@ class _EditEventScreenState extends State<EditEventScreen> {
     if (!_formKey.currentState!.validate()) return;
     if (_mediaItems.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Minimal satu poster acara harus dipilih.')),
+        const SnackBar(
+          content: Text('Minimal satu poster acara harus dipilih.'),
+        ),
       );
       return;
     }
@@ -487,10 +599,7 @@ class _EditEventScreenState extends State<EditEventScreen> {
     // Remove/reorder stale server rows before appending local files. This is
     // important when the collection is already full: the server must see the
     // deletion before it evaluates the new-file capacity.
-    await _eventService.replaceEventGallery(
-      widget.eventId,
-      remoteGalleryIds,
-    );
+    await _eventService.replaceEventGallery(widget.eventId, remoteGalleryIds);
 
     final localItems = _mediaItems
         .skip(1)
@@ -503,10 +612,9 @@ class _EditEventScreenState extends State<EditEventScreen> {
       var failedCount = 0;
       for (final localItem in localItems) {
         try {
-          final added = await _eventService.appendEventGallery(
-            widget.eventId,
-            [localItem.file!.path],
-          );
+          final added = await _eventService.appendEventGallery(widget.eventId, [
+            localItem.file!.path,
+          ]);
           final knownIds = _mediaItems
               .where((item) => !item.isLocal && item.id.isNotEmpty)
               .map((item) => item.id)
@@ -576,12 +684,15 @@ class _EditEventScreenState extends State<EditEventScreen> {
     List<EventMediaModel> items, {
     required Set<String> knownIds,
   }) {
-    final candidates = items
-        .where((item) => item.role != 'cover')
-        .where((item) => item.id.isNotEmpty)
-        .where((item) => !knownIds.contains(item.id))
-        .toList()
-      ..sort((left, right) => left.displayOrder.compareTo(right.displayOrder));
+    final candidates =
+        items
+            .where((item) => item.role != 'cover')
+            .where((item) => item.id.isNotEmpty)
+            .where((item) => !knownIds.contains(item.id))
+            .toList()
+          ..sort(
+            (left, right) => left.displayOrder.compareTo(right.displayOrder),
+          );
     return candidates.isEmpty ? null : candidates.last;
   }
 
@@ -691,13 +802,18 @@ class _EditEventScreenState extends State<EditEventScreen> {
           ),
           items: PosterAspectMode.values
               .map(
-                (mode) => DropdownMenuItem(
-                  value: mode,
-                  child: Text(mode.label),
-                ),
+                (mode) =>
+                    DropdownMenuItem(value: mode, child: Text(mode.label)),
               )
               .toList(),
-          onChanged: null,
+          onChanged: _isChangingPosterAspect ? null : _changePosterAspectMode,
+        ),
+        const SizedBox(height: 8),
+        Text(
+          _isChangingPosterAspect
+              ? 'Menyesuaikan semua poster...'
+              : 'Perubahan format akan meminta crop ulang untuk poster yang sudah ada.',
+          style: const TextStyle(fontSize: 11, color: Color(0xFF5F6368)),
         ),
         const SizedBox(height: 8),
         OutlinedButton.icon(
@@ -1067,7 +1183,7 @@ class _EditEventScreenState extends State<EditEventScreen> {
                     width: double.infinity,
                     height: 48,
                     child: ElevatedButton(
-                      onPressed: _submit,
+                      onPressed: _isChangingPosterAspect ? null : _submit,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: primaryColor,
                         foregroundColor: Colors.white,
