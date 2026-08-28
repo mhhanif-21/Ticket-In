@@ -99,17 +99,77 @@ function safeFailureCategory(stage: string, error: unknown): string {
   return 'unexpected';
 }
 
+function userFailureMessage(stage: string): string {
+  if (stage.includes('participant_file') || stage.includes('storage')) {
+    return 'Berkas pendaftaran belum dapat diproses. Periksa format dan ukuran berkas, lalu coba lagi.';
+  }
+  if (stage === 'persist_registration') {
+    return 'Gagal menyimpan registrasi. Silakan coba lagi.';
+  }
+  if (stage === 'load_event' || stage === 'load_form_fields') {
+    return 'Konfigurasi acara belum dapat dimuat. Silakan coba lagi.';
+  }
+  return 'Pendaftaran gagal diproses. Silakan coba lagi.';
+}
+
+function redactLogText(value: string, maxLength = 512): string {
+  return value
+    .replace(/\bhttps?:\/\/[^\s/@]+:[^\s/@]+@/gi, 'https://[redacted]@')
+    .replace(/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi, '[redacted-email]')
+    .replace(/\bBearer\s+\S+/gi, 'Bearer [redacted]')
+    .replace(/\b(DATABASE_URL|DIRECT_URL|SUPABASE_SERVICE_ROLE_KEY|BREVO_API_KEY)\s*=\s*\S+/gi, '$1=[redacted]')
+    .replace(/\b(password|secret|token|api[_-]?key)\s*[:=]\s*\S+/gi, '$1=[redacted]')
+    .replace(/\b(params|query|sql)\s*:\s*[^\r\n]*/gi, '$1: [redacted]')
+    .slice(0, maxLength);
+}
+
+function safeErrorDetails(error: unknown): {
+  errorName: string;
+  errorMessage: string;
+  errorStack: string | null;
+} {
+  const rawName = error instanceof Error ? error.name : typeof error;
+  const errorName = /^[A-Za-z0-9_.:-]{1,80}$/.test(rawName) ? rawName : 'UnknownError';
+  const rawMessage = error instanceof Error ? error.message : String(error ?? '');
+  const rawStack = error instanceof Error ? error.stack : '';
+  return {
+    errorName,
+    errorMessage: redactLogText(rawMessage),
+    errorStack: rawStack ? redactLogText(rawStack, 1024) : null,
+  };
+}
+
+type RegistrationFailureContext = {
+  eventSlug?: string | null;
+  eventId?: string | null;
+  fieldTypes?: string[];
+  stagedFileCount?: number;
+  uploadedFileCount?: number;
+};
+
 function logRegistrationFailure(
   requestId: string,
   stage: string,
   error: unknown,
   category?: string,
+  context: RegistrationFailureContext = {},
 ): void {
+  const details = safeErrorDetails(error);
   console.error('registration_failed', {
     requestId,
+    eventSlug: context.eventSlug ?? null,
+    eventId: context.eventId ?? null,
     failureStage: stage,
     category: category ?? safeFailureCategory(stage, error),
     errorCode: safeErrorCode(error),
+    errorName: details.errorName,
+    errorMessage: details.errorMessage,
+    errorStack: details.errorStack,
+    fieldTypes: context.fieldTypes ?? [],
+    uploadStatus: {
+      staged: context.stagedFileCount ?? 0,
+      uploaded: context.uploadedFileCount ?? 0,
+    },
   });
 }
 
@@ -135,6 +195,10 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
   const requestId = requestIdFor(req);
   let registrationOwnsUploads = false;
   let failureStage = 'request';
+  let eventSlugForLog: string | null = null;
+  let eventIdForLog: string | null = null;
+  let fieldTypesForLog: string[] = [];
+  let uploadedFileCount = 0;
 
   try {
     // Cleanup is durable and also has a cron owner. It must not block a new
@@ -143,12 +207,19 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
     try {
       await reconcileParticipantFileUploads();
     } catch (error) {
-      logRegistrationFailure(requestId, failureStage, error, 'cleanup');
+      logRegistrationFailure(requestId, failureStage, error, 'cleanup', {
+        eventSlug: eventSlugForLog,
+        eventId: eventIdForLog,
+        fieldTypes: fieldTypesForLog,
+        stagedFileCount: stagedUploadIds.length,
+        uploadedFileCount,
+      });
     }
 
     failureStage = 'parse_request';
     const params = await props.params;
     const slug = params.id;
+    eventSlugForLog = slug;
     
     // Check if it's multipart/form-data
     const contentType = req.headers.get('content-type') || '';
@@ -172,6 +243,7 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
     if (!event) {
       return NextResponse.json({ status: 'error', message: 'Event tidak ditemukan' }, { status: 404 });
     }
+    eventIdForLog = event.id;
     if (!isPublicEventStatus(event.status)) {
       return NextResponse.json({ status: 'error', message: 'Event belum dipublikasikan atau sudah dibatalkan' }, { status: 409 });
     }
@@ -186,6 +258,7 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
       fieldKey: formFields.fieldKey,
       fieldKind: formFields.fieldKind,
     }).from(formFields).where(eq(formFields.eventId, event.id));
+    fieldTypesForLog = eventFormFields.map((field) => field.fieldType).slice(0, 25);
 
     // Fix validasi: skip field Nama/Email karena dihandle sebagai static field (name/email),
     // bukan sebagai field dinamis dengan key field_{id}
@@ -250,9 +323,17 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
           });
 
         if (uploadError) {
-          logRegistrationFailure(requestId, failureStage, uploadError, 'storage');
+          logRegistrationFailure(requestId, failureStage, uploadError, 'storage', {
+            eventSlug: eventSlugForLog,
+            eventId: eventIdForLog,
+            fieldTypes: fieldTypesForLog,
+            stagedFileCount: stagedUploadIds.length,
+            uploadedFileCount,
+          });
           throw new ParticipantFileUploadError(uploadError.statusCode);
         }
+
+        uploadedFileCount += 1;
 
         answers[key] = { fileName, size: value.size, type: detectedMime, path: filePath };
       } else if (Array.isArray(value)) {
@@ -319,7 +400,13 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
             : undefined,
         );
       } catch (error) {
-        logRegistrationFailure(requestId, failureStage, error);
+        logRegistrationFailure(requestId, failureStage, error, undefined, {
+          eventSlug: eventSlugForLog,
+          eventId: eventIdForLog,
+          fieldTypes: fieldTypesForLog,
+          stagedFileCount: stagedUploadIds.length,
+          uploadedFileCount,
+        });
         return NextResponse.json({
           status: 'error',
           message: 'Pendaftaran tersimpan, tetapi OTP belum dapat dikirim. Silakan kirim ulang formulir untuk membuat OTP baru.',
@@ -338,7 +425,13 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
         failureStage = 'ticket_job_publish';
         await publishTicketGenerationJob(result.registrationId);
       } catch (publishError) {
-        logRegistrationFailure(requestId, failureStage, publishError, 'queue');
+        logRegistrationFailure(requestId, failureStage, publishError, 'queue', {
+          eventSlug: eventSlugForLog,
+          eventId: eventIdForLog,
+          fieldTypes: fieldTypesForLog,
+          stagedFileCount: stagedUploadIds.length,
+          uploadedFileCount,
+        });
         failureStage = 'ticket_job_lookup';
         const job = await import('@/lib/actions/ticketGenerationJob').then(({ getTicketGenerationJob }) => getTicketGenerationJob(result.registrationId));
         return NextResponse.json({
@@ -356,7 +449,13 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
 
     return NextResponse.json({ status: 'success', data: toPublicRegistrationData(result) }, { status: 201 });
   } catch (error: unknown) {
-    logRegistrationFailure(requestId, failureStage, error);
+    logRegistrationFailure(requestId, failureStage, error, undefined, {
+      eventSlug: eventSlugForLog,
+      eventId: eventIdForLog,
+      fieldTypes: fieldTypesForLog,
+      stagedFileCount: stagedUploadIds.length,
+      uploadedFileCount,
+    });
     if (!registrationOwnsUploads) await cleanupStagedUploads(stagedUploadIds);
 
     if (error instanceof ParticipantFileValidationError) {
@@ -393,7 +492,8 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
     return NextResponse.json({
       status: 'error',
       code: 'REGISTRATION_UNAVAILABLE',
-      message: 'Pendaftaran belum dapat diproses. Silakan coba lagi.',
+      message: userFailureMessage(failureStage),
+      request_id: requestId,
     }, { status: 500 });
   }
 }
