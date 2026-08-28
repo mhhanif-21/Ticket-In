@@ -5,6 +5,14 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 
+/// Applies one Flutter scale gesture translation to the current crop offset.
+///
+/// `ScaleUpdateDetails.focalPointDelta` is relative to the previous update,
+/// so callers must feed the returned value back into the next update.
+Offset accumulateCropPanOffset(Offset currentOffset, Offset focalPointDelta) {
+  return currentOffset + focalPointDelta;
+}
+
 /// Small dependency-free crop editor for event posters.
 ///
 /// The visible frame is always locked to the event aspect ratio. The same
@@ -47,7 +55,6 @@ class _PosterCropEditorState extends State<PosterCropEditor> {
   double _zoom = 1;
   double _gestureZoom = 1;
   Offset _offset = Offset.zero;
-  Offset _gestureOffset = Offset.zero;
   Size _frameSize = Size.zero;
   bool _isSaving = false;
 
@@ -201,11 +208,18 @@ class _PosterCropEditorState extends State<PosterCropEditor> {
           behavior: HitTestBehavior.opaque,
           onScaleStart: (_) {
             _gestureZoom = _zoom;
-            _gestureOffset = _offset;
           },
           onScaleUpdate: (details) {
             final nextZoom = (_gestureZoom * details.scale).clamp(1.0, 4.0);
-            final nextOffset = _gestureOffset + details.focalPointDelta;
+            // focalPointDelta is the movement since the previous update, not
+            // the total movement since onScaleStart. Accumulate it on the
+            // current offset so a zoomed image can be panned across the
+            // complete crop frame instead of only moving by the last frame's
+            // delta.
+            final nextOffset = accumulateCropPanOffset(
+              _offset,
+              details.focalPointDelta,
+            );
             setState(() {
               _zoom = nextZoom;
               _offset = _clampOffset(nextOffset, frameSize, zoom: nextZoom);
