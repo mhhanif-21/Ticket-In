@@ -4,7 +4,9 @@ import path from 'node:path';
 import QRCode from 'qrcode';
 import sharp from 'sharp';
 import {
+  TICKET_TEMPLATE_CANVAS_WIDTH,
   getTicketTemplateFontSize,
+  getTicketTemplateTextPosition,
   resolveRegistrationFieldToken,
   type TicketTemplateConfig,
   type TicketTemplateElement,
@@ -144,7 +146,7 @@ async function generateCustomTicket(
   // valid-but-extremely-large source image while retaining its original ratio.
   const normalizedBackground = await sharp(Buffer.from(await data.arrayBuffer()))
     .rotate()
-    .resize({ width: 1200, height: 1600, fit: 'inside', withoutEnlargement: true })
+    .resize({ width: TICKET_TEMPLATE_CANVAS_WIDTH, height: 1600, fit: 'inside', withoutEnlargement: true })
     .png({ compressionLevel: 9 })
     .toBuffer();
   const metadata = await sharp(normalizedBackground).metadata();
@@ -186,9 +188,10 @@ async function generateCustomTicket(
 
     const text = escapeXml(getTemplateText(element, context));
     const fontSize = Math.max(12, Math.min(48, Math.round(getTicketTemplateFontSize(element.fontSize))));
+    const textPosition = getTicketTemplateTextPosition(width, height, fontSize);
     const textSvg = Buffer.from(
       `<svg width="${width}" height="${height}">
-        <text x="0" y="${Math.max(fontSize, Math.floor(height * 0.72))}" font-family="${TICKET_FONT_FAMILY}" font-size="${fontSize}" font-weight="bold" fill="#111111">${text}</text>
+        <text x="${textPosition.x}" y="${textPosition.y}" text-anchor="middle" font-family="${TICKET_FONT_FAMILY}" font-size="${fontSize}" font-weight="bold" fill="#111111">${text}</text>
       </svg>`,
     );
     composites.push({ input: textSvg, left, top });

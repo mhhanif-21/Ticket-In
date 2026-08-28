@@ -145,6 +145,7 @@ export async function POST(req: Request) {
       date: eventInput.date,
       description: eventInput.description,
       registrationMode: eventInput.registrationMode,
+      posterAspectMode: eventInput.posterAspectMode,
       volunteerPinHash: '', // Dummy for now, generated in S3-T4
       creationKey: idempotencyKey,
       status: 'Draft',

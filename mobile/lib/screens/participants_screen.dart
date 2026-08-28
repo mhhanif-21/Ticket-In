@@ -281,12 +281,13 @@ class _ParticipantsScreenState extends ConsumerState<ParticipantsScreen> {
           final fileUrl = exportFileUrl(statusRes);
           if (fileUrl != null && await openUrl(fileUrl)) {
             _setExportFeedback('Membuka browser untuk mengunduh...');
-            if (mounted)
+            if (mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
                   content: Text('Membuka browser untuk mengunduh...'),
                 ),
               );
+            }
           }
           break;
         } else if (statusRes['status'] == 'failed') {
@@ -308,10 +309,11 @@ class _ParticipantsScreenState extends ConsumerState<ParticipantsScreen> {
       }
     } catch (e) {
       _setExportFeedback('Gagal: $e');
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text('Gagal: $e')));
+      }
     } finally {
       if (mounted) setState(() => _isExporting = false);
     }
@@ -363,8 +365,8 @@ class _ParticipantsScreenState extends ConsumerState<ParticipantsScreen> {
                       ),
                       const SizedBox(height: 8),
                       const Text(
-                        'Hanya 1 tipe filter yang dapat aktif bersamaan (Sistem M-E)',
-                        style: TextStyle(fontSize: 12, color: Colors.orange),
+                        'Status dan kehadiran dapat digabungkan untuk hasil yang lebih spesifik.',
+                        style: TextStyle(fontSize: 12, color: AppColors.onSurfaceVariant),
                       ),
                       const SizedBox(height: 16),
                       Expanded(
@@ -402,16 +404,19 @@ class _ParticipantsScreenState extends ConsumerState<ParticipantsScreen> {
                                           setSheetState(() {
                                             if (selected) {
                                               tempStatus = status;
-                                              tempAttendance =
-                                                  'Semua'; // Reset mutually exclusive filters
-                                              tempStartDate = null;
-                                              tempEndDate = null;
+                                              // Status + attendance are
+                                              // independent. Date filtering
+                                              // remains a separate mode.
+                                              if (status != 'Semua') {
+                                                tempStartDate = null;
+                                                tempEndDate = null;
+                                              }
                                             }
                                           });
                                         },
                                         selectedColor: AppColors
                                             .primaryContainer
-                                            .withOpacity(0.2),
+                                            .withValues(alpha: 0.2),
                                         backgroundColor:
                                             AppColors.surfaceContainerLow,
                                         labelStyle: TextStyle(
@@ -438,7 +443,7 @@ class _ParticipantsScreenState extends ConsumerState<ParticipantsScreen> {
                               Wrap(
                                 spacing: 8,
                                 runSpacing: 8,
-                                children: ['Semua', 'Hadir', 'Tidak Hadir'].map((
+                                children: ['Semua', 'Belum Hadir', 'Hadir'].map((
                                   att,
                                 ) {
                                   final isSelected = tempAttendance == att;
@@ -449,15 +454,18 @@ class _ParticipantsScreenState extends ConsumerState<ParticipantsScreen> {
                                       setSheetState(() {
                                         if (selected) {
                                           tempAttendance = att;
-                                          tempStatus =
-                                              'Semua'; // Reset mutually exclusive filters
-                                          tempStartDate = null;
-                                          tempEndDate = null;
+                                          // Keep the registration status
+                                          // selection so both dimensions
+                                          // are sent to the API together.
+                                          if (att != 'Semua') {
+                                            tempStartDate = null;
+                                            tempEndDate = null;
+                                          }
                                         }
                                       });
                                     },
                                     selectedColor: AppColors.primaryContainer
-                                        .withOpacity(0.2),
+                                        .withValues(alpha: 0.2),
                                     backgroundColor:
                                         AppColors.surfaceContainerLow,
                                     labelStyle: TextStyle(
@@ -604,7 +612,7 @@ class _ParticipantsScreenState extends ConsumerState<ParticipantsScreen> {
       onSelected: (selected) {
         if (selected) onSelect(value);
       },
-      selectedColor: AppColors.primaryContainer.withOpacity(0.2),
+      selectedColor: AppColors.primaryContainer.withValues(alpha: 0.2),
       backgroundColor: AppColors.surfaceContainerLow,
       labelStyle: TextStyle(
         color: isSelected ? AppColors.onPrimaryContainer : AppColors.secondary,
@@ -795,14 +803,14 @@ class _ParticipantsScreenState extends ConsumerState<ParticipantsScreen> {
   Color _getStatusBgColor(String status) {
     switch (status.toLowerCase()) {
       case 'accepted':
-        return const Color(0xFF000000).withOpacity(0.1);
+        return const Color(0xFF000000).withValues(alpha: 0.1);
       case 'rejected':
-        return const Color(0xFFBA1A1A).withOpacity(0.1);
+        return const Color(0xFFBA1A1A).withValues(alpha: 0.1);
       // [BUG-050] FIX: Tambahan warna status Draft
       case 'draft':
-        return Colors.grey.withOpacity(0.1);
+        return Colors.grey.withValues(alpha: 0.1);
       default:
-        return Colors.orange.withOpacity(0.1);
+        return Colors.orange.withValues(alpha: 0.1);
     }
   }
 

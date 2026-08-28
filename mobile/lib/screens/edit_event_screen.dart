@@ -3,9 +3,11 @@ import 'dart:io';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import '../models/event_model.dart';
+import '../models/poster_aspect.dart';
 import '../services/event_service.dart';
 import '../services/poster_validation.dart';
 import '../widgets/adaptive_event_image.dart';
+import '../widgets/poster_crop_editor.dart';
 
 class _EditableMediaItem {
   const _EditableMediaItem.remote(this.remote) : file = null;
@@ -27,6 +29,7 @@ class EditEventScreen extends StatefulWidget {
   final EventService? eventService;
   final Future<File?> Function()? posterPicker;
   final Future<List<File>> Function()? galleryPicker;
+  final Future<File?> Function(File file, double aspectRatio)? posterCropper;
 
   const EditEventScreen({
     super.key,
@@ -34,6 +37,7 @@ class EditEventScreen extends StatefulWidget {
     this.eventService,
     this.posterPicker,
     this.galleryPicker,
+    this.posterCropper,
   });
 
   @override
@@ -58,6 +62,7 @@ class _EditEventScreenState extends State<EditEventScreen> {
   bool _mediaChanged = false;
   bool _coverPending = false;
   int _activeMediaIndex = 0;
+  PosterAspectMode _posterAspectMode = PosterAspectMode.landscape;
 
   @override
   void initState() {
@@ -78,6 +83,7 @@ class _EditEventScreenState extends State<EditEventScreen> {
         _selectedDate = event.date;
         _dateController.text = DateFormat('dd MMM yyyy').format(event.date);
         _selectedMode = event.registrationMode;
+        _posterAspectMode = event.posterAspectMode;
         _mediaItems
           ..clear()
           ..addAll(_mediaItemsForEvent(event));
@@ -173,7 +179,18 @@ class _EditEventScreenState extends State<EditEventScreen> {
         return;
       }
       existing.add(file.absolute.path);
-      additions.add(file);
+      final cropped = await _cropPoster(file);
+      if (!mounted) return;
+      if (cropped == null) continue;
+      final croppedValidationError = await validateEventImageFile(cropped);
+      if (!mounted) return;
+      if (croppedValidationError != null) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(croppedValidationError)));
+        return;
+      }
+      additions.add(cropped);
     }
     if (additions.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -200,6 +217,83 @@ class _EditEventScreenState extends State<EditEventScreen> {
       _activeMediaIndex = _mediaItems.length - additions.length;
     });
     _moveToMediaPage(_activeMediaIndex);
+  }
+
+  Future<File?> _cropPoster(File file) {
+    if (widget.posterCropper != null) {
+      return widget.posterCropper!(file, _posterAspectMode.ratio);
+    }
+    // Injected pickers are deterministic test seams. Production uses the
+    // crop editor; tests can opt into it explicitly via posterCropper.
+    if (widget.galleryPicker != null || widget.posterPicker != null) {
+      return Future.value(file);
+    }
+    return PosterCropEditor.show(
+      context: context,
+      file: file,
+      aspectRatio: _posterAspectMode.ratio,
+    );
+  }
+
+  Future<void> _editMediaAt(int index) async {
+    if (index < 0 || index >= _mediaItems.length) return;
+    final item = _mediaItems[index];
+    File sourceFile;
+    try {
+      sourceFile = item.file ?? await _downloadMediaForCrop(item);
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Poster belum dapat dibuka untuk diedit.')),
+      );
+      return;
+    }
+
+    final cropped = await _cropPoster(sourceFile);
+    if (!mounted || cropped == null) return;
+    final validationError = await validateEventImageFile(cropped);
+    if (!mounted) return;
+    if (validationError != null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(validationError)));
+      return;
+    }
+    setState(() {
+      _mediaItems[index] = _EditableMediaItem.local(cropped);
+      _mediaChanged = true;
+      if (index == 0) _coverPending = true;
+    });
+  }
+
+  Future<File> _downloadMediaForCrop(_EditableMediaItem item) async {
+    final url = item.remote?.publicUrl.trim();
+    if (url == null || url.isEmpty) throw StateError('Media URL kosong');
+    final client = HttpClient();
+    try {
+      final request = await client.getUrl(Uri.parse(url));
+      final response = await request.close().timeout(const Duration(seconds: 15));
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw StateError('Media HTTP ${response.statusCode}');
+      }
+      final bytes = await response
+          .fold<List<int>>(<int>[], (buffer, chunk) {
+            buffer.addAll(chunk);
+            return buffer;
+          })
+          .timeout(const Duration(seconds: 15));
+      final safeId = (item.id.isEmpty ? 'media' : item.id).replaceAll(
+        RegExp(r'[^A-Za-z0-9_-]'),
+        '_',
+      );
+      final file = File(
+        '${Directory.systemTemp.path}/ticketin-crop-$safeId-${DateTime.now().microsecondsSinceEpoch}.img',
+      );
+      await file.writeAsBytes(bytes, flush: true);
+      return file;
+    } finally {
+      client.close(force: true);
+    }
   }
 
   void _removeMediaAt(int index) {
@@ -292,6 +386,7 @@ class _EditEventScreenState extends State<EditEventScreen> {
         'date': _selectedDate!.toIso8601String(),
         'description': _descriptionController.text,
         'registration_mode': _selectedMode,
+        'poster_aspect_mode': _posterAspectMode.wireValue,
       };
 
       await _eventService.updateEvent(widget.eventId, data);
@@ -412,28 +507,32 @@ class _EditEventScreenState extends State<EditEventScreen> {
             widget.eventId,
             [localItem.file!.path],
           );
-          EventMediaModel? uploadedItem;
-          if (added.length == 1 && added.first.id.isNotEmpty) {
-            uploadedItem = added.first;
-          } else if (added.isEmpty) {
-            // Some successful 2xx responses do not include the created row.
-            // Confirm the acknowledgement from the event detail before
-            // classifying the item as failed.
+          final knownIds = _mediaItems
+              .where((item) => !item.isLocal && item.id.isNotEmpty)
+              .map((item) => item.id)
+              .toSet();
+          // The endpoint normally returns the newly inserted row, but a
+          // gateway can return the current collection or an empty 2xx body.
+          // Resolve any newly returned gallery row instead of requiring an
+          // exact response shape.
+          EventMediaModel? uploadedItem = _newGalleryItem(
+            added,
+            knownIds: knownIds,
+          );
+          if (uploadedItem == null) {
+            // A successful upload is only considered failed after a server
+            // read-back cannot identify the new row. This keeps the local
+            // file available for a genuine retry without false negatives.
             try {
               final refreshed = await _eventService.getEventDetail(
                 widget.eventId,
               );
-              final knownIds = _mediaItems
-                  .where((item) => !item.isLocal && item.id.isNotEmpty)
-                  .map((item) => item.id)
-                  .toSet();
               final candidates = _mediaItemsForEvent(refreshed)
                   .where((item) => item.remote?.role != 'cover')
-                  .where((item) => !knownIds.contains(item.id))
+                  .map((item) => item.remote)
+                  .whereType<EventMediaModel>()
                   .toList();
-              if (candidates.length == 1) {
-                uploadedItem = candidates.single.remote;
-              }
+              uploadedItem = _newGalleryItem(candidates, knownIds: knownIds);
             } catch (_) {
               // Read-back failure remains retryable and must keep this local
               // file in the editor state.
@@ -471,6 +570,19 @@ class _EditEventScreenState extends State<EditEventScreen> {
     }
     await _eventService.replaceEventGallery(widget.eventId, galleryIds);
     await _refreshMediaFromServer();
+  }
+
+  EventMediaModel? _newGalleryItem(
+    List<EventMediaModel> items, {
+    required Set<String> knownIds,
+  }) {
+    final candidates = items
+        .where((item) => item.role != 'cover')
+        .where((item) => item.id.isNotEmpty)
+        .where((item) => !knownIds.contains(item.id))
+        .toList()
+      ..sort((left, right) => left.displayOrder.compareTo(right.displayOrder));
+    return candidates.isEmpty ? null : candidates.last;
   }
 
   Future<void> _refreshMediaFromServer() async {
@@ -570,6 +682,24 @@ class _EditEventScreenState extends State<EditEventScreen> {
           style: TextStyle(fontSize: 12, color: Color(0xFF5F6368)),
         ),
         const SizedBox(height: 8),
+        DropdownButtonFormField<PosterAspectMode>(
+          key: const ValueKey('edit-poster-aspect-mode'),
+          initialValue: _posterAspectMode,
+          decoration: const InputDecoration(
+            labelText: 'Format poster acara',
+            border: OutlineInputBorder(),
+          ),
+          items: PosterAspectMode.values
+              .map(
+                (mode) => DropdownMenuItem(
+                  value: mode,
+                  child: Text(mode.label),
+                ),
+              )
+              .toList(),
+          onChanged: null,
+        ),
+        const SizedBox(height: 8),
         OutlinedButton.icon(
           key: const ValueKey('edit-poster-upload'),
           onPressed: count >= maxEventPosterImages ? null : _pickPosterImages,
@@ -577,9 +707,9 @@ class _EditEventScreenState extends State<EditEventScreen> {
           label: Text(count == 0 ? 'Pilih Poster' : 'Tambah Poster'),
         ),
         const SizedBox(height: 12),
-        SizedBox(
+        AspectRatio(
           key: const ValueKey('edit-poster-preview'),
-          height: 260,
+          aspectRatio: _posterAspectMode.ratio,
           child: PageView.builder(
             controller: _mediaPageController,
             itemCount: pageCount,
@@ -597,8 +727,9 @@ class _EditEventScreenState extends State<EditEventScreen> {
                         ? _buildMediaPlaceholder()
                         : AdaptiveEventImage(
                             image: item.image,
-                            frameAspectRatio: 4 / 3,
+                            frameAspectRatio: _posterAspectMode.ratio,
                             expand: true,
+                            fit: BoxFit.contain,
                             blurredBackdrop: false,
                             backgroundColor: Colors.white,
                             borderRadius: BorderRadius.circular(10),
@@ -607,11 +738,23 @@ class _EditEventScreenState extends State<EditEventScreen> {
                       Positioned(
                         right: 8,
                         top: 8,
-                        child: IconButton.filledTonal(
-                          key: ValueKey('edit-poster-remove-$index'),
-                          tooltip: 'Hapus poster ${index + 1}',
-                          onPressed: () => _removeMediaAt(index),
-                          icon: const Icon(Icons.close),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton.filledTonal(
+                              key: ValueKey('edit-poster-crop-$index'),
+                              tooltip: 'Edit crop poster ${index + 1}',
+                              onPressed: () => _editMediaAt(index),
+                              icon: const Icon(Icons.crop),
+                            ),
+                            const SizedBox(width: 4),
+                            IconButton.filledTonal(
+                              key: ValueKey('edit-poster-remove-$index'),
+                              tooltip: 'Hapus poster ${index + 1}',
+                              onPressed: () => _removeMediaAt(index),
+                              icon: const Icon(Icons.close),
+                            ),
+                          ],
                         ),
                       ),
                   ],

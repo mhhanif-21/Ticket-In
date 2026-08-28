@@ -25,6 +25,7 @@ export const events = pgTable(
     location: varchar('location', { length: 255 }).notNull(),
     date: timestamp('date').notNull(),
     posterUrl: text('poster_url'),
+    posterAspectMode: varchar('poster_aspect_mode', { length: 16 }).notNull().default('landscape'),
     creationKey: varchar('creation_key', { length: 128 }),
     capacity: integer('capacity').notNull(),
     registrationMode: varchar('registration_mode', { length: 50 }).notNull(), // Auto-Accept, Manual Review
@@ -42,6 +43,10 @@ export const events = pgTable(
     statusCheck: check(
       'events_status_check',
       sql`${table.status} IN ('Draft', 'Published', 'Cancelled')`,
+    ),
+    posterAspectModeCheck: check(
+      'events_poster_aspect_mode_check',
+      sql`${table.posterAspectMode} IN ('portrait', 'landscape', 'banner')`,
     ),
   })
 );

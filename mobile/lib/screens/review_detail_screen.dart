@@ -60,13 +60,71 @@ class _ReviewDetailScreenState extends State<ReviewDetailScreen> {
     }
   }
 
-  void _openParticipantFile(String fieldKey) async {
+  Future<void> _showParticipantImage(ParticipantFileResource resource) async {
+    if (!mounted) return;
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return Dialog(
+          backgroundColor: Colors.black,
+          insetPadding: const EdgeInsets.all(16),
+          child: Stack(
+            children: [
+              InteractiveViewer(
+                minScale: 0.5,
+                maxScale: 4,
+                child: AspectRatio(
+                  aspectRatio: 1,
+                  child: Image.network(
+                    resource.url.toString(),
+                    fit: BoxFit.contain,
+                    errorBuilder: (_, _, _) => const Center(
+                      child: Text(
+                        'Foto belum dapat ditampilkan.',
+                        style: TextStyle(color: Colors.white),
+                      ),
+                    ),
+                    loadingBuilder: (context, child, progress) {
+                      if (progress == null) return child;
+                      return const Center(
+                        child: CircularProgressIndicator(color: Colors.white),
+                      );
+                    },
+                  ),
+                ),
+              ),
+              Positioned(
+                top: 8,
+                right: 8,
+                child: IconButton(
+                  tooltip: 'Tutup',
+                  onPressed: () => Navigator.of(dialogContext).pop(),
+                  icon: const Icon(Icons.close, color: Colors.white),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _openParticipantFile(ParticipantAnswerRow row) async {
+    if (!mounted) return;
     setState(() => _isProcessing = true);
     try {
-      final url = await (widget.adminService ?? AdminService())
-          .getParticipantFileUrl(widget.participantData['id'].toString(), fieldKey);
-      if (!await canLaunchUrl(url) || !await launchUrl(url, mode: LaunchMode.externalApplication)) {
-        throw Exception('Browser tidak dapat membuka berkas.');
+      final resource = await (widget.adminService ?? AdminService()).getParticipantFile(
+        widget.participantData['id'].toString(),
+        row.fieldKey,
+      );
+      if (resource.isImage) {
+        if (mounted) await _showParticipantImage(resource);
+      } else {
+        final url = resource.url;
+        if (!await canLaunchUrl(url) ||
+            !await launchUrl(url, mode: LaunchMode.externalApplication)) {
+          throw Exception('Aplikasi tidak dapat membuka ${resource.fileName}.');
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -81,9 +139,9 @@ class _ReviewDetailScreenState extends State<ReviewDetailScreen> {
 
   Color _getStatusBgColor(String status) {
     switch (status) {
-      case 'Accepted': return const Color(0xFF000000).withOpacity(0.1);
-      case 'Rejected': return const Color(0xFFBA1A1A).withOpacity(0.1);
-      default: return Colors.orange.withOpacity(0.1);
+      case 'Accepted': return const Color(0xFF000000).withValues(alpha: 0.1);
+      case 'Rejected': return const Color(0xFFBA1A1A).withValues(alpha: 0.1);
+      default: return Colors.orange.withValues(alpha: 0.1);
     }
   }
 
@@ -197,9 +255,9 @@ class _ReviewDetailScreenState extends State<ReviewDetailScreen> {
                       _buildDetailRow(row.label, row.value),
                       if (row.isFile)
                         TextButton.icon(
-                          onPressed: _isProcessing ? null : () => _openParticipantFile(row.fieldKey),
-                          icon: const Icon(Icons.open_in_new, size: 16),
-                          label: const Text('Buka berkas'),
+                          onPressed: _isProcessing ? null : () => _openParticipantFile(row),
+                          icon: Icon(row.isImage ? Icons.image_outlined : Icons.open_in_new, size: 16),
+                          label: Text(row.isImage ? 'Lihat foto' : 'Buka/unduh PDF'),
                         ),
                     ],
                   ),

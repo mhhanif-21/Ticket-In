@@ -3,6 +3,7 @@
 import { useRef, useState } from 'react';
 
 import { AdaptiveImage } from '@/components/media/AdaptiveImage';
+import { getPosterAspectRatio } from '@/lib/events/posterAspect';
 
 export type PublicEventMedia = {
   role: string;
@@ -13,14 +14,16 @@ export type PublicEventMedia = {
 type EventMediaCarouselProps = {
   eventName: string;
   media: PublicEventMedia[];
+  posterAspectMode?: string | null;
 };
 
 const SWIPE_THRESHOLD_PX = 40;
 
-export function EventMediaCarousel({ eventName, media }: EventMediaCarouselProps) {
+export function EventMediaCarousel({ eventName, media, posterAspectMode }: EventMediaCarouselProps) {
   const images = media.filter((item) => item.publicUrl.trim().length > 0);
   const [activeIndex, setActiveIndex] = useState(0);
   const pointerStartX = useRef<number | null>(null);
+  const aspectRatio = getPosterAspectRatio(posterAspectMode);
 
   if (images.length === 0) return null;
 
@@ -38,7 +41,7 @@ export function EventMediaCarousel({ eventName, media }: EventMediaCarouselProps
   return (
     <section
       aria-label={`Media acara ${eventName}`}
-      className="w-full overflow-hidden bg-surface-container-highest shadow-[0_4px_12px_rgba(0,0,0,0.05)]"
+      className={`w-full overflow-hidden bg-surface-container-highest shadow-[0_4px_12px_rgba(0,0,0,0.05)] ${posterAspectMode === 'portrait' ? 'mx-auto max-w-xl' : posterAspectMode === 'banner' ? 'mx-auto max-w-6xl' : ''}`}
     >
       <div
         className="relative touch-pan-y select-none cursor-grab active:cursor-grabbing"
@@ -54,42 +57,37 @@ export function EventMediaCarousel({ eventName, media }: EventMediaCarouselProps
           src={images[activeIndex].publicUrl}
           alt={`${eventName} - gambar ${activeIndex + 1}`}
           priority={activeIndex === 0}
-          sizes="100vw"
-          fallbackAspectRatio={16 / 9}
+          sizes="(max-width: 768px) 100vw, 1200px"
+          frameAspectRatio={aspectRatio}
           fit="contain"
           blurredBackdrop={false}
           containerClassName="w-full bg-surface-container-highest"
-          imageClassName="p-2 sm:p-4"
+          imageClassName="p-0"
         />
-      </div>
-
-      {images.length > 1 && (
-        <div className="flex gap-2 overflow-x-auto p-3 sm:p-4" aria-label="Pilih media acara">
-          {images.map((item, index) => (
+        {images.length > 1 && (
+          <>
             <button
-              key={`${item.role}-${item.displayOrder}-${item.publicUrl}`}
               type="button"
-              aria-label={`Tampilkan gambar ${index + 1}`}
-              aria-current={index === activeIndex ? 'true' : undefined}
-              onClick={() => goTo(index)}
-              className={`w-20 shrink-0 overflow-hidden rounded-lg ring-offset-2 transition focus:outline-none focus:ring-2 focus:ring-primary ${index === activeIndex ? 'ring-2 ring-primary' : 'opacity-75 hover:opacity-100'}`}
+              aria-label="Gambar sebelumnya"
+              onClick={() => goTo(activeIndex - 1)}
+              className="absolute left-3 top-1/2 hidden -translate-y-1/2 rounded-full bg-black/60 px-3 py-2 text-2xl leading-none text-white transition hover:bg-black/80 focus:outline-none focus:ring-2 focus:ring-white md:block"
             >
-              <AdaptiveImage
-                src={item.publicUrl}
-                alt=""
-                sizes="80px"
-                frameAspectRatio={4 / 3}
-                fit="contain"
-                containerClassName="w-full bg-surface-container-highest"
-              />
+              ‹
             </button>
-          ))}
-        </div>
-      )}
-
-      <p className="px-4 pb-3 text-center text-xs text-secondary" aria-live="polite">
-        {activeIndex + 1} / {images.length}
-      </p>
+            <button
+              type="button"
+              aria-label="Gambar berikutnya"
+              onClick={() => goTo(activeIndex + 1)}
+              className="absolute right-3 top-1/2 hidden -translate-y-1/2 rounded-full bg-black/60 px-3 py-2 text-2xl leading-none text-white transition hover:bg-black/80 focus:outline-none focus:ring-2 focus:ring-white md:block"
+            >
+              ›
+            </button>
+          </>
+        )}
+        <p className="absolute right-3 top-3 rounded-full bg-black/65 px-3 py-1 text-xs font-semibold text-white" aria-live="polite">
+          {activeIndex + 1} / {images.length}
+        </p>
+      </div>
     </section>
   );
 }

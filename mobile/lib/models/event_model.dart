@@ -1,6 +1,10 @@
+import 'poster_aspect.dart';
+
 const double ticketTemplateMinFontSize = 12;
 const double ticketTemplateMaxFontSize = 48;
 const double ticketTemplateDefaultFontSize = 24;
+// Keep in sync with the logical canvas used by the server ticket renderer.
+const double ticketTemplateCanvasWidth = 1200;
 const double ticketTemplateMinQrSize = 0.12;
 const double ticketTemplateMaxQrSize = 0.60;
 
@@ -253,6 +257,7 @@ class EventModel {
   final DateTime date;
   final String status;
   final String registrationMode;
+  final PosterAspectMode posterAspectMode;
   final String? posterUrl;
   final String? publicRegistrationUrl;
   final String? publicQrCodeUrl;
@@ -269,6 +274,7 @@ class EventModel {
     required this.date,
     required this.status,
     required this.registrationMode,
+    this.posterAspectMode = PosterAspectMode.landscape,
     this.posterUrl,
     this.publicRegistrationUrl,
     this.publicQrCodeUrl,
@@ -305,9 +311,12 @@ class EventModel {
           : DateTime.now(),
       status: json['status'] ?? 'Draft',
       registrationMode:
-          json['registration_mode'] ??
-          json['registrationMode'] ??
-          'Auto-Accept',
+            json['registration_mode'] ??
+            json['registrationMode'] ??
+            'Auto-Accept',
+      posterAspectMode: posterAspectModeFromJson(
+        json['poster_aspect_mode'] ?? json['posterAspectMode'],
+      ),
       posterUrl: json['poster_url'] ?? json['posterUrl'],
       publicRegistrationUrl:
           json['public_registration_url'] ?? json['publicRegistrationUrl'],
@@ -328,6 +337,7 @@ class EventModel {
       'date': date.toIso8601String(),
       'status': status,
       'registration_mode': registrationMode,
+      'poster_aspect_mode': posterAspectMode.wireValue,
       'poster_url': posterUrl,
       'public_registration_url': publicRegistrationUrl,
       'public_qr_code_url': publicQrCodeUrl,

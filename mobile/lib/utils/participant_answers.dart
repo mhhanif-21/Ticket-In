@@ -14,6 +14,21 @@ class ParticipantAnswerRow {
   bool get isFile => rawValue is Map &&
       (rawValue as Map)['fileName'] is String &&
       ((rawValue as Map)['fileName'] as String).trim().isNotEmpty;
+
+  String get mimeType {
+    if (rawValue is Map) {
+      final value = (rawValue as Map)['type'];
+      if (value is String && value.trim().isNotEmpty) return value.trim().toLowerCase();
+    }
+    final lowerName = value.toLowerCase();
+    if (lowerName.endsWith('.pdf')) return 'application/pdf';
+    if (lowerName.endsWith('.jpg') || lowerName.endsWith('.jpeg')) return 'image/jpeg';
+    if (lowerName.endsWith('.png')) return 'image/png';
+    if (lowerName.endsWith('.webp')) return 'image/webp';
+    return 'application/octet-stream';
+  }
+
+  bool get isImage => isFile && mimeType.startsWith('image/');
 }
 
 Map<String, dynamic> _asStringKeyedMap(Object? value) {

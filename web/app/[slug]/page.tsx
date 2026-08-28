@@ -23,7 +23,11 @@ export default async function PublicEventLandingPage(props: { params: Promise<{ 
       {/* One responsive carousel for the cover and every stored gallery item. */}
       <div className="relative w-full overflow-hidden bg-surface-container-highest shadow-[0_4px_12px_rgba(0,0,0,0.05)]">
         {event.media.length > 0 ? (
-          <EventMediaCarousel eventName={event.name} media={event.media} />
+          <EventMediaCarousel
+            eventName={event.name}
+            media={event.media}
+            posterAspectMode={event.posterAspectMode}
+          />
         ) : (
           <div className="flex min-h-56 items-center justify-center px-4 text-center text-2xl font-bold text-secondary opacity-80">
             {event.name}

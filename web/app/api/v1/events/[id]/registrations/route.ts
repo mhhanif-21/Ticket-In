@@ -73,15 +73,12 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       return NextResponse.json({ status: 'error', message: 'start_date tidak boleh setelah end_date.' }, { status: 400 });
     }
     
-    // FR-ADM-10: Mutually Exclusive Filter Check
-    let filterCount = 0;
-    if (status) filterCount++;
-    if (attendance) filterCount++;
-    if (startDate || endDate) filterCount++;
-    
-    if (filterCount > 1) {
+    // Registration status and attendance are independent dimensions. Keep
+    // date filtering separate for backward compatibility with the existing
+    // participant-list contract, but allow status + attendance together.
+    if ((startDate || endDate) && (status || attendance)) {
       return NextResponse.json(
-        { status: 'error', message: 'Hanya satu jenis filter (Status, Kehadiran, atau Waktu) yang boleh aktif secara bersamaan.' },
+        { status: 'error', message: 'Filter waktu tidak dapat digabungkan dengan status atau kehadiran.' },
         { status: 400 }
       );
     }

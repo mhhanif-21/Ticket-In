@@ -1,4 +1,5 @@
 import { EventLifecycleError, normalizeEventStatus, type EventStatus } from '@/lib/events/eventLifecycle';
+import { parsePosterAspectMode, type PosterAspectMode } from '@/lib/events/posterAspect';
 
 const MAX_EVENT_NAME_LENGTH = 255;
 const MAX_LOCATION_LENGTH = 255;
@@ -25,6 +26,7 @@ export interface ValidatedEventInput {
   location: string;
   date: Date;
   description: string | null;
+  posterAspectMode: PosterAspectMode;
   status?: EventStatus;
 }
 
@@ -113,7 +115,20 @@ function parseRegistrationMode(value: unknown): 'Auto-Accept' | 'Manual Review' 
   throw new EventValidationError('EVENT_REGISTRATION_MODE_INVALID', 'Mode pendaftaran tidak valid.', 'registration_mode');
 }
 
-const CREATE_KEYS = new Set(['name', 'slug', 'capacity', 'registration_mode', 'location', 'date', 'description']);
+function parsePosterAspect(value: unknown): PosterAspectMode {
+  if (value === undefined) return 'landscape';
+  try {
+    return parsePosterAspectMode(value);
+  } catch {
+    throw new EventValidationError(
+      'EVENT_POSTER_ASPECT_MODE_INVALID',
+      'Format poster tidak valid. Pilih Portrait, Landscape, atau Banner.',
+      'poster_aspect_mode',
+    );
+  }
+}
+
+const CREATE_KEYS = new Set(['name', 'slug', 'capacity', 'registration_mode', 'location', 'date', 'description', 'poster_aspect_mode']);
 const UPDATE_KEYS = new Set([...CREATE_KEYS, 'status']);
 
 function assertKnownKeys(payload: Record<string, unknown>, allowed: Set<string>): void {
@@ -136,6 +151,7 @@ export function validateEventCreatePayload(value: unknown): ValidatedEventInput 
     location: trimRequiredString(payload.location, 'location', MAX_LOCATION_LENGTH),
     date: parseDate(payload.date),
     description: optionalTrimmedString(payload.description, 'description', MAX_DESCRIPTION_LENGTH),
+    posterAspectMode: parsePosterAspect(payload.poster_aspect_mode),
   };
 }
 
@@ -157,6 +173,7 @@ export function validateEventUpdatePayload(value: unknown): Partial<ValidatedEve
   if (payload.location !== undefined) update.location = trimRequiredString(payload.location, 'location', MAX_LOCATION_LENGTH);
   if (payload.date !== undefined) update.date = parseDate(payload.date);
   if (payload.description !== undefined) update.description = optionalTrimmedString(payload.description, 'description', MAX_DESCRIPTION_LENGTH);
+  if (payload.poster_aspect_mode !== undefined) update.posterAspectMode = parsePosterAspect(payload.poster_aspect_mode);
   if (payload.status !== undefined) {
     try {
       update.status = normalizeEventStatus(payload.status);

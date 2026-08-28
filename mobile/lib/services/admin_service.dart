@@ -6,6 +6,21 @@ String? exportFileUrl(Map<String, dynamic> statusData) {
   return value is String && value.isNotEmpty ? value : null;
 }
 
+class ParticipantFileResource {
+  final Uri url;
+  final String fileName;
+  final String mimeType;
+
+  const ParticipantFileResource({
+    required this.url,
+    required this.fileName,
+    required this.mimeType,
+  });
+
+  bool get isImage => mimeType.toLowerCase().startsWith('image/');
+  bool get isPdf => mimeType.toLowerCase() == 'application/pdf';
+}
+
 class AdminService {
   final ApiClient _api;
 
@@ -113,16 +128,30 @@ class AdminService {
     }
   }
 
-  Future<Uri> getParticipantFileUrl(String registrationId, String fieldKey) async {
+  Future<ParticipantFileResource> getParticipantFile(
+    String registrationId,
+    String fieldKey,
+  ) async {
     final response = await _api.get('/v1/registrations/$registrationId/files/$fieldKey');
     if (response.statusCode != 200) {
       throw Exception('Berkas belum dapat dibuka. Silakan coba lagi.');
     }
     final body = jsonDecode(response.body) as Map<String, dynamic>;
-    final url = (body['data'] as Map<String, dynamic>?)?['url']?.toString();
-    if (url == null || url.isEmpty) {
+    final data = body['data'] as Map<String, dynamic>?;
+    final url = data?['url']?.toString();
+    final fileName = data?['file_name']?.toString() ?? 'Berkas peserta';
+    final mimeType = data?['mime_type']?.toString() ?? 'application/octet-stream';
+    if (url == null || url.isEmpty || Uri.tryParse(url) == null) {
       throw Exception('Berkas belum dapat dibuka. Silakan coba lagi.');
     }
-    return Uri.parse(url);
+    return ParticipantFileResource(
+      url: Uri.parse(url),
+      fileName: fileName,
+      mimeType: mimeType,
+    );
+  }
+
+  Future<Uri> getParticipantFileUrl(String registrationId, String fieldKey) async {
+    return (await getParticipantFile(registrationId, fieldKey)).url;
   }
 }

@@ -11,6 +11,11 @@ import {
 } from '@/lib/storage/imageValidation';
 
 export const TICKET_TEMPLATE_MAX_FILE_BYTES = 5 * 1024 * 1024;
+/**
+ * Logical width used by the server renderer for normalized template geometry.
+ * Mobile previews scale the same coordinates and font sizes from this width.
+ */
+export const TICKET_TEMPLATE_CANVAS_WIDTH = 1200;
 export const TICKET_TEMPLATE_MIN_FONT_SIZE = 12;
 export const TICKET_TEMPLATE_MAX_FONT_SIZE = 48;
 export const TICKET_TEMPLATE_DEFAULT_FONT_SIZE = 24;
@@ -133,6 +138,22 @@ export function normalizeTicketTemplateElementFontSize(
   fontSize: TicketTemplateElement['fontSize'],
 ): number {
   return getTicketTemplateFontSize(fontSize);
+}
+
+/**
+ * Keep text centered in the same normalized element box in the generated
+ * ticket and in the mobile editor. The baseline offset matches the font
+ * metrics used by the SVG renderer without adding a background or border.
+ */
+export function getTicketTemplateTextPosition(
+  width: number,
+  height: number,
+  fontSize: number,
+): { x: number; y: number } {
+  return {
+    x: Math.round(width / 2),
+    y: Math.round(height / 2 + fontSize * 0.35),
+  };
 }
 
 function isNormalizedBox(element: TicketTemplateElement): boolean {

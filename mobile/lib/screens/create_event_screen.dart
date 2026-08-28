@@ -5,10 +5,12 @@ import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:go_router/go_router.dart';
 import '../models/event_model.dart';
+import '../models/poster_aspect.dart';
 import '../services/event_service.dart';
 import '../services/poster_validation.dart';
 import '../widgets/dashed_border_painter.dart';
 import '../widgets/adaptive_event_image.dart';
+import '../widgets/poster_crop_editor.dart';
 
 class CreateEventScreen extends StatefulWidget {
   const CreateEventScreen({
@@ -18,6 +20,7 @@ class CreateEventScreen extends StatefulWidget {
     this.initialGalleryFiles = const [],
     this.galleryPicker,
     this.imageValidator,
+    this.posterCropper,
   });
 
   final EventService? eventService;
@@ -25,6 +28,7 @@ class CreateEventScreen extends StatefulWidget {
   final List<File> initialGalleryFiles;
   final Future<List<XFile>> Function()? galleryPicker;
   final Future<String?> Function(File file)? imageValidator;
+  final Future<File?> Function(File file, double aspectRatio)? posterCropper;
 
   @override
   State<CreateEventScreen> createState() => _CreateEventScreenState();
@@ -51,6 +55,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
   bool _isLoading = false;
   int _activeMediaIndex = 0;
   String _registrationMode = 'Auto-Accept';
+  PosterAspectMode _posterAspectMode = PosterAspectMode.landscape;
 
   // [MOB-BUG-005] FIX: Dispose controllers untuk mencegah memory leak
   @override
@@ -139,6 +144,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
       return;
     }
 
+    final croppedFiles = <File>[];
     for (final file in selectedFiles) {
       final validationError =
           await (widget.imageValidator ?? validateEventImageFile)(file);
@@ -147,15 +153,44 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
         setState(() => _posterError = validationError);
         return;
       }
+
+      final cropped = await _cropPoster(file);
+      if (!mounted) return;
+      if (cropped == null) continue;
+      final croppedValidationError =
+          await (widget.imageValidator ?? validateEventImageFile)(cropped);
+      if (!mounted) return;
+      if (croppedValidationError != null) {
+        setState(() => _posterError = croppedValidationError);
+        return;
+      }
+      croppedFiles.add(cropped);
     }
+
+    if (croppedFiles.isEmpty) return;
 
     final firstNewMediaIndex = _posterFiles.length;
     setState(() {
-      _posterFiles.addAll(selectedFiles);
+      _posterFiles.addAll(croppedFiles);
       _posterError = null;
       _activeMediaIndex = firstNewMediaIndex;
     });
     _moveToMediaPage(_activeMediaIndex);
+  }
+
+  Future<File?> _cropPoster(File file) {
+    if (widget.posterCropper != null) {
+      return widget.posterCropper!(file, _posterAspectMode.ratio);
+    }
+    // The injected picker is a deterministic test seam. Production uses the
+    // crop editor below, while picker-based widget tests can assert state
+    // changes without opening a modal dialog.
+    if (widget.galleryPicker != null) return Future.value(file);
+    return PosterCropEditor.show(
+      context: context,
+      file: file,
+      aspectRatio: _posterAspectMode.ratio,
+    );
   }
 
   bool _validateMediaSelection() {
@@ -193,6 +228,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
         'date': _selectedDate!.toIso8601String(),
         'description': _descriptionController.text,
         'registration_mode': _registrationMode,
+        'poster_aspect_mode': _posterAspectMode.wireValue,
       };
 
       final eventId = await _eventService.createEvent(
@@ -390,58 +426,58 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
 
     return Column(
       children: [
-        SizedBox(
+        AspectRatio(
           key: const ValueKey('event-poster-preview'),
-          height: 260,
-          width: double.infinity,
+          aspectRatio: _posterAspectMode.ratio,
           child: PageView.builder(
-            controller: _mediaPageController,
-            itemCount: mediaCount,
-            onPageChanged: (index) {
-              if (mounted) setState(() => _activeMediaIndex = index);
-            },
-            itemBuilder: (context, index) {
-              final image = _posterFiles.isEmpty ? null : _posterFiles[index];
-              final title = 'Poster ${index + 1}';
+              controller: _mediaPageController,
+              itemCount: mediaCount,
+              onPageChanged: (index) {
+                if (mounted) setState(() => _activeMediaIndex = index);
+              },
+              itemBuilder: (context, index) {
+                final image = _posterFiles.isEmpty ? null : _posterFiles[index];
+                final title = 'Poster ${index + 1}';
 
-              return Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 2),
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    image == null
-                        ? _buildPosterPlaceholder()
-                        : Semantics(
-                            button: true,
-                            label: 'Lihat $title layar penuh',
-                            child: InkWell(
-                              onTap: () => _showImagePreview(image, title),
-                              borderRadius: BorderRadius.circular(10),
-                              child: AdaptiveEventImage(
-                                image: FileImage(image),
-                                frameAspectRatio: 4 / 3,
-                                expand: true,
-                                blurredBackdrop: false,
-                                backgroundColor: Colors.white,
+                return Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 2),
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      image == null
+                          ? _buildPosterPlaceholder()
+                          : Semantics(
+                              button: true,
+                              label: 'Lihat $title layar penuh',
+                              child: InkWell(
+                                onTap: () => _showImagePreview(image, title),
                                 borderRadius: BorderRadius.circular(10),
+                                child: AdaptiveEventImage(
+                                  image: FileImage(image),
+                                  frameAspectRatio: _posterAspectMode.ratio,
+                                  expand: true,
+                                  fit: BoxFit.contain,
+                                  blurredBackdrop: false,
+                                  backgroundColor: Colors.white,
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
                               ),
                             ),
+                      if (image != null)
+                        Positioned(
+                          right: 8,
+                          top: 8,
+                          child: IconButton.filledTonal(
+                            key: ValueKey('event-poster-remove-$index'),
+                            tooltip: 'Hapus $title',
+                            onPressed: () => _removePosterAt(index),
+                            icon: const Icon(Icons.close),
                           ),
-                    if (image != null)
-                      Positioned(
-                        right: 8,
-                        top: 8,
-                        child: IconButton.filledTonal(
-                          key: ValueKey('event-poster-remove-$index'),
-                          tooltip: 'Hapus $title',
-                          onPressed: () => _removePosterAt(index),
-                          icon: const Icon(Icons.close),
                         ),
-                      ),
-                  ],
-                ),
-              );
-            },
+                    ],
+                  ),
+                );
+              },
           ),
         ),
         if (_posterFiles.length > 1)
@@ -475,6 +511,40 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
           'Wajib 1 gambar, maksimal 5 · JPG, PNG, atau WebP · maks. 5 MB.',
           style: TextStyle(fontSize: 12, color: Color(0xFF5F6368)),
         ),
+        const SizedBox(height: 8),
+        DropdownButtonFormField<PosterAspectMode>(
+          key: const ValueKey('event-poster-aspect-mode'),
+          initialValue: _posterAspectMode,
+          decoration: const InputDecoration(
+            labelText: 'Format poster',
+            border: OutlineInputBorder(),
+          ),
+          items: PosterAspectMode.values
+              .map(
+                (mode) => DropdownMenuItem(
+                  value: mode,
+                  child: Text(mode.label),
+                ),
+              )
+              .toList(),
+          onChanged: _posterFiles.isNotEmpty
+              ? null
+              : (value) {
+                  if (value == null || !mounted) return;
+                  setState(() {
+                    _posterAspectMode = value;
+                    _posterError = null;
+                  });
+                },
+        ),
+        if (_posterFiles.isNotEmpty)
+          const Padding(
+            padding: EdgeInsets.only(top: 4),
+            child: Text(
+              'Format dikunci setelah poster pertama dipilih.',
+              style: TextStyle(fontSize: 11, color: Color(0xFF5F6368)),
+            ),
+          ),
         const SizedBox(height: 8),
         _buildMediaCarousel(),
         const SizedBox(height: 4),

@@ -38,6 +38,7 @@ export async function getPublicEventAction(slug: string) {
       location: events.location,
       date: events.date,
       posterUrl: events.posterUrl,
+      posterAspectMode: events.posterAspectMode,
       capacity: events.capacity,
       registrationMode: events.registrationMode,
       status: events.status,

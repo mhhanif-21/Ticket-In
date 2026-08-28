@@ -639,7 +639,7 @@ class _TicketTemplateScreenState extends State<TicketTemplateScreen> {
                                       fontWeight: FontWeight.w700,
                                       fontSize: _previewFontSize(
                                         element,
-                                        height,
+                                        width,
                                       ),
                                     ),
                                   ),
@@ -658,11 +658,14 @@ class _TicketTemplateScreenState extends State<TicketTemplateScreen> {
 
   double _previewFontSize(
     TicketTemplateElementModel element,
-    double canvasHeight,
+    double canvasWidth,
   ) {
-    final canvasScale = canvasHeight / 800;
+    // The API persists normalized geometry and the renderer uses a 1200px
+    // logical canvas. Scale the explicit font size from that same width so
+    // the editor and generated ticket retain the same visual proportions.
+    final canvasScale = canvasWidth / ticketTemplateCanvasWidth;
     return math.max(
-      9,
+      1,
       math.min(
         48,
         element.fontSize

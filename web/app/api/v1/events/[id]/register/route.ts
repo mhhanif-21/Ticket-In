@@ -23,7 +23,6 @@ import {
   createParticipantFileUploadRequestId,
   createStagedParticipantFileUpload,
   queueParticipantFileUploadsForCleanup,
-  reconcileParticipantFileUploads,
 } from '@/lib/registration/participantFileLifecycle';
 import {
   ParticipantFileValidationError,
@@ -122,13 +121,15 @@ function safeDatabaseDetails(error: unknown): {
       .trim()
       .slice(0, 512)
     : null;
+  const queryTableMatch = rawQuery?.match(/\b(?:from|into|update|join)\s+"?([A-Za-z_][A-Za-z0-9_]*)"?/i);
+  const queryTable = queryTableMatch ? safeIdentifier(queryTableMatch[1]) : null;
 
   return {
     code: typeof provider?.code === 'string' && /^[A-Za-z0-9_.:-]{1,64}$/.test(provider.code)
       ? provider.code
       : null,
     queryShape,
-    table: safeIdentifier(provider?.table),
+    table: safeIdentifier(provider?.table) ?? queryTable,
     column: safeIdentifier(provider?.column),
     constraint: safeIdentifier(provider?.constraint),
     detail: typeof provider?.detail === 'string' ? redactLogText(provider.detail) : null,
@@ -192,6 +193,7 @@ type RegistrationFailureContext = {
   fieldTypes?: string[];
   stagedFileCount?: number;
   uploadedFileCount?: number;
+  startedAtMs?: number;
 };
 
 function logRegistrationFailure(
@@ -213,20 +215,26 @@ function logRegistrationFailure(
     errorName: details.errorName,
     errorMessage: details.errorMessage,
     errorStack: details.errorStack,
+    dbCode: database.code,
     database,
     fieldTypes: context.fieldTypes ?? [],
     uploadStatus: {
       staged: context.stagedFileCount ?? 0,
       uploaded: context.uploadedFileCount ?? 0,
     },
+    durationMs: context.startedAtMs === undefined
+      ? null
+      : Math.max(0, Date.now() - context.startedAtMs),
   });
 }
 
 async function cleanupStagedUploads(uploadIds: string[]): Promise<void> {
   if (uploadIds.length === 0) return;
   try {
+    // The cleanup ledger is the durable hand-off.  Do not perform a storage
+    // delete in the registration response path: a provider timeout must not
+    // turn an already classified registration failure into a second timeout.
     await queueParticipantFileUploadsForCleanup(uploadIds);
-    await reconcileParticipantFileUploads(uploadIds.length);
   } catch {
     // A durable ledger still records these objects for a later reconciliation.
     console.error('Participant file cleanup scheduling failed');
@@ -242,6 +250,7 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
   const stagedUploadIds: string[] = [];
   const uploadRequestId = createParticipantFileUploadRequestId();
   const requestId = requestIdFor(req);
+  const startedAtMs = Date.now();
   let registrationOwnsUploads = false;
   let failureStage = 'request';
   let eventSlugForLog: string | null = null;
@@ -250,21 +259,6 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
   let uploadedFileCount = 0;
 
   try {
-    // Cleanup is durable and also has a cron owner. It must not block a new
-    // registration when the cleanup dependency is temporarily unavailable.
-    failureStage = 'participant_file_cleanup_sweep';
-    try {
-      await reconcileParticipantFileUploads();
-    } catch (error) {
-      logRegistrationFailure(requestId, failureStage, error, 'cleanup', {
-        eventSlug: eventSlugForLog,
-        eventId: eventIdForLog,
-        fieldTypes: fieldTypesForLog,
-        stagedFileCount: stagedUploadIds.length,
-        uploadedFileCount,
-      });
-    }
-
     failureStage = 'parse_request';
     const params = await props.params;
     const slug = params.id;
@@ -378,6 +372,7 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
             fieldTypes: fieldTypesForLog,
             stagedFileCount: stagedUploadIds.length,
             uploadedFileCount,
+            startedAtMs,
           });
           throw new ParticipantFileUploadError(uploadError.statusCode);
         }
@@ -455,6 +450,7 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
           fieldTypes: fieldTypesForLog,
           stagedFileCount: stagedUploadIds.length,
           uploadedFileCount,
+          startedAtMs,
         });
         return NextResponse.json({
           status: 'error',
@@ -480,6 +476,7 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
           fieldTypes: fieldTypesForLog,
           stagedFileCount: stagedUploadIds.length,
           uploadedFileCount,
+          startedAtMs,
         });
         failureStage = 'ticket_job_lookup';
         const job = await import('@/lib/actions/ticketGenerationJob').then(({ getTicketGenerationJob }) => getTicketGenerationJob(result.registrationId));
@@ -504,6 +501,7 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
       fieldTypes: fieldTypesForLog,
       stagedFileCount: stagedUploadIds.length,
       uploadedFileCount,
+      startedAtMs,
     });
     if (!registrationOwnsUploads) await cleanupStagedUploads(stagedUploadIds);
 

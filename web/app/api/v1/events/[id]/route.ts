@@ -25,6 +25,7 @@ import {
 import { queueStorageCleanupJobsTx } from '@/lib/storage/cleanupLifecycle';
 import { EXPORT_STORAGE_BUCKET, STORAGE_BUCKETS } from '@/lib/storage/buckets';
 import { getPublicStorageObjectPath } from '@/lib/storage/publicObjectPath';
+import { getAuthenticatedAdmin } from '@/lib/security/adminRoute';
 
 export const runtime = 'nodejs';
 const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -32,6 +33,10 @@ const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
+    const isAdminDetail = uuidRegex.test(id);
+    if (isAdminDetail && !await getAuthenticatedAdmin(req)) {
+      return NextResponse.json({ status: 'error', message: 'Unauthorized' }, { status: 403 });
+    }
 
     const [event] = await db
       .select({
@@ -42,6 +47,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
         location: events.location,
         date: events.date,
         posterUrl: events.posterUrl,
+        posterAspectMode: events.posterAspectMode,
         capacity: events.capacity,
         registrationMode: events.registrationMode,
         status: events.status,
@@ -81,6 +87,11 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       .from(eventMedia)
       .where(eq(eventMedia.eventId, event.id))
       .orderBy(asc(eventMedia.role), asc(eventMedia.displayOrder));
+    const orderedMedia = [...media].sort((left, right) => {
+      const leftRole = left.role === 'cover' ? 0 : 1;
+      const rightRole = right.role === 'cover' ? 0 : 1;
+      return leftRole - rightRole || left.displayOrder - right.displayOrder;
+    });
 
     const isPublished = event.status === 'Published';
     const canonicalBaseUrl = isPublished ? getCanonicalBaseUrl(req) : null;
@@ -92,6 +103,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       location: event.location,
       date: event.date,
       posterUrl: event.posterUrl,
+      posterAspectMode: event.posterAspectMode,
       capacity: event.capacity,
       registrationMode: event.registrationMode,
       status: event.status,
@@ -106,7 +118,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
           fieldKey: getRegistrationFieldKey(field),
           fieldKind: field.fieldKind,
         })),
-      media,
+      media: orderedMedia,
       // Public access is a lifecycle capability, not merely a UI concern.
       // The QR endpoint and public registration route both require Published;
       // do not advertise links that will deterministically return 404/409.
@@ -119,7 +131,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     };
 
     // UUID adalah kontrak detail Admin yang dijaga middleware; slug adalah DTO publik.
-    const responseData = uuidRegex.test(id)
+    const responseData = isAdminDetail
       ? { id: event.id, ...eventDetail }
       : eventDetail;
 
@@ -185,6 +197,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
         updateData.capacity = input.capacity;
       }
       if (input.registrationMode !== undefined) updateData.registrationMode = input.registrationMode;
+      if (input.posterAspectMode !== undefined) updateData.posterAspectMode = input.posterAspectMode;
       if (input.status !== undefined) {
         const nextStatus = input.status;
         if (!canTransitionEventStatus(existing.status, nextStatus)) {

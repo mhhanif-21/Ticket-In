@@ -52,6 +52,11 @@ const MIGRATIONS = [
     path: resolve(process.cwd(), 'supabase/migrations/0015_normalize-legacy-ticket-email-tokens.sql'),
     lockKey: 2026082715,
   },
+  {
+    id: '0016_event-poster-aspect-mode',
+    path: resolve(process.cwd(), 'supabase/migrations/0016_event_poster_aspect_mode.sql'),
+    lockKey: 2026082816,
+  },
 ] as const;
 
 type SchemaRow = {
@@ -72,6 +77,7 @@ async function verifyLifecycleSchema(): Promise<void> {
     'creation_key',
     'volunteer_session_version',
     'form_version',
+    'poster_aspect_mode',
   ];
   const columns = await client.unsafe<SchemaRow[]>(`
     SELECT column_name
@@ -82,7 +88,8 @@ async function verifyLifecycleSchema(): Promise<void> {
         'status',
         'creation_key',
         'volunteer_session_version',
-        'form_version'
+        'form_version',
+        'poster_aspect_mode'
       )
   `);
 

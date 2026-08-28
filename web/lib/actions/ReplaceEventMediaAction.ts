@@ -206,6 +206,11 @@ export class ReplaceEventMediaAction {
         .from(eventMedia)
         .where(eq(eventMedia.eventId, input.eventId))
         .orderBy(asc(eventMedia.role), asc(eventMedia.displayOrder));
+      activeMedia.sort((left, right) => {
+        const leftRole = left.role === 'cover' ? 0 : 1;
+        const rightRole = right.role === 'cover' ? 0 : 1;
+        return leftRole - rightRole || left.displayOrder - right.displayOrder;
+      });
 
       return {
         posterUrl: cover.publicUrl,
