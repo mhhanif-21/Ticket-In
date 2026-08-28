@@ -221,19 +221,6 @@ class _EditEventScreenState extends State<EditEventScreen> {
     _moveToMediaPage(_activeMediaIndex);
   }
 
-  void _moveMedia(int offset) {
-    if (_activeMediaIndex == 0) return;
-    final destination = _activeMediaIndex + offset;
-    if (destination < 1 || destination >= _mediaItems.length) return;
-    setState(() {
-      final item = _mediaItems.removeAt(_activeMediaIndex);
-      _mediaItems.insert(destination, item);
-      _activeMediaIndex = destination;
-      _mediaChanged = true;
-    });
-    _moveToMediaPage(destination);
-  }
-
   void _moveToMediaPage(int index) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || !_mediaPageController.hasClients || _mediaItems.isEmpty) {
@@ -377,10 +364,13 @@ class _EditEventScreenState extends State<EditEventScreen> {
         widget.eventId,
         firstItem.file!.path,
       );
+      // The cover upload is acknowledged by the server. Keep the local file
+      // in the collection until the final read-back, but do not upload it
+      // again when a later gallery step needs a retry.
       _coverPending = false;
     }
 
-    if (!_mediaChanged) return;
+    if (!_mediaChanged && !_coverPending) return;
 
     if (!firstItem.isLocal && firstItem.remote!.role != 'cover') {
       await _eventService.promoteEventMedia(widget.eventId, firstItem.id);
@@ -412,21 +402,37 @@ class _EditEventScreenState extends State<EditEventScreen> {
         .where((item) => item.isLocal)
         .toList();
     if (localItems.isNotEmpty) {
-      final added = await _eventService.appendEventGallery(
-        widget.eventId,
-        localItems.map((item) => item.file!.path).toList(),
-      );
-      if (added.length != localItems.length) {
-        throw const EventMediaUploadException(
-          'Sebagian foto galeri belum dapat diproses. Silakan unggah ulang.',
-        );
-      }
-      var nextAdded = 0;
-      for (var index = 1; index < _mediaItems.length; index += 1) {
-        if (_mediaItems[index].isLocal) {
-          _mediaItems[index] = _EditableMediaItem.remote(added[nextAdded]);
-          nextAdded += 1;
+      // Upload each pending item independently. A successful response is
+      // immediately replaced by its server row, so a later retry contains
+      // only the item(s) that still need uploading.
+      var failedCount = 0;
+      for (final localItem in localItems) {
+        try {
+          final added = await _eventService.appendEventGallery(
+            widget.eventId,
+            [localItem.file!.path],
+          );
+          if (added.length != 1 || added.first.id.isEmpty) {
+            failedCount += 1;
+            continue;
+          }
+          final itemIndex = _mediaItems.indexOf(localItem);
+          if (itemIndex >= 0) {
+            final serverItem = _EditableMediaItem.remote(added.first);
+            if (mounted) {
+              setState(() => _mediaItems[itemIndex] = serverItem);
+            } else {
+              _mediaItems[itemIndex] = serverItem;
+            }
+          }
+        } catch (_) {
+          failedCount += 1;
         }
+      }
+      if (failedCount > 0) {
+        throw const EventMediaUploadException(
+          'Sebagian foto galeri belum dapat diproses. Silakan unggah ulang foto yang gagal.',
+        );
       }
     }
 
@@ -437,8 +443,43 @@ class _EditEventScreenState extends State<EditEventScreen> {
       );
     }
     await _eventService.replaceEventGallery(widget.eventId, galleryIds);
-    _mediaChanged = false;
-    _coverPending = false;
+    await _refreshMediaFromServer();
+  }
+
+  Future<void> _refreshMediaFromServer() async {
+    final expectedItems = List<_EditableMediaItem>.of(_mediaItems);
+    final expectedRemoteIds = expectedItems
+        .where((item) => !item.isLocal && item.id != 'legacy-cover')
+        .map((item) => item.id)
+        .where((id) => id.isNotEmpty)
+        .toSet();
+    late final EventModel event;
+    try {
+      event = await _eventService.getEventDetail(widget.eventId);
+    } catch (_) {
+      throw const EventMediaUploadException(
+        'Media sudah dikirim, tetapi status terbaru belum dapat dimuat. Silakan coba lagi.',
+      );
+    }
+
+    final serverItems = _mediaItemsForEvent(event);
+    final serverIds = serverItems.map((item) => item.id).toSet();
+    if (serverItems.length != expectedItems.length ||
+        !expectedRemoteIds.every(serverIds.contains)) {
+      throw const EventMediaUploadException(
+        'Media sudah dikirim, tetapi belum dapat dikonfirmasi dari server. Silakan coba lagi.',
+      );
+    }
+    if (!mounted) return;
+    setState(() {
+      _mediaItems
+        ..clear()
+        ..addAll(serverItems);
+      _activeMediaIndex = _activeMediaIndex.clamp(0, _mediaItems.length - 1);
+      _mediaChanged = false;
+      _coverPending = false;
+    });
+    _moveToMediaPage(_activeMediaIndex);
   }
 
   @override
@@ -554,65 +595,44 @@ class _EditEventScreenState extends State<EditEventScreen> {
         ),
         if (count > 1) ...[
           const SizedBox(height: 4),
-          Row(
-            children: [
-              IconButton(
-                key: const ValueKey('edit-poster-move-previous'),
-                tooltip: 'Pindahkan poster ke kiri',
-                onPressed: _activeMediaIndex <= 1 ? null : () => _moveMedia(-1),
-                icon: const Icon(Icons.arrow_back),
-              ),
-              Expanded(
-                child: SizedBox(
-                  height: 56,
-                  child: ListView.separated(
-                    scrollDirection: Axis.horizontal,
-                    itemCount: count,
-                    separatorBuilder: (_, _) => const SizedBox(width: 8),
-                    itemBuilder: (context, index) {
-                      final selected = index == _activeMediaIndex;
-                      return InkWell(
-                        onTap: () {
-                          setState(() => _activeMediaIndex = index);
-                          _moveToMediaPage(index);
-                        },
-                        borderRadius: BorderRadius.circular(6),
-                        child: Container(
-                          width: 72,
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(6),
-                            border: Border.all(
-                              color: selected
-                                  ? Colors.black
-                                  : const Color(0xFFC4C7C7),
-                              width: selected ? 2 : 1,
-                            ),
-                          ),
-                          clipBehavior: Clip.antiAlias,
-                          child: Image(
-                            image: _mediaItems[index].image,
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, _, _) => const ColoredBox(
-                              color: Color(0xFFE5E2E1),
-                              child: Icon(Icons.broken_image_outlined),
-                            ),
-                          ),
-                        ),
-                      );
-                    },
+          SizedBox(
+            height: 56,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: count,
+              separatorBuilder: (_, _) => const SizedBox(width: 8),
+              itemBuilder: (context, index) {
+                final selected = index == _activeMediaIndex;
+                return InkWell(
+                  onTap: () {
+                    setState(() => _activeMediaIndex = index);
+                    _moveToMediaPage(index);
+                  },
+                  borderRadius: BorderRadius.circular(6),
+                  child: Container(
+                    width: 72,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(
+                        color: selected
+                            ? Colors.black
+                            : const Color(0xFFC4C7C7),
+                        width: selected ? 2 : 1,
+                      ),
+                    ),
+                    clipBehavior: Clip.antiAlias,
+                    child: Image(
+                      image: _mediaItems[index].image,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, _, _) => const ColoredBox(
+                        color: Color(0xFFE5E2E1),
+                        child: Icon(Icons.broken_image_outlined),
+                      ),
+                    ),
                   ),
-                ),
-              ),
-              IconButton(
-                key: const ValueKey('edit-poster-move-next'),
-                tooltip: 'Pindahkan poster ke kanan',
-                onPressed:
-                    _activeMediaIndex == 0 || _activeMediaIndex == count - 1
-                    ? null
-                    : () => _moveMedia(1),
-                icon: const Icon(Icons.arrow_forward),
-              ),
-            ],
+                );
+              },
+            ),
           ),
         ],
         const SizedBox(height: 4),

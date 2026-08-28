@@ -221,6 +221,21 @@ class EventService {
     return fallback;
   }
 
+  void _throwIfErrorPayload(String body, String fallback) {
+    if (body.trim().isEmpty) return;
+    try {
+      final decoded = jsonDecode(body);
+      if (decoded is Map<String, dynamic> && decoded['status'] == 'error') {
+        throw EventMediaUploadException(_messageFromResponse(body, fallback));
+      }
+    } on EventMediaUploadException {
+      rethrow;
+    } on FormatException {
+      // A successful endpoint may return an empty/non-JSON body. HTTP 2xx is
+      // still the upload acknowledgement in that case.
+    }
+  }
+
   Future<void> uploadEventMedia(
     String id, {
     required String coverPath,
@@ -251,8 +266,8 @@ class EventService {
       ],
     );
 
+    final responseBody = await mediaResponse.stream.bytesToString();
     if (mediaResponse.statusCode != 200 && mediaResponse.statusCode != 201) {
-      final responseBody = await mediaResponse.stream.bytesToString();
       throw EventMediaUploadException(
         _messageFromResponse(
           responseBody,
@@ -260,6 +275,10 @@ class EventService {
         ),
       );
     }
+    _throwIfErrorPayload(
+      responseBody,
+      'Media acara belum dapat diunggah. Silakan coba lagi.',
+    );
   }
 
   Future<void> uploadEventPoster(String id, String posterPath) async {
@@ -276,15 +295,19 @@ class EventService {
       fileField: 'poster',
     );
 
+    final responseBody = await posterResponse.stream.bytesToString();
     if (posterResponse.statusCode != 200 && posterResponse.statusCode != 201) {
-      final errorStr = await posterResponse.stream.bytesToString();
       throw EventMediaUploadException(
         _messageFromResponse(
-          errorStr,
+          responseBody,
           'Poster acara belum dapat diunggah. Silakan coba lagi.',
         ),
       );
     }
+    _throwIfErrorPayload(
+      responseBody,
+      'Poster acara belum dapat diunggah. Silakan coba lagi.',
+    );
   }
 
   Future<List<EventMediaModel>> appendEventGallery(

@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation';
 import { getPublicEventAction } from '@/lib/actions/getPublicEventAction';
 import Link from 'next/link';
-import { AdaptiveImage } from '@/components/media/AdaptiveImage';
+import { EventMediaCarousel } from '@/components/media/EventMediaCarousel';
 
 export default async function PublicEventLandingPage(props: { params: Promise<{ slug: string }> }) {
   const params = await props.params;
@@ -20,16 +20,10 @@ export default async function PublicEventLandingPage(props: { params: Promise<{ 
 
   return (
     <main className="flex-grow w-full max-w-container-max mx-auto pb-stack-lg">
-      {/* Hero Event Poster */}
+      {/* One responsive carousel for the cover and every stored gallery item. */}
       <div className="relative w-full overflow-hidden bg-surface-container-highest shadow-[0_4px_12px_rgba(0,0,0,0.05)]">
-        {event.posterUrl ? (
-          <AdaptiveImage
-            src={event.posterUrl}
-            alt={event.name}
-            priority
-            sizes="100vw"
-            containerClassName="w-full"
-          />
+        {event.media.length > 0 ? (
+          <EventMediaCarousel eventName={event.name} media={event.media} />
         ) : (
           <div className="flex min-h-56 items-center justify-center px-4 text-center text-2xl font-bold text-secondary opacity-80">
             {event.name}
@@ -86,23 +80,6 @@ export default async function PublicEventLandingPage(props: { params: Promise<{ 
             {event.description || 'Tidak ada deskripsi.'}
           </p>
         </div>
-
-        {event.media.filter((media) => media.role === 'gallery').length > 0 && (
-          <section className="bg-surface-container-lowest dark:bg-[#1e1e1e] rounded-[16px] shadow-[0_4px_12px_rgba(0,0,0,0.05)] p-6 md:p-8">
-            <h3 className="font-label-caps text-label-caps text-secondary dark:text-white/60 uppercase tracking-widest border-b border-outline-variant/30 dark:border-white/10 pb-2 mb-4">Galeri</h3>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              {event.media.filter((media) => media.role === 'gallery').map((media) => (
-                <AdaptiveImage
-                  key={`${media.role}-${media.displayOrder}`}
-                  src={media.publicUrl}
-                  alt={`Galeri ${event.name}`}
-                  sizes="(max-width: 640px) 100vw, 50vw"
-                  containerClassName="w-full rounded-xl bg-surface-container-highest"
-                />
-              ))}
-            </div>
-          </section>
-        )}
 
         {/* Call to Action Actions */}
         <div className="flex flex-col gap-stack-md pt-4">

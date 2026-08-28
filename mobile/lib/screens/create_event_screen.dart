@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:go_router/go_router.dart';
+import '../models/event_model.dart';
 import '../services/event_service.dart';
 import '../services/poster_validation.dart';
 import '../widgets/dashed_border_painter.dart';
@@ -257,6 +258,19 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
         coverPath: _posterFiles.first.path,
         galleryPaths: _posterFiles.skip(1).map((file) => file.path).toList(),
       );
+      late final EventModel refreshedEvent;
+      try {
+        refreshedEvent = await _eventService.getEventDetail(eventId);
+      } catch (_) {
+        throw const EventMediaUploadException(
+          'Media sudah dikirim, tetapi status terbaru belum dapat dimuat. Silakan coba lagi.',
+        );
+      }
+      if (!_hasPersistedMedia(refreshedEvent)) {
+        throw const EventMediaUploadException(
+          'Media sudah dikirim, tetapi belum dapat dikonfirmasi dari server. Silakan coba lagi.',
+        );
+      }
       if (!mounted) return;
       setState(() => _pendingMediaEventId = null);
       ScaffoldMessenger.of(context).showSnackBar(
@@ -275,6 +289,13 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  bool _hasPersistedMedia(EventModel event) {
+    if (event.posterUrl?.trim().isNotEmpty == true) return true;
+    return event.media.any(
+      (media) => media.publicUrl.trim().isNotEmpty,
+    );
   }
 
   void _moveToMediaPage(int index) {
@@ -305,18 +326,6 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
             .toInt();
       }
       _posterError = null;
-    });
-    _moveToMediaPage(_activeMediaIndex);
-  }
-
-  void _movePoster(int offset) {
-    final destination = _activeMediaIndex + offset;
-    if (destination < 0 || destination >= _posterFiles.length) return;
-
-    setState(() {
-      final image = _posterFiles.removeAt(_activeMediaIndex);
-      _posterFiles.insert(destination, image);
-      _activeMediaIndex = destination;
     });
     _moveToMediaPage(_activeMediaIndex);
   }
@@ -435,36 +444,16 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
             },
           ),
         ),
-        if (_posterFiles.length > 1) ...[
-          const SizedBox(height: 4),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              IconButton(
-                key: const ValueKey('event-poster-move-previous'),
-                tooltip: 'Pindahkan poster ke kiri',
-                onPressed: _activeMediaIndex == 0
-                    ? null
-                    : () => _movePoster(-1),
-                icon: const Icon(Icons.arrow_back),
-              ),
-              Text(
-                _activeMediaIndex == 0
-                    ? 'Poster utama'
-                    : 'Poster ${_activeMediaIndex + 1} dari ${_posterFiles.length}',
-                style: const TextStyle(fontSize: 12, color: Color(0xFF5F6368)),
-              ),
-              IconButton(
-                key: const ValueKey('event-poster-move-next'),
-                tooltip: 'Pindahkan poster ke kanan',
-                onPressed: _activeMediaIndex == _posterFiles.length - 1
-                    ? null
-                    : () => _movePoster(1),
-                icon: const Icon(Icons.arrow_forward),
-              ),
-            ],
+        if (_posterFiles.length > 1)
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Text(
+              _activeMediaIndex == 0
+                  ? 'Poster utama'
+                  : 'Poster ${_activeMediaIndex + 1} dari ${_posterFiles.length}',
+              style: const TextStyle(fontSize: 12, color: Color(0xFF5F6368)),
+            ),
           ),
-        ],
       ],
     );
   }

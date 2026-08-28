@@ -102,10 +102,17 @@ function optionsFor(field: RegistrationFormField): string[] {
   return field.options;
 }
 
+export function isRegistrationFileValue(value: unknown): value is Blob {
+  if (typeof Blob !== 'undefined' && value instanceof Blob) return true;
+  if (!value || typeof value !== 'object') return false;
+  const candidate = value as { arrayBuffer?: unknown; size?: unknown };
+  return typeof candidate.arrayBuffer === 'function' && typeof candidate.size === 'number';
+}
+
 function hasValue(value: unknown): boolean {
   if (Array.isArray(value)) return value.some(hasValue);
   if (typeof value === 'string') return value.trim() !== '';
-  if (value instanceof Blob) return value.size > 0;
+  if (isRegistrationFileValue(value)) return value.size > 0;
   if (value && typeof value === 'object') return true;
   return false;
 }
@@ -135,7 +142,7 @@ export function validateRegistrationAnswers(fields: RegistrationFormField[], ans
     }
 
     if (field.fieldType === 'file' || field.fieldType === 'image') {
-      if (!(value instanceof Blob) && !isStoredFileAnswer(value)) {
+      if (!isRegistrationFileValue(value) && !isStoredFileAnswer(value)) {
         throw new RegistrationFormValidationError(`Field ${field.fieldName} harus berupa berkas`);
       }
       continue;

@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { AdaptiveImage } from '@/components/media/AdaptiveImage';
 import { RegistrationField } from '@/components/registration/RegistrationField';
 import {
   getRegistrationFieldKey,
@@ -219,26 +218,9 @@ export default function RegisterPage() {
   }
 
   return (
-    <main className="flex-grow w-full max-w-[1200px] mx-auto px-margin-mobile md:px-margin-desktop py-stack-lg flex flex-col md:flex-row gap-stack-lg">
-      {/* Graphic Element (Left side on desktop) */}
-      <div className="hidden md:block md:w-1/2 relative overflow-hidden rounded-[16px]">
-        <div className="bg-surface-variant flex items-center justify-center">
-          {eventData.posterUrl ? (
-            <AdaptiveImage
-              src={eventData.posterUrl}
-              alt={eventData.name}
-              sizes="(max-width: 768px) 100vw, 50vw"
-              containerClassName="w-full"
-              imageClassName="mix-blend-multiply opacity-80"
-            />
-          ) : (
-            <div className="px-4 py-24 text-center font-display-lg text-secondary">{eventData.name}</div>
-          )}
-        </div>
-      </div>
-
-      {/* Form Section */}
-      <div className="w-full md:w-1/2 flex flex-col justify-center">
+    <main className="flex-grow w-full max-w-[860px] mx-auto px-margin-mobile md:px-margin-desktop py-stack-lg flex flex-col items-center">
+      {/* Registration stays focused on the form; media belongs to the event landing page. */}
+      <div className="w-full max-w-[720px] flex flex-col justify-center">
         <div className="mb-stack-lg">
           <h2 className="font-display-lg-mobile md:font-display-lg text-display-lg-mobile md:text-display-lg text-primary mb-stack-sm">{correctionMode ? 'Ubah Email Pendaftaran' : 'Isi Data Pendaftaran'}</h2>
           <p className="font-description text-description text-secondary">{correctionMode ? 'Perbarui email Anda. Bukti perubahan hanya berlaku sekali.' : 'Silakan lengkapi formulir di bawah ini untuk mengonfirmasi pendaftaran Anda.'}</p>
