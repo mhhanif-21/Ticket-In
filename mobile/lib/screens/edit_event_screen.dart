@@ -412,13 +412,40 @@ class _EditEventScreenState extends State<EditEventScreen> {
             widget.eventId,
             [localItem.file!.path],
           );
-          if (added.length != 1 || added.first.id.isEmpty) {
+          EventMediaModel? uploadedItem;
+          if (added.length == 1 && added.first.id.isNotEmpty) {
+            uploadedItem = added.first;
+          } else if (added.isEmpty) {
+            // Some successful 2xx responses do not include the created row.
+            // Confirm the acknowledgement from the event detail before
+            // classifying the item as failed.
+            try {
+              final refreshed = await _eventService.getEventDetail(
+                widget.eventId,
+              );
+              final knownIds = _mediaItems
+                  .where((item) => !item.isLocal && item.id.isNotEmpty)
+                  .map((item) => item.id)
+                  .toSet();
+              final candidates = _mediaItemsForEvent(refreshed)
+                  .where((item) => item.remote?.role != 'cover')
+                  .where((item) => !knownIds.contains(item.id))
+                  .toList();
+              if (candidates.length == 1) {
+                uploadedItem = candidates.single.remote;
+              }
+            } catch (_) {
+              // Read-back failure remains retryable and must keep this local
+              // file in the editor state.
+            }
+          }
+          if (uploadedItem == null) {
             failedCount += 1;
             continue;
           }
           final itemIndex = _mediaItems.indexOf(localItem);
           if (itemIndex >= 0) {
-            final serverItem = _EditableMediaItem.remote(added.first);
+            final serverItem = _EditableMediaItem.remote(uploadedItem);
             if (mounted) {
               setState(() => _mediaItems[itemIndex] = serverItem);
             } else {
@@ -572,7 +599,7 @@ class _EditEventScreenState extends State<EditEventScreen> {
                             image: item.image,
                             frameAspectRatio: 4 / 3,
                             expand: true,
-                            blurredBackdrop: true,
+                            blurredBackdrop: false,
                             backgroundColor: Colors.white,
                             borderRadius: BorderRadius.circular(10),
                           ),

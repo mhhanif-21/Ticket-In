@@ -55,12 +55,14 @@ export function RegistrationField({
             name={fieldName}
             required={field.isRequired}
             accept={field.fieldType === 'file'
-              ? '.jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf'
+              ? '.pdf,application/pdf'
               : '.jpg,.jpeg,.png,image/jpeg,image/png'}
             onChange={(event) => onFileChange?.(field, event.currentTarget.files?.[0] ?? null)}
             className="w-full px-4 py-3 border border-outline-variant rounded-DEFAULT font-body-md text-primary bg-surface-bright file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-surface-dim file:text-primary hover:file:bg-surface-container-high"
           />
-          <p className="font-body-sm text-on-surface-variant">JPG, PNG, atau PDF maksimal 5 MB.</p>
+          <p className="font-body-sm text-on-surface-variant">
+            {field.fieldType === 'file' ? 'PDF maksimal 5 MB.' : 'JPG atau PNG maksimal 5 MB.'}
+          </p>
           {fileError ? <p role="alert" className="font-body-sm text-error">{fileError}</p> : null}
         </>
       ) : (

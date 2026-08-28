@@ -39,6 +39,10 @@ function isDeclaredMimeCompatible(declaredMime: string, detectedMime: Participan
   return declaredMime === detectedMime;
 }
 
+function allowedFormatLabel(fieldType: string): string {
+  return fieldType === 'file' ? 'PDF' : 'JPG atau PNG';
+}
+
 export function validateParticipantFileMetadata(input: {
   fileName: string;
   size: number;
@@ -56,12 +60,12 @@ export function validateParticipantFileMetadata(input: {
   const declaredMime = normalizedDeclaredMime(input.declaredMime);
   const allowedDeclaredMimes = input.fieldType === 'image'
     ? new Set(['', 'image/jpeg', 'image/jpg', 'image/png'])
-    : new Set(['', 'image/jpeg', 'image/jpg', 'image/png', 'application/pdf']);
+    : new Set(['', 'application/pdf']);
   if (!allowedDeclaredMimes.has(declaredMime)) {
     throw new ParticipantFileValidationError(
       'REGISTRATION_FILE_TYPE_NOT_ALLOWED',
       415,
-      `Format ${input.fileName} tidak didukung. Gunakan JPG, PNG, atau PDF.`,
+      `Format ${input.fileName} tidak didukung. Gunakan ${allowedFormatLabel(input.fieldType)}.`,
     );
   }
 }
@@ -75,12 +79,12 @@ export function validateParticipantFileContent(input: {
   const detectedMime = detectParticipantFileMime(input.bytes);
   const isAllowedForField = input.fieldType === 'image'
     ? detectedMime === 'image/jpeg' || detectedMime === 'image/png'
-    : detectedMime !== null;
+    : detectedMime === 'application/pdf';
   if (!detectedMime || !isAllowedForField || !isDeclaredMimeCompatible(normalizedDeclaredMime(input.declaredMime), detectedMime)) {
     throw new ParticipantFileValidationError(
       'REGISTRATION_FILE_TYPE_NOT_ALLOWED',
       415,
-      `Format ${input.fileName} tidak didukung. Gunakan JPG, PNG, atau PDF.`,
+      `Format ${input.fileName} tidak didukung. Gunakan ${allowedFormatLabel(input.fieldType)}.`,
     );
   }
   return detectedMime;

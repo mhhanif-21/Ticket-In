@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 
 import { AdaptiveImage } from '@/components/media/AdaptiveImage';
 
@@ -20,7 +20,7 @@ const SWIPE_THRESHOLD_PX = 40;
 export function EventMediaCarousel({ eventName, media }: EventMediaCarouselProps) {
   const images = media.filter((item) => item.publicUrl.trim().length > 0);
   const [activeIndex, setActiveIndex] = useState(0);
-  const [touchStartX, setTouchStartX] = useState<number | null>(null);
+  const pointerStartX = useRef<number | null>(null);
 
   if (images.length === 0) return null;
 
@@ -28,8 +28,12 @@ export function EventMediaCarousel({ eventName, media }: EventMediaCarouselProps
     setActiveIndex(Math.max(0, Math.min(index, images.length - 1)));
   };
 
-  const goPrevious = () => goTo(activeIndex - 1);
-  const goNext = () => goTo(activeIndex + 1);
+  const handlePointerEnd = (endX: number | undefined) => {
+    const startX = pointerStartX.current;
+    pointerStartX.current = null;
+    if (startX === null || endX === undefined || Math.abs(endX - startX) < SWIPE_THRESHOLD_PX) return;
+    goTo(activeIndex + (endX < startX ? 1 : -1));
+  };
 
   return (
     <section
@@ -37,16 +41,13 @@ export function EventMediaCarousel({ eventName, media }: EventMediaCarouselProps
       className="w-full overflow-hidden bg-surface-container-highest shadow-[0_4px_12px_rgba(0,0,0,0.05)]"
     >
       <div
-        className="group relative touch-pan-y select-none"
-        onTouchStart={(event) => setTouchStartX(event.changedTouches[0]?.clientX ?? null)}
-        onTouchEnd={(event) => {
-          if (touchStartX === null) return;
-          const endX = event.changedTouches[0]?.clientX;
-          setTouchStartX(null);
-          if (endX === undefined || Math.abs(endX - touchStartX) < SWIPE_THRESHOLD_PX) return;
-          if (endX < touchStartX) goNext();
-          else goPrevious();
+        className="relative touch-pan-y select-none cursor-grab active:cursor-grabbing"
+        onPointerDown={(event) => {
+          pointerStartX.current = event.clientX;
+          event.currentTarget.setPointerCapture?.(event.pointerId);
         }}
+        onPointerUp={(event) => handlePointerEnd(event.clientX)}
+        onPointerCancel={() => handlePointerEnd(undefined)}
       >
         <AdaptiveImage
           key={images[activeIndex].publicUrl}
@@ -54,35 +55,12 @@ export function EventMediaCarousel({ eventName, media }: EventMediaCarouselProps
           alt={`${eventName} - gambar ${activeIndex + 1}`}
           priority={activeIndex === 0}
           sizes="100vw"
-          frameAspectRatio={16 / 9}
+          fallbackAspectRatio={16 / 9}
           fit="contain"
-          blurredBackdrop
+          blurredBackdrop={false}
           containerClassName="w-full bg-surface-container-highest"
           imageClassName="p-2 sm:p-4"
         />
-
-        {images.length > 1 && (
-          <>
-            <button
-              type="button"
-              aria-label="Media sebelumnya"
-              onClick={goPrevious}
-              disabled={activeIndex === 0}
-              className="absolute left-3 top-1/2 hidden -translate-y-1/2 rounded-full bg-black/55 px-3 py-2 text-xl text-white transition hover:bg-black/75 disabled:invisible md:inline-flex"
-            >
-              ‹
-            </button>
-            <button
-              type="button"
-              aria-label="Media berikutnya"
-              onClick={goNext}
-              disabled={activeIndex === images.length - 1}
-              className="absolute right-3 top-1/2 hidden -translate-y-1/2 rounded-full bg-black/55 px-3 py-2 text-xl text-white transition hover:bg-black/75 disabled:invisible md:inline-flex"
-            >
-              ›
-            </button>
-          </>
-        )}
       </div>
 
       {images.length > 1 && (

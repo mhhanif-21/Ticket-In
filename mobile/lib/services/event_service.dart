@@ -344,7 +344,21 @@ class EventService {
         ),
       );
     }
-    final decoded = jsonDecode(body) as Map<String, dynamic>;
+    _throwIfErrorPayload(
+      body,
+      'Galeri acara belum dapat diunggah. Silakan coba lagi.',
+    );
+    // A successful upload is still an acknowledgement when a proxy returns
+    // an empty/non-JSON body. The edit screen performs a detail read-back and
+    // resolves the created row from server state before reporting success.
+    if (body.trim().isEmpty) return const [];
+    dynamic decoded;
+    try {
+      decoded = jsonDecode(body);
+    } on FormatException {
+      return const [];
+    }
+    if (decoded is! Map<String, dynamic>) return const [];
     final data = decoded['data'] as Map<String, dynamic>? ?? const {};
     final media = data['media'] as List? ?? const [];
     return media
@@ -373,6 +387,10 @@ class EventService {
         ),
       );
     }
+    _throwIfErrorPayload(
+      response.body,
+      'Galeri acara belum dapat diperbarui. Silakan coba lagi.',
+    );
   }
 
   Future<void> promoteEventMedia(String eventId, String mediaId) async {
@@ -392,6 +410,10 @@ class EventService {
         ),
       );
     }
+    _throwIfErrorPayload(
+      response.body,
+      'Poster utama belum dapat diperbarui. Silakan coba lagi.',
+    );
   }
 
   Future<void> updateEvent(String id, Map<String, dynamic> data) async {

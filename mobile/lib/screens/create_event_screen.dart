@@ -421,7 +421,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                                 image: FileImage(image),
                                 frameAspectRatio: 4 / 3,
                                 expand: true,
-                                blurredBackdrop: true,
+                                blurredBackdrop: false,
                                 backgroundColor: Colors.white,
                                 borderRadius: BorderRadius.circular(10),
                               ),
