@@ -76,7 +76,11 @@ function safeErrorCode(error: unknown): string {
   const record = error && typeof error === 'object'
     ? error as Record<string, unknown>
     : null;
+  const cause = record?.cause && typeof record.cause === 'object'
+    ? record.cause as Record<string, unknown>
+    : null;
   const candidates = [
+    cause?.code,
     record?.code,
     record?.errorCode,
     record?.statusCode,
@@ -86,6 +90,49 @@ function safeErrorCode(error: unknown): string {
   const candidate = candidates.find((value) => typeof value === 'string' || typeof value === 'number');
   const normalized = candidate === undefined ? '' : String(candidate);
   return /^[A-Za-z0-9_.:-]{1,64}$/.test(normalized) ? normalized : 'UNCLASSIFIED';
+}
+
+function safeIdentifier(value: unknown): string | null {
+  if (typeof value !== 'string' || !/^[A-Za-z_][A-Za-z0-9_]{0,127}$/.test(value)) return null;
+  return value;
+}
+
+function safeDatabaseDetails(error: unknown): {
+  code: string | null;
+  queryShape: string | null;
+  table: string | null;
+  column: string | null;
+  constraint: string | null;
+  detail: string | null;
+} {
+  const record = error && typeof error === 'object'
+    ? error as Record<string, unknown>
+    : null;
+  const cause = record?.cause && typeof record.cause === 'object'
+    ? record.cause as Record<string, unknown>
+    : null;
+  const provider = cause ?? record;
+  const rawQuery = typeof record?.query === 'string'
+    ? record.query
+    : typeof cause?.query === 'string' ? cause.query : null;
+  const queryShape = rawQuery
+    ? rawQuery
+      .replace(/'(?:''|[^'])*'/g, "'?'")
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, 512)
+    : null;
+
+  return {
+    code: typeof provider?.code === 'string' && /^[A-Za-z0-9_.:-]{1,64}$/.test(provider.code)
+      ? provider.code
+      : null,
+    queryShape,
+    table: safeIdentifier(provider?.table),
+    column: safeIdentifier(provider?.column),
+    constraint: safeIdentifier(provider?.constraint),
+    detail: typeof provider?.detail === 'string' ? redactLogText(provider.detail) : null,
+  };
 }
 
 function safeFailureCategory(stage: string, error: unknown): string {
@@ -155,6 +202,7 @@ function logRegistrationFailure(
   context: RegistrationFailureContext = {},
 ): void {
   const details = safeErrorDetails(error);
+  const database = safeDatabaseDetails(error);
   console.error('registration_failed', {
     requestId,
     eventSlug: context.eventSlug ?? null,
@@ -165,6 +213,7 @@ function logRegistrationFailure(
     errorName: details.errorName,
     errorMessage: details.errorMessage,
     errorStack: details.errorStack,
+    database,
     fieldTypes: context.fieldTypes ?? [],
     uploadStatus: {
       staged: context.stagedFileCount ?? 0,
