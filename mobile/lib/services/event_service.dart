@@ -352,6 +352,25 @@ class EventService {
     }
   }
 
+  Future<void> promoteEventMedia(String eventId, String mediaId) async {
+    if (mediaId.isEmpty) {
+      throw const EventMediaUploadException(
+        'Poster utama belum siap diperbarui. Silakan coba lagi.',
+      );
+    }
+    final response = await _apiClient.patch('/v1/events/$eventId/media', {
+      'promote_media_id': mediaId,
+    });
+    if (response.statusCode != 200) {
+      throw EventMediaUploadException(
+        _messageFromResponse(
+          response.body,
+          'Poster utama belum dapat diperbarui. Silakan coba lagi.',
+        ),
+      );
+    }
+  }
+
   Future<void> updateEvent(String id, Map<String, dynamic> data) async {
     final response = await _apiClient.put('/v1/events/$id', data);
     if (response.statusCode != 200) {

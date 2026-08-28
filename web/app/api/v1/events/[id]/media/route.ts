@@ -3,7 +3,11 @@ import { and, eq } from 'drizzle-orm';
 
 import { db } from '@/db';
 import { eventMedia, events } from '@/db/schema';
-import { ReplaceEventMediaAction, EventMediaUploadError } from '@/lib/actions/ReplaceEventMediaAction';
+import {
+  PromoteEventMediaAction,
+  ReplaceEventMediaAction,
+  EventMediaUploadError,
+} from '@/lib/actions/ReplaceEventMediaAction';
 import { EventMediaValidationError } from '@/lib/events/eventMedia';
 import {
   EventGalleryReconciliationError,
@@ -81,6 +85,20 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     }
 
     const body: unknown = await req.json().catch(() => null);
+    const promoteMediaId = body && typeof body === 'object'
+      && 'promote_media_id' in body
+      && typeof body.promote_media_id === 'string'
+      ? body.promote_media_id
+      : null;
+    if (promoteMediaId !== null) {
+      const { id } = await params;
+      const promoted = await PromoteEventMediaAction.execute({
+        eventId: id,
+        mediaId: promoteMediaId,
+      });
+      return NextResponse.json({ status: 'success', data: { media: [promoted] } });
+    }
+
     const requestedIds = body && typeof body === 'object'
       && 'gallery_media_ids' in body
       && Array.isArray(body.gallery_media_ids)

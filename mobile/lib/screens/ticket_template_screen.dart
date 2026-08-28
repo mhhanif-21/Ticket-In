@@ -306,11 +306,15 @@ class _TicketTemplateScreenState extends State<TicketTemplateScreen> {
     });
   }
 
-  void _setSelectedFontScale(double fontScale) {
+  void _setSelectedFontSize(double fontSize) {
     final index = _selectedElementIndex;
     if (index == null || index < 0 || index >= _elements.length) return;
     setState(() {
-      _elements[index] = _elements[index].copyWith(fontSize: fontScale);
+      _elements[index] = _elements[index].copyWith(
+        fontSize: fontSize
+            .clamp(ticketTemplateMinFontSize, ticketTemplateMaxFontSize)
+            .toDouble(),
+      );
     });
   }
 
@@ -656,10 +660,17 @@ class _TicketTemplateScreenState extends State<TicketTemplateScreen> {
     TicketTemplateElementModel element,
     double canvasHeight,
   ) {
-    final scale = element.fontSize
-        .clamp(ticketTemplateMinFontScale, ticketTemplateMaxFontScale)
-        .toDouble();
-    return math.max(9, math.min(28, element.height * canvasHeight * scale));
+    final canvasScale = canvasHeight / 800;
+    return math.max(
+      9,
+      math.min(
+        48,
+        element.fontSize
+                .clamp(ticketTemplateMinFontSize, ticketTemplateMaxFontSize)
+                .toDouble() *
+            canvasScale,
+      ),
+    );
   }
 
   Widget _buildSelectedElementControls() {
@@ -699,18 +710,18 @@ class _TicketTemplateScreenState extends State<TicketTemplateScreen> {
             ),
           ] else ...[
             const SizedBox(height: 8),
-            Text('Ukuran teks: ${(element.fontSize * 100).round()}%'),
+            Text('Ukuran teks: ${element.fontSize.round()}'),
             const SizedBox(height: 5),
             Slider(
               key: const ValueKey('ticket-template-text-size-slider'),
-              min: ticketTemplateMinFontScale,
-              max: ticketTemplateMaxFontScale,
-              divisions: 11,
+              min: ticketTemplateMinFontSize,
+              max: ticketTemplateMaxFontSize,
+              divisions: 18,
               value: element.fontSize
-                  .clamp(ticketTemplateMinFontScale, ticketTemplateMaxFontScale)
+                  .clamp(ticketTemplateMinFontSize, ticketTemplateMaxFontSize)
                   .toDouble(),
-              label: '${(element.fontSize * 100).round()}%',
-              onChanged: _setSelectedFontScale,
+              label: '${element.fontSize.round()}',
+              onChanged: _setSelectedFontSize,
             ),
           ],
           if (!isRequired) ...[

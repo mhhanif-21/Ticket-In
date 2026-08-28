@@ -259,11 +259,11 @@ export class AppendEventGalleryAction {
           .from(eventMedia)
           .where(and(eq(eventMedia.eventId, input.eventId), eq(eventMedia.role, 'gallery')))
           .for('update');
-        if (existingGallery.length + uploaded.length > 5) {
+        if (existingGallery.length + uploaded.length > 4) {
           throw new EventMediaValidationError(
             'MEDIA_GALLERY_LIMIT_EXCEEDED',
             422,
-            'Maksimal 5 foto galeri per acara.',
+            'Maksimal 5 poster acara, termasuk poster utama.',
           );
         }
 
@@ -293,5 +293,79 @@ export class AppendEventGalleryAction {
       await activateHeldStorageCleanupJobs(stagedObjects).catch(() => undefined);
       throw error;
     }
+  }
+}
+
+type PromoteEventMediaInput = {
+  eventId: string;
+  mediaId: string;
+};
+
+export class PromoteEventMediaAction {
+  static async execute(input: PromoteEventMediaInput) {
+    return db.transaction(async (transaction) => {
+      const [event] = await transaction
+        .select({ id: events.id })
+        .from(events)
+        .where(eq(events.id, input.eventId))
+        .for('update')
+        .limit(1);
+      if (!event) throw new EventMediaUploadError();
+
+      const [target] = await transaction
+        .select({
+          id: eventMedia.id,
+          publicUrl: eventMedia.publicUrl,
+        })
+        .from(eventMedia)
+        .where(and(
+          eq(eventMedia.id, input.mediaId),
+          eq(eventMedia.eventId, input.eventId),
+          eq(eventMedia.role, 'gallery'),
+        ))
+        .for('update')
+        .limit(1);
+      if (!target) {
+        throw new EventMediaValidationError(
+          'MEDIA_GALLERY_UNKNOWN_ITEM',
+          422,
+          'Poster yang dipilih tidak ditemukan.',
+        );
+      }
+
+      const [cover] = await transaction
+        .select({ id: eventMedia.id, storagePath: eventMedia.storagePath })
+        .from(eventMedia)
+        .where(and(
+          eq(eventMedia.eventId, input.eventId),
+          eq(eventMedia.role, 'cover'),
+          eq(eventMedia.displayOrder, 0),
+        ))
+        .for('update')
+        .limit(1);
+
+      if (cover && cover.id !== target.id) {
+        await transaction.delete(eventMedia).where(eq(eventMedia.id, cover.id));
+        if (cover.storagePath) {
+          await queueStorageCleanupJobsTx(transaction, [{
+            bucket: STORAGE_BUCKETS.eventPosters,
+            storagePath: cover.storagePath,
+            reason: 'event_media_replace' as const,
+          }]);
+        }
+      }
+
+      const now = new Date();
+      await transaction
+        .update(eventMedia)
+        .set({ role: 'cover', displayOrder: 0, updatedAt: now })
+        .where(eq(eventMedia.id, target.id));
+      await transaction
+        .update(events)
+        .set({ posterUrl: target.publicUrl, updatedAt: now })
+        .where(eq(events.id, input.eventId));
+
+      return { id: target.id, publicUrl: target.publicUrl };
+    });
   }
 }

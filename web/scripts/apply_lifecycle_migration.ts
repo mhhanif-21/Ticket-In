@@ -47,6 +47,11 @@ const MIGRATIONS = [
     path: resolve(process.cwd(), 'supabase/migrations/0014_manual-review-email-template-kinds.sql'),
     lockKey: 2026082714,
   },
+  {
+    id: '0015_normalize-legacy-ticket-email-tokens',
+    path: resolve(process.cwd(), 'supabase/migrations/0015_normalize-legacy-ticket-email-tokens.sql'),
+    lockKey: 2026082715,
+  },
 ] as const;
 
 type SchemaRow = {

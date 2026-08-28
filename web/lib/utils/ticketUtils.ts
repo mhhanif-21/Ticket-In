@@ -4,7 +4,7 @@ import path from 'node:path';
 import QRCode from 'qrcode';
 import sharp from 'sharp';
 import {
-  getTicketTemplateFontScale,
+  getTicketTemplateFontSize,
   resolveRegistrationFieldToken,
   type TicketTemplateConfig,
   type TicketTemplateElement,
@@ -185,8 +185,7 @@ async function generateCustomTicket(
     }
 
     const text = escapeXml(getTemplateText(element, context));
-    const fontScale = getTicketTemplateFontScale(element.fontSize);
-    const fontSize = Math.max(12, Math.min(56, Math.floor(height * fontScale)));
+    const fontSize = Math.max(12, Math.min(48, Math.round(getTicketTemplateFontSize(element.fontSize))));
     const textSvg = Buffer.from(
       `<svg width="${width}" height="${height}">
         <text x="0" y="${Math.max(fontSize, Math.floor(height * 0.72))}" font-family="${TICKET_FONT_FAMILY}" font-size="${fontSize}" font-weight="bold" fill="#111111">${text}</text>

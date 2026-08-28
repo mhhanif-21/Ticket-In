@@ -81,7 +81,8 @@ class _EditEventScreenState extends State<EditEventScreen> {
         _mediaItems
           ..clear()
           ..addAll(_mediaItemsForEvent(event));
-        _mediaChanged = false;
+        _mediaChanged = _mediaItems.isNotEmpty &&
+            _mediaItems.first.remote?.role != 'cover';
         _coverPending = false;
         _activeMediaIndex = 0;
         _isLoading = false;
@@ -98,7 +99,19 @@ class _EditEventScreenState extends State<EditEventScreen> {
   List<_EditableMediaItem> _mediaItemsForEvent(EventModel event) {
     final items = <_EditableMediaItem>[];
     final posterUrl = event.posterUrl?.trim();
-    if (posterUrl != null && posterUrl.isNotEmpty) {
+    EventMediaModel? persistedCover;
+    for (final media in event.media) {
+      if (media.role == 'cover' &&
+          media.displayOrder == 0 &&
+          media.publicUrl.trim().isNotEmpty) {
+        persistedCover = media;
+        break;
+      }
+    }
+
+    if (persistedCover != null) {
+      items.add(_EditableMediaItem.remote(persistedCover));
+    } else if (posterUrl != null && posterUrl.isNotEmpty) {
       items.add(
         _EditableMediaItem.remote(
           EventMediaModel(
@@ -111,13 +124,10 @@ class _EditEventScreenState extends State<EditEventScreen> {
       );
     }
 
-    final media =
-        event.media
+    final media = event.media
             .where((item) => item.publicUrl.trim().isNotEmpty)
-            .where(
-              (item) => posterUrl == null || item.publicUrl.trim() != posterUrl,
-            )
-            .where((item) => posterUrl == null || item.role != 'cover')
+            .where((item) => item.id != persistedCover?.id)
+            .where((item) => item.role != 'cover')
             .toList()
           ..sort((left, right) {
             final roleOrder = left.role == 'cover' ? -1 : 0;
@@ -194,22 +204,19 @@ class _EditEventScreenState extends State<EditEventScreen> {
 
   void _removeMediaAt(int index) {
     if (index < 0 || index >= _mediaItems.length) return;
-    if (index == 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Poster utama tidak dapat dihapus. Hapus poster tambahan atau tambahkan pengganti.',
-          ),
-        ),
-      );
-      return;
-    }
     setState(() {
       _mediaItems.removeAt(index);
       _mediaChanged = true;
-      _activeMediaIndex = _mediaItems.isEmpty
-          ? 0
-          : _activeMediaIndex.clamp(0, _mediaItems.length - 1);
+      _coverPending = _mediaItems.isNotEmpty && _mediaItems.first.isLocal;
+      if (_mediaItems.isEmpty) {
+        _activeMediaIndex = 0;
+      } else {
+        if (_activeMediaIndex > index) _activeMediaIndex -= 1;
+        _activeMediaIndex = _activeMediaIndex.clamp(
+          0,
+          _mediaItems.length - 1,
+        );
+      }
     });
     _moveToMediaPage(_activeMediaIndex);
   }
@@ -270,6 +277,12 @@ class _EditEventScreenState extends State<EditEventScreen> {
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
+    if (_mediaItems.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Minimal satu poster acara harus dipilih.')),
+      );
+      return;
+    }
     if (_mediaItems.length > maxEventPosterImages) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -352,17 +365,48 @@ class _EditEventScreenState extends State<EditEventScreen> {
   }
 
   Future<void> _syncPendingMedia() async {
-    if (_coverPending && _mediaItems.first.isLocal) {
+    if (_mediaItems.isEmpty) {
+      throw const EventMediaUploadException(
+        'Minimal satu poster acara harus dipilih sebelum menyimpan.',
+      );
+    }
+
+    final firstItem = _mediaItems.first;
+    if (_coverPending && firstItem.isLocal) {
       await _eventService.uploadEventPoster(
         widget.eventId,
-        _mediaItems.first.file!.path,
+        firstItem.file!.path,
       );
       _coverPending = false;
     }
+
     if (!_mediaChanged) return;
+
+    if (!firstItem.isLocal && firstItem.remote!.role != 'cover') {
+      await _eventService.promoteEventMedia(widget.eventId, firstItem.id);
+    }
 
     // The API still stores the first item as cover and subsequent items as
     // gallery rows. The editor itself has only one media collection.
+    final remoteGalleryIds = _mediaItems
+        .skip(1)
+        .where((item) => !item.isLocal)
+        .map((item) => item.id)
+        .toList();
+    if (remoteGalleryIds.any((id) => id.isEmpty)) {
+      throw const EventMediaUploadException(
+        'Poster tambahan belum siap diperbarui. Silakan coba lagi.',
+      );
+    }
+
+    // Remove/reorder stale server rows before appending local files. This is
+    // important when the collection is already full: the server must see the
+    // deletion before it evaluates the new-file capacity.
+    await _eventService.replaceEventGallery(
+      widget.eventId,
+      remoteGalleryIds,
+    );
+
     final localItems = _mediaItems
         .skip(1)
         .where((item) => item.isLocal)
@@ -394,6 +438,7 @@ class _EditEventScreenState extends State<EditEventScreen> {
     }
     await _eventService.replaceEventGallery(widget.eventId, galleryIds);
     _mediaChanged = false;
+    _coverPending = false;
   }
 
   @override
@@ -490,7 +535,7 @@ class _EditEventScreenState extends State<EditEventScreen> {
                             backgroundColor: Colors.white,
                             borderRadius: BorderRadius.circular(10),
                           ),
-                    if (item != null && index > 0)
+                    if (item != null)
                       Positioned(
                         right: 8,
                         top: 8,
@@ -505,26 +550,6 @@ class _EditEventScreenState extends State<EditEventScreen> {
                 ),
               );
             },
-          ),
-        ),
-        const SizedBox(height: 8),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: List.generate(
-            pageCount,
-            (index) => AnimatedContainer(
-              key: ValueKey('edit-media-dot-$index'),
-              duration: const Duration(milliseconds: 150),
-              margin: const EdgeInsets.symmetric(horizontal: 3),
-              width: index == _activeMediaIndex ? 18 : 7,
-              height: 7,
-              decoration: BoxDecoration(
-                color: index == _activeMediaIndex
-                    ? Colors.black
-                    : const Color(0xFFC4C7C7),
-                borderRadius: BorderRadius.circular(8),
-              ),
-            ),
           ),
         ),
         if (count > 1) ...[

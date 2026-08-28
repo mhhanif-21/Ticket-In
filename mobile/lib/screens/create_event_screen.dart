@@ -294,15 +294,16 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
 
   void _removePosterAt(int index) {
     if (index < 0 || index >= _posterFiles.length) return;
-    if (_posterFiles.length == 1) {
-      setState(() => _posterError = 'Minimal satu poster acara harus dipilih.');
-      return;
-    }
     setState(() {
       _posterFiles.removeAt(index);
-      _activeMediaIndex = _activeMediaIndex
-          .clamp(0, _posterFiles.length - 1)
-          .toInt();
+      if (_posterFiles.isEmpty) {
+        _activeMediaIndex = 0;
+      } else {
+        if (_activeMediaIndex > index) _activeMediaIndex -= 1;
+        _activeMediaIndex = _activeMediaIndex
+            .clamp(0, _posterFiles.length - 1)
+            .toInt();
+      }
       _posterError = null;
     });
     _moveToMediaPage(_activeMediaIndex);
@@ -417,7 +418,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                               ),
                             ),
                           ),
-                    if (image != null && _posterFiles.length > 1)
+                    if (image != null)
                       Positioned(
                         right: 8,
                         top: 8,
@@ -432,26 +433,6 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                 ),
               );
             },
-          ),
-        ),
-        const SizedBox(height: 8),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: List.generate(
-            mediaCount,
-            (index) => AnimatedContainer(
-              key: ValueKey('event-media-dot-$index'),
-              duration: const Duration(milliseconds: 150),
-              margin: const EdgeInsets.symmetric(horizontal: 3),
-              width: index == _activeMediaIndex ? 18 : 7,
-              height: 7,
-              decoration: BoxDecoration(
-                color: index == _activeMediaIndex
-                    ? Colors.black
-                    : const Color(0xFFC4C7C7),
-                borderRadius: BorderRadius.circular(8),
-              ),
-            ),
           ),
         ),
         if (_posterFiles.length > 1) ...[

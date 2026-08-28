@@ -1,6 +1,6 @@
-const double ticketTemplateMinFontScale = 0.45;
-const double ticketTemplateMaxFontScale = 1.0;
-const double ticketTemplateDefaultFontScale = 0.68;
+const double ticketTemplateMinFontSize = 12;
+const double ticketTemplateMaxFontSize = 48;
+const double ticketTemplateDefaultFontSize = 24;
 const double ticketTemplateMinQrSize = 0.12;
 const double ticketTemplateMaxQrSize = 0.60;
 
@@ -112,7 +112,7 @@ class TicketTemplateElementModel {
   const TicketTemplateElementModel({
     required this.type,
     this.token,
-    this.fontSize = ticketTemplateDefaultFontScale,
+    this.fontSize = ticketTemplateDefaultFontSize,
     required this.x,
     required this.y,
     required this.width,
@@ -123,7 +123,7 @@ class TicketTemplateElementModel {
     return TicketTemplateElementModel(
       type: json['type']?.toString() ?? '',
       token: json['token']?.toString(),
-      fontSize: _ticketTextScale(json['font_size'] ?? json['fontSize']),
+      fontSize: _ticketFontSize(json['font_size'] ?? json['fontSize']),
       x: (json['x'] as num?)?.toDouble() ?? 0,
       y: (json['y'] as num?)?.toDouble() ?? 0,
       width: (json['width'] as num?)?.toDouble() ?? 0.2,
@@ -160,17 +160,27 @@ class TicketTemplateElementModel {
   };
 }
 
-double _ticketTextScale(dynamic value) {
+double _ticketFontSize(dynamic value) {
   if (value is num && value.isFinite) {
-    return value
-        .toDouble()
-        .clamp(ticketTemplateMinFontScale, ticketTemplateMaxFontScale)
-        .toDouble();
+    final numeric = value.toDouble();
+    if (numeric >= ticketTemplateMinFontSize &&
+        numeric <= ticketTemplateMaxFontSize) {
+      return numeric;
+    }
+    // Existing templates persisted a 0.45–1.0 scale. Convert it once when
+    // reading so every newly saved template uses an explicit font size.
+    if (numeric >= 0.45 && numeric <= 1.0) {
+      return (ticketTemplateMinFontSize +
+              ((numeric - 0.45) / 0.55) *
+                  (ticketTemplateMaxFontSize - ticketTemplateMinFontSize))
+          .roundToDouble();
+    }
   }
   return switch (value?.toString()) {
-    'small' => 0.5,
-    'large' => 0.9,
-    _ => ticketTemplateDefaultFontScale,
+    'small' => 16,
+    'medium' => ticketTemplateDefaultFontSize,
+    'large' => 36,
+    _ => ticketTemplateDefaultFontSize,
   };
 }
 

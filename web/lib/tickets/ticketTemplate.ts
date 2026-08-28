@@ -11,9 +11,11 @@ import {
 } from '@/lib/storage/imageValidation';
 
 export const TICKET_TEMPLATE_MAX_FILE_BYTES = 5 * 1024 * 1024;
-export const TICKET_TEMPLATE_MIN_FONT_SCALE = 0.45;
-export const TICKET_TEMPLATE_MAX_FONT_SCALE = 1;
-export const TICKET_TEMPLATE_DEFAULT_FONT_SCALE = 0.68;
+export const TICKET_TEMPLATE_MIN_FONT_SIZE = 12;
+export const TICKET_TEMPLATE_MAX_FONT_SIZE = 48;
+export const TICKET_TEMPLATE_DEFAULT_FONT_SIZE = 24;
+const LEGACY_TICKET_TEMPLATE_MIN_FONT_SCALE = 0.45;
+const LEGACY_TICKET_TEMPLATE_MAX_FONT_SCALE = 1;
 
 export type EmailTemplateKind = 'otp' | 'ticket';
 
@@ -41,7 +43,7 @@ export type TicketTemplateElementType =
 export type TicketTemplateElement = {
   type: TicketTemplateElementType;
   token?: string;
-  /** Numeric scale is the current contract; legacy enum values remain readable. */
+  /** Explicit font size in familiar numeric units; legacy values remain readable. */
   fontSize?: number | 'small' | 'medium' | 'large';
   x: number;
   y: number;
@@ -99,22 +101,38 @@ function isTemplateFontSize(value: unknown): value is NonNullable<TicketTemplate
     || value === 'large'
     || (typeof value === 'number'
       && Number.isFinite(value)
-      && value >= TICKET_TEMPLATE_MIN_FONT_SCALE
-      && value <= TICKET_TEMPLATE_MAX_FONT_SCALE);
+      && ((value >= TICKET_TEMPLATE_MIN_FONT_SIZE && value <= TICKET_TEMPLATE_MAX_FONT_SIZE)
+        || (value >= LEGACY_TICKET_TEMPLATE_MIN_FONT_SCALE
+          && value <= LEGACY_TICKET_TEMPLATE_MAX_FONT_SCALE)));
 }
 
-export function getTicketTemplateFontScale(
+function legacyScaleToFontSize(scale: number): number {
+  return Math.round(
+    TICKET_TEMPLATE_MIN_FONT_SIZE
+      + ((scale - LEGACY_TICKET_TEMPLATE_MIN_FONT_SCALE)
+        / (LEGACY_TICKET_TEMPLATE_MAX_FONT_SCALE - LEGACY_TICKET_TEMPLATE_MIN_FONT_SCALE))
+        * (TICKET_TEMPLATE_MAX_FONT_SIZE - TICKET_TEMPLATE_MIN_FONT_SIZE),
+  );
+}
+
+export function getTicketTemplateFontSize(
   fontSize: TicketTemplateElement['fontSize'],
 ): number {
   if (typeof fontSize === 'number') {
-    return Math.min(
-      TICKET_TEMPLATE_MAX_FONT_SCALE,
-      Math.max(TICKET_TEMPLATE_MIN_FONT_SCALE, fontSize),
-    );
+    if (fontSize >= LEGACY_TICKET_TEMPLATE_MIN_FONT_SCALE && fontSize <= LEGACY_TICKET_TEMPLATE_MAX_FONT_SCALE) {
+      return legacyScaleToFontSize(fontSize);
+    }
+    return Math.min(TICKET_TEMPLATE_MAX_FONT_SIZE, Math.max(TICKET_TEMPLATE_MIN_FONT_SIZE, fontSize));
   }
-  if (fontSize === 'small') return 0.5;
-  if (fontSize === 'large') return 0.9;
-  return TICKET_TEMPLATE_DEFAULT_FONT_SCALE;
+  if (fontSize === 'small') return 16;
+  if (fontSize === 'large') return 36;
+  return TICKET_TEMPLATE_DEFAULT_FONT_SIZE;
+}
+
+export function normalizeTicketTemplateElementFontSize(
+  fontSize: TicketTemplateElement['fontSize'],
+): number {
+  return getTicketTemplateFontSize(fontSize);
 }
 
 function isNormalizedBox(element: TicketTemplateElement): boolean {
@@ -157,10 +175,16 @@ export function parseTicketTemplateElements(value: unknown): TicketTemplateEleme
       );
     }
 
+    const normalizedFontSize = rawFontSize === undefined
+      ? undefined
+      : normalizeTicketTemplateElementFontSize(
+        rawFontSize as TicketTemplateElement['fontSize'],
+      );
+
     const element: TicketTemplateElement = {
       type: item.type,
       token: typeof item.token === 'string' ? item.token.trim() : undefined,
-      fontSize: rawFontSize as TicketTemplateElement['fontSize'],
+      fontSize: normalizedFontSize,
       x: typeof item.x === 'number' ? item.x : Number.NaN,
       y: typeof item.y === 'number' ? item.y : Number.NaN,
       width: typeof item.width === 'number' ? item.width : Number.NaN,
@@ -308,7 +332,9 @@ export async function getActiveEmailTemplate(eventId: string, kind: EmailTemplat
     ))
     .limit(1);
 
-  return template?.isActive ? { ...template, templateKind: kind } : null;
+  if (!template?.isActive) return null;
+  const normalized = normalizeEmailTemplateContent(kind, template.subject, template.body);
+  return { ...template, ...normalized, templateKind: kind };
 }
 
 // Compatibility alias for existing ticket-delivery callers.
@@ -348,6 +374,26 @@ export type ApprovalEmailTemplate = {
   subject: string;
   body: string;
 };
+
+/**
+ * 0014 made the ticket and OTP contracts separate. Older approval templates
+ * were migrated as ticket templates and could still contain the OTP-only
+ * [CODE] token, so remove that known legacy token at every read/write
+ * boundary. Unknown tokens remain untouched and are still rejected by the
+ * validator instead of being silently accepted.
+ */
+export function normalizeEmailTemplateContent(
+  kind: EmailTemplateKind,
+  subject: string,
+  body: string,
+): Pick<ApprovalEmailTemplate, 'subject' | 'body'> {
+  if (kind !== 'ticket') return { subject, body };
+
+  return {
+    subject: subject.replace(/\[CODE\]/gi, '').replace(/[ \t]{2,}/g, ' ').trim(),
+    body: body.replace(/\[CODE\]/gi, ''),
+  };
+}
 
 export function validateApprovalEmailTemplateTokens(
   subject: string,
@@ -389,18 +435,17 @@ export function renderApprovalEmailTemplate(
       .filter((value): value is string => typeof value === 'string')
       .map((label) => [label, resolveRegistrationFieldToken(label, input.answers, input.answerFieldLabels)] as const)
     : [];
+  const normalized = normalizeEmailTemplateContent(kind, template.subject, template.body);
   const values = new Map<string, string>([
     ['NAME', input.name],
     ['EMAIL', input.email],
     ['EVENT_NAME', input.eventName],
-    // Kept for already-saved pre-0014 ticket templates. New ticket templates
-    // cannot use CODE because the validator exposes it only for OTP.
-    ['CODE', input.ticketCode ?? ''],
+    ...(kind === 'otp' ? [['CODE', input.ticketCode ?? ''] as const] : []),
     ...dynamicValues,
   ]);
 
-  let subject = template.subject;
-  let body = escapeHtml(template.body).replace(/\r?\n/g, '<br>');
+  let subject = normalized.subject;
+  let body = escapeHtml(normalized.body).replace(/\r?\n/g, '<br>');
   for (const [token, value] of values) {
     subject = subject.split(`[${token}]`).join(value);
     body = body.split(`[${token}]`).join(escapeHtml(value));

@@ -7,6 +7,7 @@ import {
   getEmailTemplateTokenOptions,
   getUniqueFieldLabels,
   isEmailTemplateKind,
+  normalizeEmailTemplateContent,
   type EmailTemplateKind,
   TicketTemplateValidationError,
   validateApprovalEmailTemplateTokens,
@@ -91,13 +92,17 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     if (!context) return NextResponse.json({ status: 'error', message: 'Event tidak ditemukan.' }, { status: 404 });
     if (context.event.registrationMode !== 'Manual Review') return unsupportedForAutoAccept();
 
+    const templateContent = context.template
+      ? normalizeEmailTemplateContent(kind, context.template.subject, context.template.body)
+      : { subject: '', body: '' };
+
     return NextResponse.json({
       status: 'success',
       data: {
         kind,
         is_active: context.template?.isActive ?? false,
-        subject: context.template?.subject ?? '',
-        body: context.template?.body ?? '',
+        subject: templateContent.subject,
+        body: templateContent.body,
         token_options: getEmailTemplateTokenOptions(kind),
       },
     });
@@ -124,8 +129,9 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     const isActive = body.is_active === true;
     const subject = typeof body.subject === 'string' ? body.subject : '';
     const content = typeof body.body === 'string' ? body.body : '';
+    const normalized = normalizeEmailTemplateContent(kind, subject, content);
 
-    if (isActive && (!subject.trim() || !content.trim())) {
+    if (isActive && (!normalized.subject.trim() || !normalized.body.trim())) {
       throw new TicketTemplateValidationError(
         'EMAIL_TEMPLATE_TOKEN_INVALID',
         422,
@@ -133,7 +139,12 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
       );
     }
     if (isActive) {
-      validateApprovalEmailTemplateTokens(subject, content, context.tokenLabels, kind);
+      validateApprovalEmailTemplateTokens(
+        normalized.subject,
+        normalized.body,
+        context.tokenLabels,
+        kind,
+      );
     }
 
     const now = new Date();
@@ -145,14 +156,14 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
         isActive,
         // Off only changes activation state; stored content is preserved by
         // the conflict update below. Empty values are used only for a new row.
-        subject: isActive ? subject : '',
-        body: isActive ? content : '',
+        subject: isActive ? normalized.subject : '',
+        body: isActive ? normalized.body : '',
         updatedAt: now,
       })
       .onConflictDoUpdate({
         target: [eventApprovalEmailTemplates.eventId, eventApprovalEmailTemplates.templateKind],
         set: isActive
-          ? { isActive, subject, body: content, updatedAt: now }
+          ? { isActive, subject: normalized.subject, body: normalized.body, updatedAt: now }
           : { isActive, updatedAt: now },
       });
 

@@ -4,7 +4,9 @@ import {
 } from '@/lib/storage/imageValidation';
 
 export const EVENT_MEDIA_MAX_BYTES = 5 * 1024 * 1024;
-export const EVENT_MEDIA_MAX_GALLERY_ITEMS = 5;
+// One cover plus up to four gallery rows forms the single five-image poster
+// collection exposed by the clients.
+export const EVENT_MEDIA_MAX_GALLERY_ITEMS = 4;
 
 export type EventMediaRole = 'cover' | 'gallery';
 
@@ -26,7 +28,8 @@ export class EventMediaValidationError extends Error {
       | 'MEDIA_FILE_CONTENT_INVALID'
       | 'MEDIA_FILE_DIMENSIONS_INVALID'
       | 'MEDIA_GALLERY_REPLACE_REQUIRED'
-      | 'MEDIA_GALLERY_LIMIT_EXCEEDED',
+      | 'MEDIA_GALLERY_LIMIT_EXCEEDED'
+      | 'MEDIA_GALLERY_UNKNOWN_ITEM',
     public readonly status: 400 | 413 | 415 | 422,
     message: string,
   ) {
@@ -103,7 +106,7 @@ export async function validateEventMediaFiles({
     throw new EventMediaValidationError(
       'MEDIA_GALLERY_LIMIT_EXCEEDED',
       422,
-      'Maksimal 5 foto galeri per acara.',
+      'Maksimal 5 poster acara, termasuk poster utama.',
     );
   }
 
@@ -121,7 +124,7 @@ export async function validateEventGalleryFiles(
     throw new EventMediaValidationError(
       'MEDIA_GALLERY_LIMIT_EXCEEDED',
       422,
-      'Maksimal 5 foto galeri per acara.',
+      'Maksimal 5 poster acara, termasuk poster utama.',
     );
   }
 
