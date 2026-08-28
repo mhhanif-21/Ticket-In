@@ -28,7 +28,7 @@ export function EventMediaCarousel({ eventName, media, posterAspectMode }: Event
   if (images.length === 0) return null;
 
   const goTo = (index: number) => {
-    setActiveIndex(Math.max(0, Math.min(index, images.length - 1)));
+    setActiveIndex((index + images.length) % images.length);
   };
 
   const handlePointerEnd = (endX: number | undefined) => {
@@ -41,11 +41,12 @@ export function EventMediaCarousel({ eventName, media, posterAspectMode }: Event
   return (
     <section
       aria-label={`Media acara ${eventName}`}
-      className={`w-full overflow-hidden bg-surface-container-highest shadow-[0_4px_12px_rgba(0,0,0,0.05)] ${posterAspectMode === 'portrait' ? 'mx-auto max-w-xl' : posterAspectMode === 'banner' ? 'mx-auto max-w-6xl' : ''}`}
+      className="w-full px-4 sm:px-6 lg:px-8"
     >
       <div
-        className="relative touch-pan-y select-none cursor-grab active:cursor-grabbing"
+        className={`relative mx-auto w-full overflow-hidden rounded-[16px] bg-surface-container-highest shadow-[0_4px_12px_rgba(0,0,0,0.05)] touch-pan-y select-none cursor-grab active:cursor-grabbing ${posterAspectMode === 'portrait' ? 'max-w-xl' : posterAspectMode === 'banner' ? 'max-w-6xl' : 'max-w-5xl'}`}
         onPointerDown={(event) => {
+          if (event.target instanceof HTMLElement && event.target.closest('button')) return;
           pointerStartX.current = event.clientX;
           event.currentTarget.setPointerCapture?.(event.pointerId);
         }}
@@ -70,6 +71,8 @@ export function EventMediaCarousel({ eventName, media, posterAspectMode }: Event
               type="button"
               aria-label="Gambar sebelumnya"
               onClick={() => goTo(activeIndex - 1)}
+              onPointerDown={(event) => event.stopPropagation()}
+              onPointerUp={(event) => event.stopPropagation()}
               className="absolute left-3 top-1/2 hidden -translate-y-1/2 rounded-full bg-black/60 px-3 py-2 text-2xl leading-none text-white transition hover:bg-black/80 focus:outline-none focus:ring-2 focus:ring-white md:block"
             >
               ‹
@@ -78,6 +81,8 @@ export function EventMediaCarousel({ eventName, media, posterAspectMode }: Event
               type="button"
               aria-label="Gambar berikutnya"
               onClick={() => goTo(activeIndex + 1)}
+              onPointerDown={(event) => event.stopPropagation()}
+              onPointerUp={(event) => event.stopPropagation()}
               className="absolute right-3 top-1/2 hidden -translate-y-1/2 rounded-full bg-black/60 px-3 py-2 text-2xl leading-none text-white transition hover:bg-black/80 focus:outline-none focus:ring-2 focus:ring-white md:block"
             >
               ›

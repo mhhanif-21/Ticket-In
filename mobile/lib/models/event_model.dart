@@ -3,6 +3,7 @@ import 'poster_aspect.dart';
 const double ticketTemplateMinFontSize = 12;
 const double ticketTemplateMaxFontSize = 48;
 const double ticketTemplateDefaultFontSize = 24;
+const String ticketTemplateDefaultTextColor = '#111111';
 // Keep in sync with the logical canvas used by the server ticket renderer.
 const double ticketTemplateCanvasWidth = 1200;
 const double ticketTemplateMinQrSize = 0.12;
@@ -108,6 +109,7 @@ class TicketTemplateElementModel {
   final String type;
   final String? token;
   final double fontSize;
+  final String color;
   final double x;
   final double y;
   final double width;
@@ -117,6 +119,7 @@ class TicketTemplateElementModel {
     required this.type,
     this.token,
     this.fontSize = ticketTemplateDefaultFontSize,
+    this.color = ticketTemplateDefaultTextColor,
     required this.x,
     required this.y,
     required this.width,
@@ -128,6 +131,7 @@ class TicketTemplateElementModel {
       type: json['type']?.toString() ?? '',
       token: json['token']?.toString(),
       fontSize: _ticketFontSize(json['font_size'] ?? json['fontSize']),
+      color: _ticketTextColor(json['color'] ?? json['text_color']),
       x: (json['x'] as num?)?.toDouble() ?? 0,
       y: (json['y'] as num?)?.toDouble() ?? 0,
       width: (json['width'] as num?)?.toDouble() ?? 0.2,
@@ -137,6 +141,7 @@ class TicketTemplateElementModel {
 
   TicketTemplateElementModel copyWith({
     double? fontSize,
+    String? color,
     double? x,
     double? y,
     double? width,
@@ -146,6 +151,7 @@ class TicketTemplateElementModel {
       type: type,
       token: token,
       fontSize: fontSize ?? this.fontSize,
+      color: color ?? this.color,
       x: x ?? this.x,
       y: y ?? this.y,
       width: width ?? this.width,
@@ -157,11 +163,19 @@ class TicketTemplateElementModel {
     'type': type,
     if (token != null) 'token': token,
     'font_size': fontSize,
+    'color': color,
     'x': x,
     'y': y,
     'width': width,
     'height': height,
   };
+}
+
+String _ticketTextColor(dynamic value) {
+  if (value is String && RegExp(r'^#[0-9a-fA-F]{6}$').hasMatch(value.trim())) {
+    return value.trim().toLowerCase();
+  }
+  return ticketTemplateDefaultTextColor;
 }
 
 double _ticketFontSize(dynamic value) {
@@ -236,7 +250,10 @@ class ApprovalEmailTemplateModel {
 
   factory ApprovalEmailTemplateModel.fromJson(Map<String, dynamic> json) {
     return ApprovalEmailTemplateModel(
-      kind: json['kind']?.toString() ?? json['template_kind']?.toString() ?? 'ticket',
+      kind:
+          json['kind']?.toString() ??
+          json['template_kind']?.toString() ??
+          'ticket',
       isActive: json['is_active'] == true,
       subject: json['subject']?.toString() ?? '',
       body: json['body']?.toString() ?? '',
@@ -311,9 +328,9 @@ class EventModel {
           : DateTime.now(),
       status: json['status'] ?? 'Draft',
       registrationMode:
-            json['registration_mode'] ??
-            json['registrationMode'] ??
-            'Auto-Accept',
+          json['registration_mode'] ??
+          json['registrationMode'] ??
+          'Auto-Accept',
       posterAspectMode: posterAspectModeFromJson(
         json['poster_aspect_mode'] ?? json['posterAspectMode'],
       ),

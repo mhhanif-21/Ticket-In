@@ -7,6 +7,7 @@ import '../services/event_service.dart';
 // [MOB-BUG-013] FIX: Import dari provider terpusat
 import '../providers/admin_providers.dart';
 import '../widgets/adaptive_event_image.dart';
+import '../models/poster_aspect.dart';
 
 final eventStatsProvider = FutureProvider.autoDispose
     .family<Map<String, dynamic>, String>((ref, eventId) {
@@ -14,13 +15,25 @@ final eventStatsProvider = FutureProvider.autoDispose
       return service.getEventStats(eventId);
     });
 
-class DetailEventMetricsScreen extends ConsumerWidget {
+class DetailEventMetricsScreen extends ConsumerStatefulWidget {
   final String eventId;
 
   const DetailEventMetricsScreen({super.key, required this.eventId});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<DetailEventMetricsScreen> createState() =>
+      _DetailEventMetricsScreenState();
+}
+
+class _DetailEventMetricsScreenState
+    extends ConsumerState<DetailEventMetricsScreen> {
+  final PageController _heroMediaController = PageController();
+  int _heroMediaIndex = 0;
+
+  String get eventId => widget.eventId;
+
+  @override
+  Widget build(BuildContext context) {
     final statsAsync = ref.watch(eventStatsProvider(eventId));
 
     return Scaffold(
@@ -39,6 +52,12 @@ class DetailEventMetricsScreen extends ConsumerWidget {
     );
   }
 
+  @override
+  void dispose() {
+    _heroMediaController.dispose();
+    super.dispose();
+  }
+
   // [MOB-BUG-011] FIX: ref diteruskan agar management menu bisa invalidate provider
   Widget _buildContent(
     BuildContext context,
@@ -54,6 +73,8 @@ class DetailEventMetricsScreen extends ConsumerWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                _buildEventMetadata(data),
+                const SizedBox(height: 32),
                 const Text(
                   'Dashboard Metrik',
                   style: TextStyle(
@@ -92,20 +113,123 @@ class DetailEventMetricsScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildHeroSection(BuildContext context, Map<String, dynamic> data) {
-    final String title = data['name'] ?? 'Untitled Event';
-    final String rawDate = data['date'] ?? '';
-    String formattedDate = '';
-    if (rawDate.isNotEmpty) {
-      try {
-        final dateObj = DateTime.parse(rawDate);
-        formattedDate = DateFormat('dd MMM yyyy, HH:mm').format(dateObj);
-      } catch (_) {
-        formattedDate = rawDate;
+  List<String> _heroMediaUrls(Map<String, dynamic> data) {
+    final urls = <String>[];
+    final rawMedia = data['media'];
+    var hasCover = false;
+    if (rawMedia is List) {
+      for (final rawItem in rawMedia) {
+        if (rawItem is! Map) continue;
+        final role = rawItem['role']?.toString().trim().toLowerCase();
+        if (role == 'cover') hasCover = true;
+        final url = (rawItem['public_url'] ?? rawItem['publicUrl'])
+            ?.toString()
+            .trim();
+        if (url != null && url.isNotEmpty && !urls.contains(url)) {
+          urls.add(url);
+        }
       }
     }
 
-    final String? posterUrl = data['posterUrl'];
+    final legacyPoster = data['posterUrl']?.toString().trim();
+    if (legacyPoster != null &&
+        legacyPoster.isNotEmpty &&
+        (!hasCover || urls.isEmpty) &&
+        !urls.contains(legacyPoster)) {
+      urls.insert(0, legacyPoster);
+    }
+    return urls;
+  }
+
+  String _formatEventDate(Object? rawValue) {
+    final rawDate = rawValue?.toString() ?? '';
+    if (rawDate.isEmpty) return '-';
+    try {
+      return DateFormat('dd MMM yyyy, HH:mm').format(DateTime.parse(rawDate));
+    } catch (_) {
+      return rawDate;
+    }
+  }
+
+  String _metadataValue(Object? value) {
+    final text = value?.toString().trim() ?? '';
+    return text.isEmpty ? '-' : text;
+  }
+
+  Widget _buildEventMetadata(Map<String, dynamic> data) {
+    final status = _metadataValue(data['status']);
+    return Container(
+      key: const ValueKey('event-metadata-section'),
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.outlineVariant),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Informasi Acara',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: AppColors.onBackground,
+            ),
+          ),
+          const SizedBox(height: 14),
+          _buildMetadataRow('Nama Acara', _metadataValue(data['name'])),
+          _buildMetadataRow('Deskripsi', _metadataValue(data['description'])),
+          _buildMetadataRow('Lokasi', _metadataValue(data['location'])),
+          _buildMetadataRow('Tanggal & Waktu', _formatEventDate(data['date'])),
+          _buildMetadataRow(
+            'Kapasitas',
+            '${_metadataValue(data['total_capacity'])} peserta',
+          ),
+          _buildMetadataRow(
+            'Mode Registrasi',
+            _metadataValue(
+              data['registrationMode'] ?? data['registration_mode'],
+            ),
+          ),
+          _buildMetadataRow('Status', status),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMetadataRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 12,
+              color: AppColors.onSurfaceVariant,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 3),
+          Text(
+            value,
+            style: const TextStyle(fontSize: 14, color: AppColors.onSurface),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHeroSection(BuildContext context, Map<String, dynamic> data) {
+    final title = _metadataValue(data['name']);
+    final formattedDate = _formatEventDate(data['date']);
+    final mediaUrls = _heroMediaUrls(data);
+    final posterAspectRatio = posterAspectModeFromJson(
+      data['posterAspectMode'] ?? data['poster_aspect_mode'],
+    ).ratio;
     final status = data['status']?.toString() ?? 'Draft';
     final statusLabel = switch (status) {
       'Published' => 'PUBLISHED EVENT',
@@ -125,7 +249,7 @@ class DetailEventMetricsScreen extends ConsumerWidget {
       leading: Padding(
         padding: const EdgeInsets.all(8.0),
         child: CircleAvatar(
-          backgroundColor: Colors.black.withOpacity(0.5),
+          backgroundColor: Colors.black.withValues(alpha: 0.5),
           child: IconButton(
             icon: const Icon(Icons.arrow_back, color: Colors.white),
             onPressed: () => Navigator.of(context).pop(),
@@ -136,15 +260,49 @@ class DetailEventMetricsScreen extends ConsumerWidget {
         background: Stack(
           fit: StackFit.expand,
           children: [
-            if (posterUrl != null && posterUrl.isNotEmpty)
-              AdaptiveEventImage(
-                image: NetworkImage(posterUrl),
-                fit: BoxFit.contain,
-                blurredBackdrop: true,
-                expand: true,
+            if (mediaUrls.isNotEmpty)
+              PageView.builder(
+                key: const ValueKey('event-detail-media-carousel'),
+                controller: _heroMediaController,
+                itemCount: mediaUrls.length,
+                onPageChanged: (index) {
+                  if (mounted) setState(() => _heroMediaIndex = index);
+                },
+                itemBuilder: (context, index) => AdaptiveEventImage(
+                  image: NetworkImage(mediaUrls[index]),
+                  frameAspectRatio: posterAspectRatio,
+                  fit: BoxFit.contain,
+                  blurredBackdrop: false,
+                  expand: true,
+                  backgroundColor: AppColors.surfaceVariant,
+                ),
               )
             else
               Container(color: AppColors.primary),
+
+            if (mediaUrls.length > 1)
+              Positioned(
+                top: 18,
+                right: 18,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 5,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.55),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    '${(_heroMediaIndex.clamp(0, mediaUrls.length - 1)) + 1} / ${mediaUrls.length}',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
 
             // Gradient Overlay
             Container(
@@ -153,8 +311,8 @@ class DetailEventMetricsScreen extends ConsumerWidget {
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                   colors: [
-                    Colors.black.withOpacity(0.2),
-                    Colors.black.withOpacity(0.8),
+                    Colors.black.withValues(alpha: 0.2),
+                    Colors.black.withValues(alpha: 0.8),
                   ],
                 ),
               ),

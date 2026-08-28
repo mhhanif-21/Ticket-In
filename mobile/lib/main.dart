@@ -71,8 +71,12 @@ Map<String, dynamic>? reviewParticipantDataFromExtra(Object? extra) {
   for (final entry in extra.entries) {
     if (entry.key is String) data[entry.key as String] = entry.value;
   }
-  final id = data['id'];
-  return id is String && id.trim().isNotEmpty ? data : null;
+  final id = data['id'] ?? data['registrationId'] ?? data['registration_id'];
+  if (id is! String || id.trim().isEmpty) return null;
+  // Keep the detail screen independent from whether the API used camelCase
+  // or snake_case for the registration identifier.
+  data['id'] = id;
+  return data;
 }
 
 GoRouter buildAppRouter(AuthSessionController authSession) => GoRouter(

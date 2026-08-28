@@ -21,20 +21,17 @@ export default async function PublicEventLandingPage(props: { params: Promise<{ 
   return (
     <main className="flex-grow w-full max-w-container-max mx-auto pb-stack-lg">
       {/* One responsive carousel for the cover and every stored gallery item. */}
-      <div className="relative w-full overflow-hidden bg-surface-container-highest shadow-[0_4px_12px_rgba(0,0,0,0.05)]">
-        {event.media.length > 0 ? (
-          <EventMediaCarousel
-            eventName={event.name}
-            media={event.media}
-            posterAspectMode={event.posterAspectMode}
-          />
-        ) : (
-          <div className="flex min-h-56 items-center justify-center px-4 text-center text-2xl font-bold text-secondary opacity-80">
-            {event.name}
-          </div>
-        )}
-        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-primary/10 to-transparent" />
-      </div>
+      {event.media.length > 0 ? (
+        <EventMediaCarousel
+          eventName={event.name}
+          media={event.media}
+          posterAspectMode={event.posterAspectMode}
+        />
+      ) : (
+        <div className="mx-4 flex min-h-56 items-center justify-center rounded-[16px] bg-surface-container-highest px-4 text-center text-2xl font-bold text-secondary opacity-80 sm:mx-6 lg:mx-8">
+          {event.name}
+        </div>
+      )}
 
       {/* Event Details Container */}
       <div className="px-margin-mobile md:px-margin-desktop mt-stack-lg max-w-3xl mx-auto space-y-stack-lg">

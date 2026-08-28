@@ -5,6 +5,7 @@ import QRCode from 'qrcode';
 import sharp from 'sharp';
 import {
   TICKET_TEMPLATE_CANVAS_WIDTH,
+  getTicketTemplateTextColor,
   getTicketTemplateFontSize,
   getTicketTemplateTextPosition,
   resolveRegistrationFieldToken,
@@ -189,9 +190,10 @@ async function generateCustomTicket(
     const text = escapeXml(getTemplateText(element, context));
     const fontSize = Math.max(12, Math.min(48, Math.round(getTicketTemplateFontSize(element.fontSize))));
     const textPosition = getTicketTemplateTextPosition(width, height, fontSize);
+    const textColor = escapeXml(getTicketTemplateTextColor(element.color));
     const textSvg = Buffer.from(
       `<svg width="${width}" height="${height}">
-        <text x="${textPosition.x}" y="${textPosition.y}" text-anchor="middle" font-family="${TICKET_FONT_FAMILY}" font-size="${fontSize}" font-weight="bold" fill="#111111">${text}</text>
+        <text x="${textPosition.x}" y="${textPosition.y}" text-anchor="middle" font-family="${TICKET_FONT_FAMILY}" font-size="${fontSize}" font-weight="bold" fill="${textColor}">${text}</text>
       </svg>`,
     );
     composites.push({ input: textSvg, left, top });

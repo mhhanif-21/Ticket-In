@@ -19,8 +19,10 @@ export const TICKET_TEMPLATE_CANVAS_WIDTH = 1200;
 export const TICKET_TEMPLATE_MIN_FONT_SIZE = 12;
 export const TICKET_TEMPLATE_MAX_FONT_SIZE = 48;
 export const TICKET_TEMPLATE_DEFAULT_FONT_SIZE = 24;
+export const TICKET_TEMPLATE_DEFAULT_TEXT_COLOR = '#111111';
 const LEGACY_TICKET_TEMPLATE_MIN_FONT_SCALE = 0.45;
 const LEGACY_TICKET_TEMPLATE_MAX_FONT_SCALE = 1;
+const TICKET_TEMPLATE_HEX_COLOR = /^#[0-9a-f]{6}$/i;
 
 export type EmailTemplateKind = 'otp' | 'ticket';
 
@@ -50,6 +52,8 @@ export type TicketTemplateElement = {
   token?: string;
   /** Explicit font size in familiar numeric units; legacy values remain readable. */
   fontSize?: number | 'small' | 'medium' | 'large';
+  /** Six-digit sRGB hex color used by both editor and server renderer. */
+  color?: string;
   x: number;
   y: number;
   width: number;
@@ -109,6 +113,15 @@ function isTemplateFontSize(value: unknown): value is NonNullable<TicketTemplate
       && ((value >= TICKET_TEMPLATE_MIN_FONT_SIZE && value <= TICKET_TEMPLATE_MAX_FONT_SIZE)
         || (value >= LEGACY_TICKET_TEMPLATE_MIN_FONT_SCALE
           && value <= LEGACY_TICKET_TEMPLATE_MAX_FONT_SCALE)));
+}
+
+function isTemplateTextColor(value: unknown): value is string {
+  return typeof value === 'string' && TICKET_TEMPLATE_HEX_COLOR.test(value.trim());
+}
+
+export function getTicketTemplateTextColor(value: unknown): string {
+  if (!isTemplateTextColor(value)) return TICKET_TEMPLATE_DEFAULT_TEXT_COLOR;
+  return value.trim().toLowerCase();
 }
 
 function legacyScaleToFontSize(scale: number): number {
@@ -196,6 +209,15 @@ export function parseTicketTemplateElements(value: unknown): TicketTemplateEleme
       );
     }
 
+    const rawColor = item.color ?? item.text_color;
+    if (rawColor !== undefined && !isTemplateTextColor(rawColor)) {
+      throw new TicketTemplateValidationError(
+        'TICKET_TEMPLATE_ELEMENT_INVALID',
+        422,
+        'Warna teks template tidak valid.',
+      );
+    }
+
     const normalizedFontSize = rawFontSize === undefined
       ? undefined
       : normalizeTicketTemplateElementFontSize(
@@ -206,6 +228,7 @@ export function parseTicketTemplateElements(value: unknown): TicketTemplateEleme
       type: item.type,
       token: typeof item.token === 'string' ? item.token.trim() : undefined,
       fontSize: normalizedFontSize,
+      color: rawColor === undefined ? undefined : getTicketTemplateTextColor(rawColor),
       x: typeof item.x === 'number' ? item.x : Number.NaN,
       y: typeof item.y === 'number' ? item.y : Number.NaN,
       width: typeof item.width === 'number' ? item.width : Number.NaN,
