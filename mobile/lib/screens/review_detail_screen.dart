@@ -469,6 +469,10 @@ class _ReviewDetailScreenState extends State<ReviewDetailScreen> {
                     ],
                   )
                 : Column(
+                    // A bottomNavigationBar receives the Scaffold's full
+                    // vertical constraint. Keep the final-status footer
+                    // content-sized so it cannot consume the detail body.
+                    mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       Text(
