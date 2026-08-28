@@ -80,7 +80,10 @@ Map<String, dynamic>? reviewParticipantDataFromExtra(Object? extra) {
   // Normalize aliases at the navigation boundary so the detail body does not
   // depend on which status or payload shape produced the tapped row.
   data['id'] = id;
-  _copyAlias(data, 'status', const ['registrationStatus', 'registration_status']);
+  _copyAlias(data, 'status', const [
+    'registrationStatus',
+    'registration_status',
+  ]);
   _copyAlias(data, 'createdAt', const ['created_at']);
   _copyAlias(data, 'answers', const ['answer_map']);
   _copyAlias(data, 'answerFieldLabels', const ['answer_field_labels']);
@@ -173,11 +176,22 @@ GoRouter buildAppRouter(AuthSessionController authSession) => GoRouter(
           ParticipantsScreen(eventId: state.pathParameters['id']!),
     ),
     GoRoute(
-      path: '/review-detail',
+      path: '/review-detail/:id',
       builder: (context, state) {
+        final routeId = _firstNonBlankString(state.pathParameters['id']);
         final participantData = reviewParticipantDataFromExtra(state.extra);
-        if (participantData == null) return const _InvalidReviewDetailScreen();
-        return ReviewDetailScreen(participantData: participantData);
+        if (routeId == null && participantData == null) {
+          return const _InvalidReviewDetailScreen();
+        }
+
+        final data = <String, dynamic>{
+          ...?participantData,
+          if (routeId != null) 'id': routeId,
+        };
+        return ReviewDetailScreen(
+          participantData: data,
+          refreshFromServer: true,
+        );
       },
     ),
   ],

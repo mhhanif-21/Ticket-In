@@ -840,7 +840,21 @@ class _ParticipantsScreenState extends ConsumerState<ParticipantsScreen> {
 
     return InkWell(
       onTap: () async {
-        final result = await context.push('/review-detail', extra: p);
+        final participantId = p['id'] ??
+            p['registrationId'] ??
+            p['registration_id'];
+        if (participantId == null || participantId.toString().trim().isEmpty) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Data pendaftar tidak tersedia.')),
+            );
+          }
+          return;
+        }
+        final result = await context.push(
+          '/review-detail/${Uri.encodeComponent(participantId.toString())}',
+          extra: Map<String, dynamic>.from(p),
+        );
         if (result != null) {
           ref.read(participantsProvider(widget.eventId).notifier).refresh();
         }

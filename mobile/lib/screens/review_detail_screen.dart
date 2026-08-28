@@ -7,11 +7,13 @@ import '../utils/participant_answers.dart';
 class ReviewDetailScreen extends StatefulWidget {
   final Map<String, dynamic> participantData;
   final AdminService? adminService;
+  final bool refreshFromServer;
 
   const ReviewDetailScreen({
     super.key,
     required this.participantData,
     this.adminService,
+    this.refreshFromServer = false,
   });
 
   @override
@@ -20,6 +22,51 @@ class ReviewDetailScreen extends StatefulWidget {
 
 class _ReviewDetailScreenState extends State<ReviewDetailScreen> {
   bool _isProcessing = false;
+  bool _isLoadingDetail = false;
+  String? _detailLoadError;
+  late Map<String, dynamic> _participantData;
+
+  AdminService get _adminService => widget.adminService ?? AdminService();
+
+  @override
+  void initState() {
+    super.initState();
+    _participantData = Map<String, dynamic>.from(widget.participantData);
+    if (widget.refreshFromServer && _participantId != null) {
+      _loadLatestDetail();
+    }
+  }
+
+  Future<void> _loadLatestDetail() async {
+    final registrationId = _participantId;
+    if (registrationId == null) return;
+    if (mounted) {
+      setState(() {
+        _isLoadingDetail = true;
+        _detailLoadError = null;
+      });
+    }
+    try {
+      final latest = await _adminService.getParticipantDetail(registrationId);
+      if (!mounted || _participantId != registrationId) return;
+      setState(() {
+        _participantData = {
+          ..._participantData,
+          ...latest,
+          'id': registrationId,
+        };
+        _isLoadingDetail = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      // The list row remains the usable fallback. Never replace the detail
+      // body with a final-status/blank state when the refresh is unavailable.
+      setState(() {
+        _isLoadingDetail = false;
+        _detailLoadError = 'Data terbaru belum dapat dimuat.';
+      });
+    }
+  }
 
   void _updateStatus(String status) async {
     if (_currentStatus() != 'Pending') return;
@@ -28,10 +75,7 @@ class _ReviewDetailScreenState extends State<ReviewDetailScreen> {
     setState(() => _isProcessing = true);
     try {
       final action = status == 'Accepted' ? 'Approve' : 'Reject';
-      await (widget.adminService ?? AdminService()).reviewParticipant(
-        registrationId,
-        action,
-      );
+      await _adminService.reviewParticipant(registrationId, action);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Status berhasil diubah menjadi $status')),
@@ -54,9 +98,7 @@ class _ReviewDetailScreenState extends State<ReviewDetailScreen> {
     if (registrationId == null) return;
     setState(() => _isProcessing = true);
     try {
-      await (widget.adminService ?? AdminService()).retryTicketGeneration(
-        registrationId,
-      );
+      await _adminService.retryTicketGeneration(registrationId);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -135,11 +177,10 @@ class _ReviewDetailScreenState extends State<ReviewDetailScreen> {
     }
     setState(() => _isProcessing = true);
     try {
-      final resource = await (widget.adminService ?? AdminService())
-          .getParticipantFile(
-            registrationId,
-            row.fieldKey,
-          );
+      final resource = await _adminService.getParticipantFile(
+        registrationId,
+        row.fieldKey,
+      );
       if (resource.isImage) {
         if (mounted) await _showParticipantImage(resource);
       } else {
@@ -226,6 +267,24 @@ class _ReviewDetailScreenState extends State<ReviewDetailScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            if (_isLoadingDetail) const LinearProgressIndicator(minHeight: 2),
+            if (_detailLoadError != null) ...[
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      _detailLoadError!,
+                      style: const TextStyle(color: AppColors.onSurfaceVariant),
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: _isLoadingDetail ? null : _loadLatestDetail,
+                    child: const Text('Coba lagi'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+            ],
             Center(
               child: Column(
                 children: [
@@ -475,15 +534,14 @@ class _ReviewDetailScreenState extends State<ReviewDetailScreen> {
       RegExp(r'[A-Z]'),
       (match) => '_${match.group(0)!.toLowerCase()}',
     );
-    return widget.participantData[camelCase] ??
-        widget.participantData[snakeCase];
+    return _participantData[camelCase] ?? _participantData[snakeCase];
   }
 
   String? get _participantId {
     final value =
-        widget.participantData['id'] ??
-        widget.participantData['registrationId'] ??
-        widget.participantData['registration_id'];
+        _participantData['id'] ??
+        _participantData['registrationId'] ??
+        _participantData['registration_id'];
     final id = value?.toString().trim();
     return id == null || id.isEmpty ? null : id;
   }
@@ -504,8 +562,8 @@ class _ReviewDetailScreenState extends State<ReviewDetailScreen> {
   String _currentStatus() {
     final raw =
         _participantValue('status') ??
-        widget.participantData['registrationStatus'] ??
-        widget.participantData['registration_status'];
+        _participantData['registrationStatus'] ??
+        _participantData['registration_status'];
     switch (raw?.toString().trim().toLowerCase()) {
       case 'draft':
         return 'Draft';

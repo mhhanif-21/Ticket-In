@@ -105,6 +105,16 @@ class AdminService {
     }
   }
 
+  Future<Map<String, dynamic>> getParticipantDetail(String registrationId) async {
+    final response = await _api.get('/v1/registrations/$registrationId');
+    if (response.statusCode == 200) {
+      final json = jsonDecode(response.body) as Map<String, dynamic>;
+      final data = json['data'];
+      if (data is Map) return Map<String, dynamic>.from(data);
+    }
+    throw Exception('Failed to load participant detail');
+  }
+
   Future<void> reviewParticipant(String registrationId, String action) async {
     final response = await _api.post(
       '/v1/registrations/$registrationId/review',
