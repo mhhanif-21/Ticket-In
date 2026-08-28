@@ -42,6 +42,8 @@ class _TicketTemplateEditorScreenState
   static const _minimumTextHeight = 0.012;
   static const _textHorizontalPadding = 4.0;
   static const _textVerticalPadding = 4.0;
+  static const _resizeHandleDiameter = 14.0;
+  static const _selectionInset = _resizeHandleDiameter / 2;
   static const _paletteTokens = <String>['NAME', 'EMAIL', 'EVENT_NAME'];
 
   static const _textColorPresets = <String>[
@@ -101,29 +103,39 @@ class _TicketTemplateEditorScreenState
   TicketTemplateElementModel _normalizeElement(
     TicketTemplateElementModel element,
   ) {
-    // QR needs a meaningful physical square. Text, however, must stay close
-    // to its measured glyphs so a selection outline never becomes a giant
-    // unrelated container.
+    // QR owns its physical square. Text owns only its glyph bounds; persisted
+    // width/height are regenerated from the canonical font size to prevent an
+    // old layout rectangle from becoming a group-like selection box.
     final minimumWidth = element.type == 'qr'
         ? ticketTemplateMinQrSize
         : _minimumTextWidth;
-    var width = _clamp(element.width, minimumWidth, 1.0);
+    final previousWidth = _clamp(element.width, minimumWidth, 1.0);
     final minimumHeight = element.type == 'qr'
         ? ticketTemplateMinQrSize
         : _minimumTextHeight;
-    var height = _clamp(element.height, minimumHeight, 1.0);
+    final previousHeight = _clamp(element.height, minimumHeight, 1.0);
     final fontSize = _clamp(
       element.fontSize,
       ticketTemplateMinFontSize,
       ticketTemplateMaxFontSize,
     );
-    if (element.type != 'qr' && _isLegacyTextBounds(element)) {
-      final intrinsic = _intrinsicTextGeometry(element.copyWith(fontSize: fontSize));
+    var width = previousWidth;
+    var height = previousHeight;
+    var x = _clamp(element.x, 0.0, 1.0 - previousWidth);
+    var y = _clamp(element.y, 0.0, 1.0 - previousHeight);
+    if (element.type != 'qr') {
+      // Existing templates positioned text in a broad container. Preserve the
+      // visual centre while replacing that container with its compact bounds.
+      final centerX = x + previousWidth / 2;
+      final centerY = y + previousHeight / 2;
+      final intrinsic = _intrinsicTextGeometry(
+        element.copyWith(fontSize: fontSize),
+      );
       width = _clamp(intrinsic.width, minimumWidth, 0.75);
       height = _clamp(intrinsic.height, minimumHeight, 0.20);
+      x = _clamp(centerX - width / 2, 0.0, 1.0 - width);
+      y = _clamp(centerY - height / 2, 0.0, 1.0 - height);
     }
-    final x = _clamp(element.x, 0.0, 1.0 - width);
-    final y = _clamp(element.y, 0.0, 1.0 - height);
     return element.copyWith(
       x: x,
       y: y,
@@ -131,19 +143,6 @@ class _TicketTemplateEditorScreenState
       height: height,
       fontSize: fontSize,
     );
-  }
-
-  bool _isLegacyTextBounds(TicketTemplateElementModel element) {
-    if (element.width > 0.85 || element.height > 0.22) return true;
-    final defaultFont =
-        (element.fontSize - ticketTemplateDefaultFontSize).abs() < 0.01;
-    if (!defaultFont) return false;
-    final oldDefault =
-        ((element.width - 0.70).abs() <= 0.025 &&
-            (element.height - 0.10).abs() <= 0.02) ||
-        ((element.width - 0.65).abs() <= 0.025 &&
-            (element.height - 0.07).abs() <= 0.02);
-    return oldDefault;
   }
 
   Size _intrinsicTextGeometry(TicketTemplateElementModel element) {
@@ -322,7 +321,9 @@ class _TicketTemplateEditorScreenState
     // Resize is semantic for text: first scale the font, then measure the
     // resulting label again. This keeps the selection bounds tight around the
     // actual one-line text instead of merely growing an empty box.
-    final intrinsic = _intrinsicTextGeometry(current.copyWith(fontSize: fontSize));
+    final intrinsic = _intrinsicTextGeometry(
+      current.copyWith(fontSize: fontSize),
+    );
     final width = _clamp(intrinsic.width, _minimumTextWidth, 0.75);
     final height = _clamp(intrinsic.height, _minimumTextHeight, 0.20);
     var x = current.x;
@@ -491,67 +492,89 @@ class _TicketTemplateEditorScreenState
             .clamp(1.0, 160.0)
             .toDouble();
 
-    return Positioned.fromRect(
-      rect: rect,
+    final outerInset = selected ? _selectionInset : 0.0;
+    return Positioned(
+      left: rect.left - outerInset,
+      top: rect.top - outerInset,
+      width: rect.width + outerInset * 2,
+      height: rect.height + outerInset * 2,
       child: Stack(
         clipBehavior: Clip.none,
         children: [
-          GestureDetector(
-            key: ValueKey('ticket-template-element-$index'),
-            behavior: HitTestBehavior.translucent,
-            onTap: () => _select(index),
-            onPanStart: (_) => _select(index),
-            onPanUpdate: (details) =>
-                _moveElement(index, details.delta, canvasSize),
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                color: isQr ? Colors.white : Colors.transparent,
-                border: selected
-                    ? Border.all(color: Colors.white70, width: 1)
-                    : null,
-              ),
-              child: Center(
-                child: isQr
-                    ? const FittedBox(
-                        fit: BoxFit.contain,
-                        child: Icon(Icons.qr_code_2, color: Colors.black),
-                      )
-                    : Text(
-                        _elementLabel(element),
-                        textAlign: TextAlign.center,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: _colorFromHex(element.color),
-                          fontWeight: FontWeight.w700,
-                          fontSize: fontSize,
+          Positioned.fromRect(
+            rect: Rect.fromLTWH(
+              outerInset,
+              outerInset,
+              rect.width,
+              rect.height,
+            ),
+            child: GestureDetector(
+              key: ValueKey('ticket-template-element-$index'),
+              behavior: HitTestBehavior.translucent,
+              onTap: () => _select(index),
+              onPanStart: (_) => _select(index),
+              onPanUpdate: (details) =>
+                  _moveElement(index, details.delta, canvasSize),
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: isQr ? Colors.white : Colors.transparent,
+                  border: selected
+                      ? Border.all(color: Colors.white70, width: 1)
+                      : null,
+                ),
+                child: Center(
+                  child: isQr
+                      ? const FittedBox(
+                          fit: BoxFit.contain,
+                          child: Icon(Icons.qr_code_2, color: Colors.black),
+                        )
+                      : Text(
+                          _elementLabel(element),
+                          textAlign: TextAlign.center,
+                          maxLines: 1,
+                          overflow: TextOverflow.visible,
+                          style: TextStyle(
+                            color: _colorFromHex(element.color),
+                            fontWeight: FontWeight.w700,
+                            fontSize: fontSize,
+                          ),
                         ),
-                      ),
+                ),
               ),
             ),
           ),
           if (selected)
             ..._ResizeHandle.values.map(
-              (handle) => _buildResizeHandle(index, handle, canvasSize),
+              (handle) =>
+                  _buildResizeHandle(index, handle, canvasSize, rect.size),
             ),
         ],
       ),
     );
   }
 
-  Widget _buildResizeHandle(int index, _ResizeHandle handle, Size canvasSize) {
+  Widget _buildResizeHandle(
+    int index,
+    _ResizeHandle handle,
+    Size canvasSize,
+    Size elementSize,
+  ) {
     final isBottomRight = handle == _ResizeHandle.bottomRight;
     final keyName = isBottomRight
         ? 'ticket-template-resize-handle-$index'
         : 'ticket-template-resize-handle-$index-${handle.name}';
-    final alignment = switch (handle) {
-      _ResizeHandle.topLeft => const Alignment(-1, -1),
-      _ResizeHandle.topRight => const Alignment(1, -1),
-      _ResizeHandle.bottomLeft => const Alignment(-1, 1),
-      _ResizeHandle.bottomRight => const Alignment(1, 1),
+    final left = switch (handle) {
+      _ResizeHandle.topLeft || _ResizeHandle.bottomLeft => 0.0,
+      _ResizeHandle.topRight || _ResizeHandle.bottomRight => elementSize.width,
     };
-    return Align(
-      alignment: alignment,
+    final top = switch (handle) {
+      _ResizeHandle.topLeft || _ResizeHandle.topRight => 0.0,
+      _ResizeHandle.bottomLeft ||
+      _ResizeHandle.bottomRight => elementSize.height,
+    };
+    return Positioned(
+      left: left,
+      top: top,
       child: GestureDetector(
         key: ValueKey(keyName),
         behavior: HitTestBehavior.opaque,
@@ -559,12 +582,12 @@ class _TicketTemplateEditorScreenState
         onPanUpdate: (details) =>
             _resizeElement(index, handle, details.delta, canvasSize),
         child: Container(
-          width: 18,
-          height: 18,
+          width: _resizeHandleDiameter,
+          height: _resizeHandleDiameter,
           decoration: BoxDecoration(
             color: Colors.white,
             border: Border.all(color: Colors.black87, width: 1.2),
-            borderRadius: BorderRadius.circular(3),
+            shape: BoxShape.circle,
           ),
         ),
       ),
