@@ -23,11 +23,13 @@ class _ReviewDetailScreenState extends State<ReviewDetailScreen> {
 
   void _updateStatus(String status) async {
     if (_currentStatus() != 'Pending') return;
+    final registrationId = _participantId;
+    if (registrationId == null) return;
     setState(() => _isProcessing = true);
     try {
       final action = status == 'Accepted' ? 'Approve' : 'Reject';
       await (widget.adminService ?? AdminService()).reviewParticipant(
-        widget.participantData['id'],
+        registrationId,
         action,
       );
       if (mounted) {
@@ -48,10 +50,12 @@ class _ReviewDetailScreenState extends State<ReviewDetailScreen> {
   }
 
   void _retryTicket() async {
+    final registrationId = _participantId;
+    if (registrationId == null) return;
     setState(() => _isProcessing = true);
     try {
       await (widget.adminService ?? AdminService()).retryTicketGeneration(
-        widget.participantData['id'],
+        registrationId,
       );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -174,15 +178,14 @@ class _ReviewDetailScreenState extends State<ReviewDetailScreen> {
   @override
   Widget build(BuildContext context) {
     final currentStatus = _currentStatus();
-    final ticketJobStatus = widget.participantData['ticketJobStatus']
-        ?.toString();
+    final ticketJobStatus = _participantValue('ticketJobStatus')?.toString();
     final participantName = _textValue(
-      widget.participantData['name'],
+      _participantValue('name'),
       fallback: 'Unknown',
     );
     final answerRows = buildParticipantAnswerRows(
-      answers: widget.participantData['answers'],
-      answerFieldLabels: widget.participantData['answerFieldLabels'],
+      answers: _participantValue('answers'),
+      answerFieldLabels: _participantValue('answerFieldLabels'),
     );
 
     return Scaffold(
@@ -208,7 +211,10 @@ class _ReviewDetailScreenState extends State<ReviewDetailScreen> {
           child: Container(color: AppColors.outlineVariant, height: 1.0),
         ),
       ),
+      // Status only changes the footer actions. Every registration status
+      // must share this same complete read-only detail body.
       body: SingleChildScrollView(
+        key: const ValueKey('review-detail-content'),
         padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -278,14 +284,11 @@ class _ReviewDetailScreenState extends State<ReviewDetailScreen> {
               ),
             ),
             const SizedBox(height: 16),
-            _buildDetailRow(
-              'Email',
-              _textValue(widget.participantData['email']),
-            ),
+            _buildDetailRow('Email', _textValue(_participantValue('email'))),
             const SizedBox(height: 12),
             _buildDetailRow(
               'Waktu Daftar',
-              _textValue(widget.participantData['createdAt']),
+              _textValue(_participantValue('createdAt')),
             ),
             const SizedBox(height: 32),
             const Text(
@@ -403,7 +406,7 @@ class _ReviewDetailScreenState extends State<ReviewDetailScreen> {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       Text(
-                        'Status $currentStatus sudah final.',
+                        _statusMessage(currentStatus),
                         textAlign: TextAlign.center,
                         style: const TextStyle(
                           color: AppColors.onSurfaceVariant,
@@ -460,9 +463,40 @@ class _ReviewDetailScreenState extends State<ReviewDetailScreen> {
     return text.isEmpty ? fallback : text;
   }
 
+  Object? _participantValue(String camelCase) {
+    final snakeCase = camelCase.replaceAllMapped(
+      RegExp(r'[A-Z]'),
+      (match) => '_${match.group(0)!.toLowerCase()}',
+    );
+    return widget.participantData[camelCase] ??
+        widget.participantData[snakeCase];
+  }
+
+  String? get _participantId {
+    final value =
+        widget.participantData['id'] ??
+        widget.participantData['registrationId'] ??
+        widget.participantData['registration_id'];
+    final id = value?.toString().trim();
+    return id == null || id.isEmpty ? null : id;
+  }
+
+  String _statusMessage(String status) {
+    switch (status) {
+      case 'Accepted':
+        return 'Peserta telah diterima.';
+      case 'Rejected':
+        return 'Peserta telah ditolak.';
+      case 'Draft':
+        return 'Peserta masih berupa draft.';
+      default:
+        return 'Tidak ada aksi review untuk status ini.';
+    }
+  }
+
   String _currentStatus() {
     final raw =
-        widget.participantData['status'] ??
+        _participantValue('status') ??
         widget.participantData['registrationStatus'] ??
         widget.participantData['registration_status'];
     switch (raw?.toString().trim().toLowerCase()) {

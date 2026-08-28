@@ -101,9 +101,14 @@ class _TicketTemplateEditorScreenState
     // reachable. QR also needs a meaningful physical square before the first
     // gesture; legacy templates occasionally contain very small boxes.
     final minimumWidth = element.type == 'qr' ? ticketTemplateMinQrSize : 0.08;
-    final width = _clamp(element.width, minimumWidth, 1.0);
+    var width = _clamp(element.width, minimumWidth, 1.0);
     final minimumHeight = element.type == 'qr' ? ticketTemplateMinQrSize : 0.04;
-    final height = _clamp(element.height, minimumHeight, 1.0);
+    var height = _clamp(element.height, minimumHeight, 1.0);
+    if (element.type != 'qr' && _isLegacyTextBounds(element)) {
+      final intrinsic = _intrinsicTextGeometry(element);
+      width = _clamp(intrinsic.width, minimumWidth, 0.75);
+      height = _clamp(intrinsic.height, minimumHeight, 0.20);
+    }
     final x = _clamp(element.x, 0.0, 1.0 - width);
     final y = _clamp(element.y, 0.0, 1.0 - height);
     final fontSize = _clamp(
@@ -117,6 +122,39 @@ class _TicketTemplateEditorScreenState
       width: width,
       height: height,
       fontSize: fontSize,
+    );
+  }
+
+  bool _isLegacyTextBounds(TicketTemplateElementModel element) {
+    if (element.width > 0.85 || element.height > 0.22) return true;
+    final defaultFont =
+        (element.fontSize - ticketTemplateDefaultFontSize).abs() < 0.01;
+    if (!defaultFont) return false;
+    final oldDefault =
+        ((element.width - 0.70).abs() <= 0.025 &&
+            (element.height - 0.10).abs() <= 0.02) ||
+        ((element.width - 0.65).abs() <= 0.025 &&
+            (element.height - 0.07).abs() <= 0.02);
+    return oldDefault;
+  }
+
+  Size _intrinsicTextGeometry(TicketTemplateElementModel element) {
+    final painter = TextPainter(
+      text: TextSpan(
+        text: _elementLabel(element),
+        style: TextStyle(
+          fontSize: element.fontSize,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+      maxLines: 1,
+      textDirection: TextDirection.ltr,
+    )..layout(maxWidth: ticketTemplateCanvasWidth * 0.8);
+    final canonicalCanvasHeight =
+        ticketTemplateCanvasWidth / _backgroundAspectRatio;
+    return Size(
+      _clamp((painter.width + 16) / ticketTemplateCanvasWidth, 0.08, 0.75),
+      _clamp((painter.height + 8) / canonicalCanvasHeight, 0.04, 0.20),
     );
   }
 
@@ -213,35 +251,65 @@ class _TicketTemplateEditorScreenState
 
     final dx = delta.dx / canvasSize.width;
     final dy = delta.dy / canvasSize.height;
+    final scaleDelta = switch (handle) {
+      _ResizeHandle.bottomRight => math.max(
+        dx / current.width,
+        dy / current.height,
+      ),
+      _ResizeHandle.topLeft => math.max(
+        -dx / current.width,
+        -dy / current.height,
+      ),
+      _ResizeHandle.topRight => math.max(
+        dx / current.width,
+        -dy / current.height,
+      ),
+      _ResizeHandle.bottomLeft => math.max(
+        -dx / current.width,
+        dy / current.height,
+      ),
+    };
+    final minimumScale = math.max(0.08 / current.width, 0.04 / current.height);
+    final right = current.x + current.width;
+    final bottom = current.y + current.height;
+    final maximumScale = switch (handle) {
+      _ResizeHandle.topLeft => math.min(
+        right / current.width,
+        bottom / current.height,
+      ),
+      _ResizeHandle.topRight => math.min(
+        (1.0 - current.x) / current.width,
+        bottom / current.height,
+      ),
+      _ResizeHandle.bottomLeft => math.min(
+        right / current.width,
+        (1.0 - current.y) / current.height,
+      ),
+      _ResizeHandle.bottomRight => math.min(
+        (1.0 - current.x) / current.width,
+        (1.0 - current.y) / current.height,
+      ),
+    };
+    final scale = _clamp(
+      1.0 + scaleDelta,
+      minimumScale,
+      math.max(minimumScale, maximumScale),
+    );
+    final width = current.width * scale;
+    final height = current.height * scale;
     var x = current.x;
     var y = current.y;
-    var width = current.width;
-    var height = current.height;
-
     switch (handle) {
-      case _ResizeHandle.bottomRight:
-        width = _clamp(width + dx, 0.08, 1.0 - x);
-        height = _clamp(height + dy, 0.04, 1.0 - y);
       case _ResizeHandle.topLeft:
-        final nextX = _clamp(x + dx, 0.0, x + width - 0.08);
-        final nextY = _clamp(y + dy, 0.0, y + height - 0.04);
-        width += x - nextX;
-        height += y - nextY;
-        x = nextX;
-        y = nextY;
+        x = right - width;
+        y = bottom - height;
       case _ResizeHandle.topRight:
-        final nextY = _clamp(y + dy, 0.0, y + height - 0.04);
-        width = _clamp(width + dx, 0.08, 1.0 - x);
-        height += y - nextY;
-        y = nextY;
+        y = bottom - height;
       case _ResizeHandle.bottomLeft:
-        final nextX = _clamp(x + dx, 0.0, x + width - 0.08);
-        width += x - nextX;
-        height = _clamp(height + dy, 0.04, 1.0 - y);
-        x = nextX;
+        x = right - width;
+      case _ResizeHandle.bottomRight:
+        break;
     }
-
-    final scale = math.max(width / current.width, height / current.height);
     final fontSize = _clamp(
       current.fontSize * scale,
       ticketTemplateMinFontSize,
@@ -267,14 +335,12 @@ class _TicketTemplateEditorScreenState
     Size canvasSize,
     TicketTemplateElementModel current,
   ) {
-    final currentLeft = current.x * canvasSize.width;
-    final currentTop = current.y * canvasSize.height;
-    final currentRight = currentLeft + current.width * canvasSize.width;
-    final currentBottom = currentTop + current.height * canvasSize.height;
-    final currentSize = math.min(
-      current.width * canvasSize.width,
-      current.height * canvasSize.height,
-    );
+    final currentRect = _elementRect(current, canvasSize);
+    final currentLeft = currentRect.left;
+    final currentTop = currentRect.top;
+    final currentRight = currentRect.right;
+    final currentBottom = currentRect.bottom;
+    final currentSize = currentRect.width;
     final signedDelta = switch (handle) {
       _ResizeHandle.bottomRight => math.max(delta.dx, delta.dy),
       _ResizeHandle.topLeft => math.max(-delta.dx, -delta.dy),
@@ -328,14 +394,18 @@ class _TicketTemplateEditorScreenState
     };
     final y = _clamp(0.70 + _elements.length * 0.06, 0.0, 0.86);
     setState(() {
+      final draft = TicketTemplateElementModel(
+        type: type,
+        x: 0.12,
+        y: y,
+        width: 0.20,
+        height: 0.08,
+        fontSize: ticketTemplateDefaultFontSize,
+      );
+      final intrinsic = _intrinsicTextGeometry(draft);
       _elements.add(
-        TicketTemplateElementModel(
-          type: type,
-          x: 0.12,
-          y: y,
-          width: 0.70,
-          height: 0.10,
-          fontSize: ticketTemplateDefaultFontSize,
+        _normalizeElement(
+          draft.copyWith(width: intrinsic.width, height: intrinsic.height),
         ),
       );
       _selectedIndex = _elements.length - 1;
