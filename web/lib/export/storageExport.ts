@@ -17,10 +17,29 @@ const EXPORT_PAGE_SIZE = 500;
 type ExportRegistrationPageRow = ExportRegistrationRecord;
 
 export class ExportStorageUploadError extends Error {
-  constructor() {
-    super('export_storage_upload_failed');
+  readonly status: number | null;
+  readonly providerCode: string | null;
+
+  constructor(status: number | null = null, providerCode: string | null = null) {
+    const suffix = status === null ? '' : `:${status}`;
+    super(`export_storage_upload_failed${suffix}`);
     this.name = 'ExportStorageUploadError';
+    this.status = status;
+    this.providerCode = providerCode;
   }
+}
+
+export const EXPORT_CSV_CONTENT_TYPE = 'text/csv';
+
+export function createExportUploadHeaders(serviceKey: string): Record<string, string> {
+  return {
+    Authorization: `Bearer ${serviceKey}`,
+    apikey: serviceKey,
+    // Keep this identical to the private `exports` bucket allow-list. A
+    // charset parameter would be a different value for exact MIME checks.
+    'Content-Type': EXPORT_CSV_CONTENT_TYPE,
+    'x-upsert': 'true',
+  };
 }
 
 function customHeaders(row: Record<string, unknown>): string[] {
@@ -126,17 +145,27 @@ export async function uploadExportCsv(input: {
   const headers = await collectHeaders(input.eventId, input.fields);
   const storagePath = createExportStoragePath(input.eventId, input.jobId);
   const stream = streamFromAsyncGenerator(generateCsvChunks(input.eventId, input.fields, headers));
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!serviceKey) throw new ExportStorageUploadError();
   const response = await fetch(storageObjectUrl(EXPORT_STORAGE_BUCKET, storagePath), {
     method: 'POST',
-    headers: {
-      Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY!}`,
-      apikey: process.env.SUPABASE_SERVICE_ROLE_KEY!,
-      'Content-Type': 'text/csv; charset=utf-8',
-      'x-upsert': 'true',
-    },
+    headers: createExportUploadHeaders(serviceKey),
     body: stream,
     duplex: 'half',
   } as RequestInit);
-  if (!response.ok) throw new ExportStorageUploadError();
+  if (!response.ok) {
+    let providerCode: string | null = null;
+    try {
+      const payload = await response.json() as { code?: unknown; statusCode?: unknown };
+      const candidate = payload.code ?? payload.statusCode;
+      if (typeof candidate === 'string' && /^[A-Za-z0-9_.:-]{1,80}$/.test(candidate)) {
+        providerCode = candidate;
+      }
+    } catch {
+      // The worker only needs the HTTP status for a safe diagnostic. Do not
+      // persist or log an arbitrary provider response body.
+    }
+    throw new ExportStorageUploadError(response.status, providerCode);
+  }
   return { storagePath };
 }

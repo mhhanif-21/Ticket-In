@@ -5,7 +5,11 @@ import { db } from '@/db';
 import { exportJobs, formFields } from '@/db/schema';
 import { markExportJobFailed } from '@/lib/actions/exportJob';
 import { type ExportFieldDefinition } from '@/lib/export/csv';
-import { createExportStoragePath, uploadExportCsv } from '@/lib/export/storageExport';
+import {
+  createExportStoragePath,
+  ExportStorageUploadError,
+  uploadExportCsv,
+} from '@/lib/export/storageExport';
 import { readVerifiedQStashBody } from '@/lib/security/qstash';
 import {
   activateHeldStorageCleanupJobs,
@@ -115,7 +119,12 @@ export async function POST(request: Request) {
     if (stagedObject) {
       await activateHeldStorageCleanupJobs([stagedObject]).catch(() => undefined);
     }
-    console.error('Export worker error:', { error: error instanceof Error ? error.name : 'unknown' });
+    console.error('Export worker error:', {
+      error: error instanceof Error ? error.name : 'unknown',
+      ...(error instanceof ExportStorageUploadError
+        ? { storageStatus: error.status, providerCode: error.providerCode }
+        : {}),
+    });
     if (jobId) {
       try {
         await markExportJobFailed(jobId, error);
