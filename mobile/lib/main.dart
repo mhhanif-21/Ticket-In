@@ -71,12 +71,41 @@ Map<String, dynamic>? reviewParticipantDataFromExtra(Object? extra) {
   for (final entry in extra.entries) {
     if (entry.key is String) data[entry.key as String] = entry.value;
   }
-  final id = data['id'] ?? data['registrationId'] ?? data['registration_id'];
-  if (id is! String || id.trim().isEmpty) return null;
-  // Keep the detail screen independent from whether the API used camelCase
-  // or snake_case for the registration identifier.
+  final id = _firstNonBlankString(
+    data['id'] ?? data['registrationId'] ?? data['registration_id'],
+  );
+  if (id == null) return null;
+
+  // The list API and older deployments have used both naming conventions.
+  // Normalize aliases at the navigation boundary so the detail body does not
+  // depend on which status or payload shape produced the tapped row.
   data['id'] = id;
+  _copyAlias(data, 'status', const ['registrationStatus', 'registration_status']);
+  _copyAlias(data, 'createdAt', const ['created_at']);
+  _copyAlias(data, 'answers', const ['answer_map']);
+  _copyAlias(data, 'answerFieldLabels', const ['answer_field_labels']);
+  _copyAlias(data, 'ticketJobStatus', const ['ticket_job_status']);
   return data;
+}
+
+String? _firstNonBlankString(Object? value) {
+  final text = value?.toString().trim();
+  return text == null || text.isEmpty ? null : text;
+}
+
+void _copyAlias(
+  Map<String, dynamic> data,
+  String canonicalKey,
+  List<String> aliases,
+) {
+  if (data[canonicalKey] != null) return;
+  for (final alias in aliases) {
+    final value = data[alias];
+    if (value != null) {
+      data[canonicalKey] = value;
+      return;
+    }
+  }
 }
 
 GoRouter buildAppRouter(AuthSessionController authSession) => GoRouter(

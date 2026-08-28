@@ -126,11 +126,18 @@ class _ReviewDetailScreenState extends State<ReviewDetailScreen> {
 
   Future<void> _openParticipantFile(ParticipantAnswerRow row) async {
     if (!mounted) return;
+    final registrationId = _participantId;
+    if (registrationId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Data pendaftar tidak tersedia.')),
+      );
+      return;
+    }
     setState(() => _isProcessing = true);
     try {
       final resource = await (widget.adminService ?? AdminService())
           .getParticipantFile(
-            widget.participantData['id'].toString(),
+            registrationId,
             row.fieldKey,
           );
       if (resource.isImage) {

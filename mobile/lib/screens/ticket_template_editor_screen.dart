@@ -38,6 +38,10 @@ class TicketTemplateEditorScreen extends StatefulWidget {
 
 class _TicketTemplateEditorScreenState
     extends State<TicketTemplateEditorScreen> {
+  static const _minimumTextWidth = 0.02;
+  static const _minimumTextHeight = 0.012;
+  static const _textHorizontalPadding = 4.0;
+  static const _textVerticalPadding = 4.0;
   static const _paletteTokens = <String>['NAME', 'EMAIL', 'EVENT_NAME'];
 
   static const _textColorPresets = <String>[
@@ -97,25 +101,29 @@ class _TicketTemplateEditorScreenState
   TicketTemplateElementModel _normalizeElement(
     TicketTemplateElementModel element,
   ) {
-    // Keep the minimum geometry large enough for the resize handles to remain
-    // reachable. QR also needs a meaningful physical square before the first
-    // gesture; legacy templates occasionally contain very small boxes.
-    final minimumWidth = element.type == 'qr' ? ticketTemplateMinQrSize : 0.08;
+    // QR needs a meaningful physical square. Text, however, must stay close
+    // to its measured glyphs so a selection outline never becomes a giant
+    // unrelated container.
+    final minimumWidth = element.type == 'qr'
+        ? ticketTemplateMinQrSize
+        : _minimumTextWidth;
     var width = _clamp(element.width, minimumWidth, 1.0);
-    final minimumHeight = element.type == 'qr' ? ticketTemplateMinQrSize : 0.04;
+    final minimumHeight = element.type == 'qr'
+        ? ticketTemplateMinQrSize
+        : _minimumTextHeight;
     var height = _clamp(element.height, minimumHeight, 1.0);
-    if (element.type != 'qr' && _isLegacyTextBounds(element)) {
-      final intrinsic = _intrinsicTextGeometry(element);
-      width = _clamp(intrinsic.width, minimumWidth, 0.75);
-      height = _clamp(intrinsic.height, minimumHeight, 0.20);
-    }
-    final x = _clamp(element.x, 0.0, 1.0 - width);
-    final y = _clamp(element.y, 0.0, 1.0 - height);
     final fontSize = _clamp(
       element.fontSize,
       ticketTemplateMinFontSize,
       ticketTemplateMaxFontSize,
     );
+    if (element.type != 'qr' && _isLegacyTextBounds(element)) {
+      final intrinsic = _intrinsicTextGeometry(element.copyWith(fontSize: fontSize));
+      width = _clamp(intrinsic.width, minimumWidth, 0.75);
+      height = _clamp(intrinsic.height, minimumHeight, 0.20);
+    }
+    final x = _clamp(element.x, 0.0, 1.0 - width);
+    final y = _clamp(element.y, 0.0, 1.0 - height);
     return element.copyWith(
       x: x,
       y: y,
@@ -153,8 +161,16 @@ class _TicketTemplateEditorScreenState
     final canonicalCanvasHeight =
         ticketTemplateCanvasWidth / _backgroundAspectRatio;
     return Size(
-      _clamp((painter.width + 16) / ticketTemplateCanvasWidth, 0.08, 0.75),
-      _clamp((painter.height + 8) / canonicalCanvasHeight, 0.04, 0.20),
+      _clamp(
+        (painter.width + _textHorizontalPadding) / ticketTemplateCanvasWidth,
+        _minimumTextWidth,
+        0.75,
+      ),
+      _clamp(
+        (painter.height + _textVerticalPadding) / canonicalCanvasHeight,
+        _minimumTextHeight,
+        0.20,
+      ),
     );
   }
 
@@ -269,7 +285,10 @@ class _TicketTemplateEditorScreenState
         dy / current.height,
       ),
     };
-    final minimumScale = math.max(0.08 / current.width, 0.04 / current.height);
+    final minimumScale = math.max(
+      _minimumTextWidth / current.width,
+      _minimumTextHeight / current.height,
+    );
     final right = current.x + current.width;
     final bottom = current.y + current.height;
     final maximumScale = switch (handle) {
@@ -295,8 +314,17 @@ class _TicketTemplateEditorScreenState
       minimumScale,
       math.max(minimumScale, maximumScale),
     );
-    final width = current.width * scale;
-    final height = current.height * scale;
+    final fontSize = _clamp(
+      current.fontSize * scale,
+      ticketTemplateMinFontSize,
+      ticketTemplateMaxFontSize,
+    );
+    // Resize is semantic for text: first scale the font, then measure the
+    // resulting label again. This keeps the selection bounds tight around the
+    // actual one-line text instead of merely growing an empty box.
+    final intrinsic = _intrinsicTextGeometry(current.copyWith(fontSize: fontSize));
+    final width = _clamp(intrinsic.width, _minimumTextWidth, 0.75);
+    final height = _clamp(intrinsic.height, _minimumTextHeight, 0.20);
     var x = current.x;
     var y = current.y;
     switch (handle) {
@@ -310,11 +338,8 @@ class _TicketTemplateEditorScreenState
       case _ResizeHandle.bottomRight:
         break;
     }
-    final fontSize = _clamp(
-      current.fontSize * scale,
-      ticketTemplateMinFontSize,
-      ticketTemplateMaxFontSize,
-    );
+    x = _clamp(x, 0.0, 1.0 - width);
+    y = _clamp(y, 0.0, 1.0 - height);
     setState(() {
       _selectedIndex = index;
       _dirty = true;
@@ -494,7 +519,7 @@ class _TicketTemplateEditorScreenState
                     : Text(
                         _elementLabel(element),
                         textAlign: TextAlign.center,
-                        maxLines: 2,
+                        maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           color: _colorFromHex(element.color),
