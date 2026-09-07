@@ -4,7 +4,6 @@ import { events } from '@/db/schema';
 import { eq } from 'drizzle-orm';
 import bcrypt from 'bcryptjs';
 import { isPublicEventStatus } from '@/lib/events/eventLifecycle';
-import { revokeVolunteerSessionsTx } from '@/lib/events/eventLifecycleActions';
 
 export const runtime = 'nodejs';
 
@@ -32,25 +31,24 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       const updatedAt = new Date();
       await tx.update(events)
         .set({
+          volunteerPin: pin,
           volunteerPinHash: pinHash,
-          volunteerSessionVersion: existing.volunteerSessionVersion + 1,
           updatedAt,
         })
         .where(eq(events.id, id));
-      await revokeVolunteerSessionsTx(tx, id, updatedAt);
       return 'rotated' as const;
     });
 
     if (rotated === 'not_found') {
-      return NextResponse.json({ status: 'error', message: 'Event tidak ditemukan' }, { status: 404 });
+      return NextResponse.json({ status: 'error', message: 'Event not found' }, { status: 404 });
     }
     if (rotated === 'inactive') {
-      return NextResponse.json({ status: 'error', message: 'PIN tidak dapat dibuat untuk event yang belum dipublikasikan atau dibatalkan.' }, { status: 409 });
+      return NextResponse.json({ status: 'error', message: 'PIN cannot be created for an unpublished or cancelled event.' }, { status: 409 });
     }
 
     return NextResponse.json({ 
       status: 'success', 
-      message: 'PIN berhasil dibuat',
+      message: 'PIN created successfully',
       data: {
         pin: pin
       }

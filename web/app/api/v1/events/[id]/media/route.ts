@@ -35,7 +35,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     const { id } = await params;
     const [event] = await db.select({ id: events.id }).from(events).where(eq(events.id, id)).limit(1);
     if (!event) {
-      return NextResponse.json({ status: 'error', message: 'Event tidak ditemukan' }, { status: 404 });
+      return NextResponse.json({ status: 'error', message: 'Event not found' }, { status: 404 });
     }
 
     const formData = await req.formData();
@@ -45,7 +45,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       return NextResponse.json({
         status: 'error',
         code: 'MEDIA_FILE_MISSING',
-        message: 'Poster acara wajib diunggah.',
+        message: 'Event poster is required.',
       }, { status: 400 });
     }
 
@@ -58,7 +58,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
     return NextResponse.json({
       status: 'success',
-      message: 'Media acara berhasil diperbarui',
+      message: 'Event media updated successfully',
       data: result,
     });
   } catch (error) {
@@ -73,7 +73,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     return NextResponse.json({
       status: 'error',
       code: 'MEDIA_UPLOAD_UNAVAILABLE',
-      message: 'Media acara sementara tidak tersedia. Silakan coba lagi.',
+      message: 'Event media temporarily unavailable. Please try again.',
     }, { status: 503 });
   }
 }
@@ -111,7 +111,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       return NextResponse.json({
         status: 'error',
         code: 'MEDIA_GALLERY_PAYLOAD_INVALID',
-        message: 'Payload galeri tidak valid.',
+        message: 'Invalid gallery payload.',
       }, { status: 400 });
     }
 
@@ -173,7 +173,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       }));
     });
     if (media === null) {
-      return NextResponse.json({ status: 'error', message: 'Event tidak ditemukan' }, { status: 404 });
+      return NextResponse.json({ status: 'error', message: 'Event not found' }, { status: 404 });
     }
     return NextResponse.json({ status: 'success', data: { media } });
   } catch (error) {
@@ -184,7 +184,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     return NextResponse.json({
       status: 'error',
       code: 'MEDIA_GALLERY_UNAVAILABLE',
-      message: 'Galeri acara sementara tidak tersedia. Silakan coba lagi.',
+      message: 'Event gallery temporarily unavailable. Please try again.',
     }, { status: 503 });
   }
 }

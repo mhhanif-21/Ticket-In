@@ -14,7 +14,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     const body = await req.json();
     
     if (!body.fields || !Array.isArray(body.fields)) {
-      return NextResponse.json({ status: 'error', message: 'Format payload tidak valid. Harap kirim array "fields"' }, { status: 400 });
+      return NextResponse.json({ status: 'error', message: 'Invalid payload format. Please send a "fields" array' }, { status: 400 });
     }
 
     const fieldsPayload: FormFieldPayload[] = body.fields;
@@ -28,7 +28,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
     return NextResponse.json({ 
       status: 'success', 
-      message: 'Form berhasil disimpan' 
+      message: 'Form saved successfully' 
     }, { status: 200 });
 
   } catch (error: any) {

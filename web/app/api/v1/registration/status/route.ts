@@ -8,6 +8,6 @@ export async function GET(request: Request) {
     return await getPublicRegistrationStatusResponse(request);
   } catch (error) {
     console.error('Error in check status API:', error);
-    return Response.json({ status: 'error', message: 'Terjadi kesalahan internal' }, { status: 500 });
+    return Response.json({ status: 'error', message: 'Internal server error' }, { status: 500 });
   }
 }

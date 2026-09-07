@@ -38,7 +38,7 @@ if (configuredApplicationId == "com.example" ||
 }
 if (configuredApplicationId != canonicalApplicationId) {
     throw GradleException(
-        "TICKETIN_APPLICATION_ID harus menggunakan canonical value $canonicalApplicationId."
+        "TICKETIN_APPLICATION_ID must use canonical value $canonicalApplicationId."
     )
 }
 
@@ -70,7 +70,7 @@ if (releaseBuildRequested) {
         host.isNullOrBlank() ||
         host in localHosts) {
         throw GradleException(
-            "Release API_BASE_URL wajib diberikan via --dart-define, memakai HTTPS, dan tidak boleh menuju host lokal atau emulator."
+            "Release API_BASE_URL must be provided via --dart-define, use HTTPS, and must not point to local hosts or emulators."
         )
     }
 }
@@ -99,16 +99,16 @@ val releaseSigningConfigured = !releaseStoreFilePath.isNullOrBlank() &&
 if (releaseBuildRequested) {
     if (!releaseSigningConfigured) {
         throw GradleException(
-            "Release signing belum dikonfigurasi. Sediakan android/key.properties (ignored) atau TICKETIN_SIGNING_STORE_FILE, TICKETIN_SIGNING_STORE_PASSWORD, TICKETIN_SIGNING_KEY_ALIAS, dan TICKETIN_SIGNING_KEY_PASSWORD."
+            "Release signing is not configured. Provide android/key.properties (ignored) or TICKETIN_SIGNING_STORE_FILE, TICKETIN_SIGNING_STORE_PASSWORD, TICKETIN_SIGNING_KEY_ALIAS, and TICKETIN_SIGNING_KEY_PASSWORD."
         )
     }
     val storeFileName = rootProject.file(releaseStoreFilePath!!).name.lowercase()
     if (releaseKeyAlias.equals("AndroidDebugKey", ignoreCase = true) ||
         storeFileName == "debug.keystore") {
-        throw GradleException("Release signing tidak boleh memakai debug keystore atau alias debug.")
+        throw GradleException("Release signing cannot use debug keystore or debug alias.")
     }
     if (!rootProject.file(releaseStoreFilePath!!).isFile) {
-        throw GradleException("File keystore release tidak ditemukan pada TICKETIN_SIGNING_STORE_FILE/key.properties.")
+        throw GradleException("Release keystore file not found at TICKETIN_SIGNING_STORE_FILE/key.properties.")
     }
 }
 

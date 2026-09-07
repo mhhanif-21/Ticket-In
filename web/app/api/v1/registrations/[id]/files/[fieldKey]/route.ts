@@ -47,7 +47,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     const storagePath = typeof answer?.path === 'string' ? answer.path : null;
     const fileName = typeof answer?.fileName === 'string' ? answer.fileName : null;
     if (!storagePath || !fileName) {
-      return NextResponse.json({ status: 'error', code: 'REGISTRATION_FILE_NOT_FOUND', message: 'Berkas tidak ditemukan.' }, { status: 404 });
+      return NextResponse.json({ status: 'error', code: 'REGISTRATION_FILE_NOT_FOUND', message: 'File not found.' }, { status: 404 });
     }
 
     const [claimedUpload] = await db
@@ -61,7 +61,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       ))
       .limit(1);
     if (!claimedUpload) {
-      return NextResponse.json({ status: 'error', code: 'REGISTRATION_FILE_NOT_FOUND', message: 'Berkas tidak ditemukan.' }, { status: 404 });
+      return NextResponse.json({ status: 'error', code: 'REGISTRATION_FILE_NOT_FOUND', message: 'File not found.' }, { status: 404 });
     }
 
     const expiresInSeconds = 5 * 60;
@@ -71,7 +71,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     if (error || !data?.signedUrl) {
       console.error('Registration file signed URL failed', { registrationId, fieldKey });
       return NextResponse.json(
-        { status: 'error', message: 'Berkas belum dapat dibuka. Silakan coba lagi.' },
+        { status: 'error', message: 'File could not be opened. Please try again.' },
         { status: 502 },
       );
     }
@@ -87,6 +87,6 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     }, { headers: { 'Cache-Control': 'private, no-store' } });
   } catch {
     console.error('Registration file access failed');
-    return NextResponse.json({ status: 'error', message: 'Berkas belum dapat dibuka. Silakan coba lagi.' }, { status: 500 });
+    return NextResponse.json({ status: 'error', message: 'File could not be opened. Please try again.' }, { status: 500 });
   }
 }

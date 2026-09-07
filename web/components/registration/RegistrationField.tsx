@@ -45,7 +45,7 @@ export function RegistrationField({
         </div>
       ) : field.fieldType === 'select' ? (
         <select name={fieldName} required={field.isRequired} defaultValue={typeof defaultValue === 'string' ? defaultValue : ''} className="w-full h-[48px] px-4 bg-transparent border border-outline-variant rounded-DEFAULT font-body-md text-primary focus:outline-none input-border focus:border-primary">
-          <option value="" disabled>Pilih {field.fieldName}</option>
+          <option value="" disabled>Select {field.fieldName}</option>
           {options.map((option) => <option key={option} value={option}>{option}</option>)}
         </select>
       ) : field.fieldType === 'file' || field.fieldType === 'image' ? (
@@ -61,7 +61,7 @@ export function RegistrationField({
             className="w-full px-4 py-3 border border-outline-variant rounded-DEFAULT font-body-md text-primary bg-surface-bright file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-surface-dim file:text-primary hover:file:bg-surface-container-high"
           />
           <p className="font-body-sm text-on-surface-variant">
-            {field.fieldType === 'file' ? 'PDF maksimal 5 MB.' : 'JPG atau PNG maksimal 5 MB.'}
+            {field.fieldType === 'file' ? 'PDF max 5 MB.' : 'JPG or PNG max 5 MB.'}
           </p>
           {fileError ? <p role="alert" className="font-body-sm text-error">{fileError}</p> : null}
         </>

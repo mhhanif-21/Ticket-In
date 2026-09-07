@@ -52,25 +52,25 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     const limit = parsePositiveInteger(searchParams.get('limit'), 10);
 
     if (page === null || limit === null || limit > MAX_PAGE_SIZE) {
-      return NextResponse.json({ status: 'error', message: `Parameter page/limit tidak valid. Limit maksimum ${MAX_PAGE_SIZE}.` }, { status: 400 });
+      return NextResponse.json({ status: 'error', message: `Invalid page/limit parameter. Maximum limit is ${MAX_PAGE_SIZE}.` }, { status: 400 });
     }
     if (status && !VALID_STATUSES.has(status)) {
-      return NextResponse.json({ status: 'error', message: 'Status peserta tidak valid.' }, { status: 400 });
+      return NextResponse.json({ status: 'error', message: 'Invalid participant status.' }, { status: 400 });
     }
     if (attendance && !VALID_ATTENDANCE.has(attendance)) {
-      return NextResponse.json({ status: 'error', message: 'Parameter attendance harus true atau false.' }, { status: 400 });
+      return NextResponse.json({ status: 'error', message: 'Attendance parameter must be true or false.' }, { status: 400 });
     }
     if (!VALID_SORTS.has(sort)) {
-      return NextResponse.json({ status: 'error', message: 'Parameter sort harus asc atau desc.' }, { status: 400 });
+      return NextResponse.json({ status: 'error', message: 'Sort parameter must be asc or desc.' }, { status: 400 });
     }
 
     const parsedStartDate = startDate ? parseDateValue(startDate) : null;
     const parsedEndDate = endDate ? parseDateValue(endDate) : null;
     if ((startDate && !parsedStartDate) || (endDate && !parsedEndDate)) {
-      return NextResponse.json({ status: 'error', message: 'Format tanggal tidak valid.' }, { status: 400 });
+      return NextResponse.json({ status: 'error', message: 'Invalid date format.' }, { status: 400 });
     }
     if (parsedStartDate && parsedEndDate && parsedStartDate.date > parsedEndDate.date) {
-      return NextResponse.json({ status: 'error', message: 'start_date tidak boleh setelah end_date.' }, { status: 400 });
+      return NextResponse.json({ status: 'error', message: 'start_date cannot be after end_date.' }, { status: 400 });
     }
     
     // Registration status and attendance are independent dimensions. Keep
@@ -78,7 +78,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     // participant-list contract, but allow status + attendance together.
     if ((startDate || endDate) && (status || attendance)) {
       return NextResponse.json(
-        { status: 'error', message: 'Filter waktu tidak dapat digabungkan dengan status atau kehadiran.' },
+        { status: 'error', message: 'Time filter cannot be combined with status or attendance.' },
         { status: 400 }
       );
     }

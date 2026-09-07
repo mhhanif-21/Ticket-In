@@ -11,13 +11,13 @@ export async function GET(request: Request, props: { params: Promise<{ id: strin
 
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     if (!uuidRegex.test(id)) {
-      return NextResponse.json({ status: 'error', message: 'Data Tidak Ditemukan' }, { status: 404 });
+      return NextResponse.json({ status: 'error', message: 'Data Not Found' }, { status: 404 });
     }
 
     return await getPublicRegistrationStatusResponse(request, id);
 
   } catch (error) {
     console.error('Error in polling API:', error);
-    return NextResponse.json({ status: 'error', message: 'Terjadi kesalahan internal' }, { status: 500 });
+    return NextResponse.json({ status: 'error', message: 'Internal server error' }, { status: 500 });
   }
 }

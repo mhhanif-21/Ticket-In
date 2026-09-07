@@ -41,7 +41,7 @@ class ExecutiveOversightScreen extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              'Laporan Eksekutif',
+              'Executive Report',
               style: TextStyle(
                 fontSize: 24,
                 fontWeight: FontWeight.w600,
@@ -50,7 +50,7 @@ class ExecutiveOversightScreen extends ConsumerWidget {
             ),
             const SizedBox(height: 4),
             const Text(
-              'Ringkasan tingkat tinggi untuk pemantauan strategis.',
+              'High-level summary for strategic monitoring.',
               style: TextStyle(fontSize: 14, color: AppColors.onSurfaceVariant),
             ),
             const SizedBox(height: 24),
@@ -86,7 +86,7 @@ class ExecutiveOversightScreen extends ConsumerWidget {
           children: [
             Expanded(
               child: _buildSummaryCard(
-                'Total Acara',
+                'Total Events',
                 data['total_events']?.toString() ?? '0',
                 Icons.event,
               ),
@@ -94,7 +94,7 @@ class ExecutiveOversightScreen extends ConsumerWidget {
             const SizedBox(width: 12),
             Expanded(
               child: _buildSummaryCard(
-                'Kehadiran',
+                'Attendance',
                 '$conversion%',
                 Icons.analytics,
               ),
@@ -106,7 +106,7 @@ class ExecutiveOversightScreen extends ConsumerWidget {
           children: [
             Expanded(
               child: _buildSummaryCard(
-                'Pendaftar',
+                'Registrants',
                 totalReg.toString(),
                 Icons.groups,
               ),
@@ -114,7 +114,7 @@ class ExecutiveOversightScreen extends ConsumerWidget {
             const SizedBox(width: 12),
             Expanded(
               child: _buildSummaryCard(
-                'Hadir',
+                'Present',
                 totalPresent.toString(),
                 Icons.how_to_reg,
               ),
@@ -123,7 +123,7 @@ class ExecutiveOversightScreen extends ConsumerWidget {
         ),
         const SizedBox(height: 24),
         const Text(
-          'Acara Mendatang',
+          'Upcoming Events',
           style: TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w600,
@@ -135,7 +135,7 @@ class ExecutiveOversightScreen extends ConsumerWidget {
           const Padding(
             padding: EdgeInsets.symmetric(vertical: 16),
             child: Text(
-              'Belum ada acara terbit yang akan datang.',
+              'No upcoming published events.',
               style: TextStyle(color: AppColors.onSurfaceVariant),
             ),
           ),
@@ -200,7 +200,7 @@ class ExecutiveOversightScreen extends ConsumerWidget {
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
-                    'Pendaftar: ${ev['registrants_count'] ?? 0}',
+                    'Registrants: ${ev['registrants_count'] ?? 0}',
                     style: const TextStyle(
                       color: AppColors.onSecondaryContainer,
                       fontSize: 12,

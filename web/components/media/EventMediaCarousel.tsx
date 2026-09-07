@@ -40,7 +40,7 @@ export function EventMediaCarousel({ eventName, media, posterAspectMode }: Event
 
   return (
     <section
-      aria-label={`Media acara ${eventName}`}
+      aria-label={`Event media ${eventName}`}
       className="w-full px-4 sm:px-6 lg:px-8"
     >
       <div
@@ -56,7 +56,7 @@ export function EventMediaCarousel({ eventName, media, posterAspectMode }: Event
         <AdaptiveImage
           key={images[activeIndex].publicUrl}
           src={images[activeIndex].publicUrl}
-          alt={`${eventName} - gambar ${activeIndex + 1}`}
+          alt={`${eventName} - image ${activeIndex + 1}`}
           priority={activeIndex === 0}
           sizes="(max-width: 768px) 100vw, 1200px"
           frameAspectRatio={aspectRatio}
@@ -69,7 +69,7 @@ export function EventMediaCarousel({ eventName, media, posterAspectMode }: Event
           <>
             <button
               type="button"
-              aria-label="Gambar sebelumnya"
+              aria-label="Previous image"
               onClick={() => goTo(activeIndex - 1)}
               onPointerDown={(event) => event.stopPropagation()}
               onPointerUp={(event) => event.stopPropagation()}
@@ -79,7 +79,7 @@ export function EventMediaCarousel({ eventName, media, posterAspectMode }: Event
             </button>
             <button
               type="button"
-              aria-label="Gambar berikutnya"
+              aria-label="Next image"
               onClick={() => goTo(activeIndex + 1)}
               onPointerDown={(event) => event.stopPropagation()}
               onPointerUp={(event) => event.stopPropagation()}

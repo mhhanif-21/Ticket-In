@@ -10,6 +10,7 @@ import {
   registrations,
 } from '@/db/schema';
 import { and, asc, count, eq, inArray, sql } from 'drizzle-orm';
+import bcrypt from 'bcryptjs';
 import { getCanonicalBaseUrl } from '@/lib/security/url';
 import { getRegistrationFieldKey } from '@/lib/validation/registrationForm';
 import {
@@ -51,6 +52,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
         capacity: events.capacity,
         registrationMode: events.registrationMode,
         status: events.status,
+        volunteerPin: events.volunteerPin,
       })
       .from(events)
       .where(uuidRegex.test(id)
@@ -59,7 +61,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       .limit(1);
 
     if (!event) {
-      return NextResponse.json({ status: 'error', message: 'Event tidak ditemukan' }, { status: 404 });
+      return NextResponse.json({ status: 'error', message: 'Event not found' }, { status: 404 });
     }
 
     const publicFormFields = await db
@@ -132,7 +134,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
 
     // UUID adalah kontrak detail Admin yang dijaga middleware; slug adalah DTO publik.
     const responseData = isAdminDetail
-      ? { id: event.id, ...eventDetail }
+      ? { id: event.id, ...eventDetail, volunteer_pin: event.volunteerPin ?? null }
       : eventDetail;
 
     return NextResponse.json({ status: 'success', data: responseData });
@@ -157,7 +159,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     try {
       body = await req.json();
     } catch {
-      return NextResponse.json({ status: 'error', code: 'EVENT_PAYLOAD_INVALID', message: 'Payload JSON tidak valid.' }, { status: 400 });
+      return NextResponse.json({ status: 'error', code: 'EVENT_PAYLOAD_INVALID', message: 'Invalid JSON payload.' }, { status: 400 });
     }
 
     const input = validateEventUpdatePayload(body);
@@ -190,7 +192,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
         if (Number(activeRegistrations.count) > input.capacity) {
           throw new EventValidationError(
             'EVENT_CAPACITY_BELOW_REGISTRATIONS',
-            'Kapasitas tidak boleh lebih kecil dari jumlah pendaftaran aktif.',
+            'Capacity cannot be less than the number of active registrations.',
             'capacity',
           );
         }
@@ -201,9 +203,18 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       if (input.status !== undefined) {
         const nextStatus = input.status;
         if (!canTransitionEventStatus(existing.status, nextStatus)) {
-          throw new EventLifecycleError(`Transisi status acara dari ${existing.status} ke ${nextStatus} tidak diizinkan`);
+          throw new EventLifecycleError(`Event status transition from ${existing.status} to ${nextStatus} is not allowed`);
         }
         updateData.status = nextStatus;
+
+        // Auto-generate volunteer PIN on publish if not yet generated
+        if (nextStatus === 'Published' && (!existing.volunteerPin || !existing.volunteerPinHash)) {
+          const pin = Math.floor(100000 + Math.random() * 900000).toString();
+          const salt = await bcrypt.genSalt(10);
+          const pinHash = await bcrypt.hash(pin, salt);
+          updateData.volunteerPin = pin;
+          updateData.volunteerPinHash = pinHash;
+        }
       }
       updateData.updatedAt = new Date();
 
@@ -219,10 +230,10 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     });
 
     if (!updatedEvent) {
-      return NextResponse.json({ status: 'error', message: 'Event tidak ditemukan' }, { status: 404 });
+      return NextResponse.json({ status: 'error', message: 'Event not found' }, { status: 404 });
     }
 
-    return NextResponse.json({ status: 'success', message: 'Event berhasil diperbarui', data: updatedEvent });
+    return NextResponse.json({ status: 'success', message: 'Event updated successfully', data: updatedEvent });
   } catch (error: unknown) {
     if (error instanceof EventValidationError) {
       return NextResponse.json(
@@ -335,10 +346,10 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
     });
 
     if (!deleted) {
-      return NextResponse.json({ status: 'error', message: 'Event tidak ditemukan' }, { status: 404 });
+      return NextResponse.json({ status: 'error', message: 'Event not found' }, { status: 404 });
     }
 
-    return NextResponse.json({ status: 'success', message: 'Event berhasil dihapus' });
+    return NextResponse.json({ status: 'success', message: 'Event deleted successfully' });
   } catch (error: any) {
     console.error('Error deleting event:', error);
     return NextResponse.json(

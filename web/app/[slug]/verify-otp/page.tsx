@@ -44,7 +44,7 @@ export default function VerifyOtpPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (otpCode.length !== 6) {
-      setError('Kode OTP harus 6 digit angka.');
+      setError('OTP code must be 6 digits.');
       return;
     }
 
@@ -61,7 +61,7 @@ export default function VerifyOtpPage() {
       const data = await res.json();
 
       if (!res.ok) {
-        throw new Error(data.message || 'Gagal memverifikasi OTP');
+        throw new Error(data.message || 'Failed to verify OTP');
       }
 
       // Success, redirect to status page
@@ -110,11 +110,11 @@ export default function VerifyOtpPage() {
           saveRegistrationResubmitState(slug, rotatedState);
           setResubmitState(rotatedState);
         }
-        throw new Error(data.message || 'OTP belum dapat dikirim.');
+        throw new Error(data.message || 'OTP cannot be sent yet.');
       }
 
       if (data.data?.status !== 'Draft' || !data.data?.resubmitToken || !data.data?.status_token || !data.data?.status_token_expires_at) {
-        throw new Error('Bukti pengiriman OTP tidak tersedia.');
+        throw new Error('OTP delivery proof not available.');
       }
 
       const rotatedState = {
@@ -126,7 +126,7 @@ export default function VerifyOtpPage() {
       saveRegistrationStatusCapability(slug, { token: rotatedState.statusToken, expiresAt: rotatedState.statusTokenExpiresAt });
       saveRegistrationResubmitState(slug, rotatedState);
       setResubmitState(rotatedState);
-      setNotice('OTP baru telah dikirim.');
+      setNotice('A new OTP has been sent.');
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -147,9 +147,9 @@ export default function VerifyOtpPage() {
 
         <div className="flex flex-col gap-stack-sm text-center items-center">
           <span className="material-symbols-outlined text-primary mb-2 text-4xl">password</span>
-          <h2 className="font-display-lg-mobile text-display-lg-mobile md:font-display-lg md:text-display-lg text-primary">Verifikasi Email</h2>
+          <h2 className="font-display-lg-mobile text-display-lg-mobile md:font-display-lg md:text-display-lg text-primary">Email Verification</h2>
           <p className="font-body-md text-body-md md:font-body-lg md:text-body-lg text-on-surface-variant max-w-[400px]">
-            Masukkan 6 digit kode OTP yang telah dikirim ke <span className="font-semibold text-primary">{email}</span>.
+            Enter the 6-digit OTP code sent to <span className="font-semibold text-primary">{email}</span>.
           </p>
         </div>
 
@@ -166,7 +166,7 @@ export default function VerifyOtpPage() {
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-stack-md mt-4">
           <div className="flex flex-col gap-stack-sm group">
-            <label className="font-label-caps text-label-caps text-on-surface uppercase tracking-wider text-center">Kode OTP</label>
+            <label className="font-label-caps text-label-caps text-on-surface uppercase tracking-wider text-center">OTP Code</label>
             <div className="relative">
               <input
                 type="text"
@@ -185,7 +185,7 @@ export default function VerifyOtpPage() {
             disabled={loading || otpCode.length !== 6}
             className="mt-stack-md w-full bg-primary text-on-primary font-body-md text-body-md py-4 rounded-lg hover:opacity-90 active:scale-[0.96] transition-all duration-150 flex items-center justify-center font-medium shadow-sm disabled:opacity-70 disabled:cursor-not-allowed"
           >
-            {loading ? 'Memverifikasi...' : 'Verifikasi OTP'}
+            {loading ? 'Verifying...' : 'Verify OTP'}
             {!loading && <span className="material-symbols-outlined ml-2 text-[20px]">check_circle</span>}
           </button>
           <button
@@ -194,16 +194,16 @@ export default function VerifyOtpPage() {
             disabled={loading || resending}
             className="w-full border border-primary text-primary font-body-md text-body-md py-3 rounded-lg hover:bg-primary/10 transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
           >
-            {resending ? 'Mengirim ulang...' : 'Kirim ulang OTP'}
+            {resending ? 'Resending...' : 'Resend OTP'}
           </button>
           <Link
             href={`/${slug}/register?correction=1&registration_id=${encodeURIComponent(regId)}`}
             className="text-center font-body-md text-body-md text-primary hover:underline"
           >
-            Ubah Email
+            Change Email
           </Link>
           <Link href={`/${slug}`} className="mt-2 text-center font-body-md text-body-md text-secondary hover:text-primary transition-colors duration-150">
-            Batalkan Pendaftaran
+            Cancel Registration
           </Link>
         </form>
       </div>

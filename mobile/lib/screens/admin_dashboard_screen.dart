@@ -60,7 +60,7 @@ class AdminDashboardScreen extends ConsumerWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
-                'Halo, Admin',
+                'Hello, Admin',
                 style: TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.w600,
@@ -69,7 +69,7 @@ class AdminDashboardScreen extends ConsumerWidget {
               ),
               const SizedBox(height: 4),
               const Text(
-                'Berikut adalah ringkasan operasional hari ini.',
+                'Here is today\'s operational summary.',
                 style: TextStyle(
                   fontSize: 14,
                   color: AppColors.onSurfaceVariant,
@@ -119,7 +119,7 @@ class AdminDashboardScreen extends ConsumerWidget {
                 _buildNavItem(Icons.settings, 'Settings', false, () {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
-                      content: Text('⚙️ Pengaturan — Segera Hadir'),
+                      content: Text('⚙️ Settings — Coming Soon'),
                       duration: Duration(seconds: 2),
                     ),
                   );
@@ -185,7 +185,7 @@ class AdminDashboardScreen extends ConsumerWidget {
               Expanded(
                 flex: 1,
                 child: _buildStatCard(
-                  'Event\nDibuat',
+                  'Events\nCreated',
                   Icons.event_available,
                   data['total_events']?.toString() ?? '0',
                 ),
@@ -196,13 +196,13 @@ class AdminDashboardScreen extends ConsumerWidget {
                 child: Column(
                   children: [
                     _buildStatCard(
-                      'Pendaftar',
+                      'Registrants',
                       Icons.groups,
                       data['total_registrations']?.toString() ?? '0',
                     ),
                     const SizedBox(height: 8),
                     _buildStatCard(
-                      'Hadir',
+                      'Present',
                       Icons.how_to_reg,
                       data['total_present']?.toString() ?? '0',
                     ),
@@ -216,7 +216,7 @@ class AdminDashboardScreen extends ConsumerWidget {
         const SizedBox(height: 24),
         // [BUG-040] FIX: Hapus TextButton "Lihat Semua" — cukup tampilkan judul section
         const Text(
-          '5 Event Terakhir',
+          'Last 5 Events',
           style: TextStyle(
             fontSize: 20,
             fontWeight: FontWeight.w600,
@@ -282,7 +282,7 @@ class AdminDashboardScreen extends ConsumerWidget {
                       ),
                     ),
                     const Text(
-                      'PENDAFTAR',
+                      'REGISTRANTS',
                       style: TextStyle(
                         color: AppColors.onSurfaceVariant,
                         fontSize: 11,

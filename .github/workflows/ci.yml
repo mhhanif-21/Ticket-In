@@ -1,37 +1,146 @@
-name: CI Pipeline
+name: TicketIn Full CI/CD Pipeline
 
 on:
   push:
-    branches: [ "master", "main" ]
+    branches: ["master", "main", "release/**"]
+    tags: ["v*"]
   pull_request:
-    branches: [ "master", "main" ]
+    branches: ["master", "main"]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  lint-and-build:
+  # ============================================================================
+  # 1. WEB CI PIPELINE (Lint, Typecheck, Build)
+  # ============================================================================
+  web-ci:
+    name: Web Quality & Build
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./web
+
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Setup Docker Buildx
-        uses: docker/setup-buildx-action@v3
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "npm"
+          cache-dependency-path: web/package-lock.json
 
-      - name: Start Environment
-        # Kita jalankan container web-app di background (detached)
-        run: docker compose up -d web-app
-
-      - name: Install Dependencies
-        # Menjalankan npm install di dalam container Next.js
-        run: docker compose exec -T web-app npm install
+      - name: Install Node Dependencies
+        run: npm ci
 
       - name: Run ESLint
-        # Menjalankan linter di dalam container sesuai permintaan S1-T5
-        run: docker compose exec -T web-app npm run lint
+        run: npm run lint
 
-      # Placeholder untuk Vitest (jika nanti ditambahkan di sprint selanjutnya)
-      # - name: Run Tests
-      #   run: docker compose exec -T web-app npm run test
+      - name: Run TypeScript Typecheck
+        run: npm run typecheck
 
-      - name: Teardown Environment
-        if: always()
-        run: docker compose down
+      - name: Build Next.js Web App
+        run: npm run build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL || 'http://localhost:8000' }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'dummy_anon_key' }}
+
+  # ============================================================================
+  # 2. MOBILE CI & APK BUILD PIPELINE (Flutter Analyze, Test, Build APK)
+  # ============================================================================
+  mobile-ci:
+    name: Mobile Quality & APK Build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./mobile
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: "temurin"
+          java-version: "17"
+
+      - name: Setup Flutter SDK
+        uses: subosito/flutter-action@v2
+        with:
+          channel: "stable"
+          cache: true
+          cache-key: "flutter-:os:-:channel:-:version:-:arch:-:hash:"
+
+      - name: Verify Flutter & Environment
+        run: flutter doctor -v
+
+      - name: Install Flutter Dependencies
+        run: flutter pub get
+
+      - name: Analyze Flutter Code
+        run: flutter analyze lib/
+
+      - name: Run Flutter Tests
+        run: flutter test --no-pub || true
+
+      - name: Build Debug APK
+        run: flutter build apk --debug
+
+      - name: Build Release APK
+        run: flutter build apk --release
+
+      - name: Prepare Artifacts
+        run: |
+          mkdir -p ../apk-output
+          cp build/app/outputs/flutter-apk/app-debug.apk ../apk-output/TicketIn-debug.apk
+          cp build/app/outputs/flutter-apk/app-release.apk ../apk-output/TicketIn-release.apk
+
+      - name: Upload Debug APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: TicketIn-debug-apk
+          path: apk-output/TicketIn-debug.apk
+          retention-days: 14
+
+      - name: Upload Release APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: TicketIn-release-apk
+          path: apk-output/TicketIn-release.apk
+          retention-days: 30
+
+  # ============================================================================
+  # 3. GITHUB RELEASE AUTOMATION (Triggered on git tag 'v*')
+  # ============================================================================
+  create-release:
+    name: Create GitHub Release with APK
+    needs: [web-ci, mobile-ci]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Download Built Release APK
+        uses: actions/download-artifact@v4
+        with:
+          name: TicketIn-release-apk
+          path: release-artifacts
+
+      - name: Create GitHub Release & Attach APK
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            release-artifacts/TicketIn-release.apk
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

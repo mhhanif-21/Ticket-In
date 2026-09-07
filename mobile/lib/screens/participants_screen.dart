@@ -32,8 +32,8 @@ class ParticipantsState {
     this.hasMore = true,
     this.page = 1,
     this.searchQuery = '',
-    this.filterStatus = 'Semua',
-    this.filterAttendance = 'Semua',
+    this.filterStatus = 'All',
+    this.filterAttendance = 'All',
     this.filterSort = 'desc',
     this.filterStartDate,
     this.filterEndDate,
@@ -267,7 +267,7 @@ class _ParticipantsScreenState extends ConsumerState<ParticipantsScreen> {
       final jobId = await service.triggerExportCSV(widget.eventId);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Menyiapkan file ekspor... Harap tunggu')),
+        const SnackBar(content: Text('Preparing export file... Please wait')),
       );
 
       final openUrl = widget.exportUrlOpener ?? _openExportUrl;
@@ -280,39 +280,39 @@ class _ParticipantsScreenState extends ConsumerState<ParticipantsScreen> {
           isReady = true;
           final fileUrl = exportFileUrl(statusRes);
           if (fileUrl != null && await openUrl(fileUrl)) {
-            _setExportFeedback('Membuka browser untuk mengunduh...');
+            _setExportFeedback('Opening browser to download...');
             if (mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
-                  content: Text('Membuka browser untuk mengunduh...'),
+                  content: Text('Opening browser to download...'),
                 ),
               );
             }
           }
           break;
         } else if (statusRes['status'] == 'failed') {
-          throw Exception(statusRes['error'] ?? 'Ekspor gagal di server');
+          throw Exception(statusRes['error'] ?? 'Export failed on server');
         }
       }
 
       if (!isReady && mounted) {
         _setExportFeedback(
-          'Waktu tunggu habis. Proses mungkin masih berjalan di background.',
+          'Timeout. Process may still be running in background.',
         );
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text(
-              'Waktu tunggu habis. Proses mungkin masih berjalan di background.',
+              'Timeout. Process may still be running in background.',
             ),
           ),
         );
       }
     } catch (e) {
-      _setExportFeedback('Gagal: $e');
+      _setExportFeedback('Failed: $e');
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('Gagal: $e')));
+        ).showSnackBar(SnackBar(content: Text('Failed: $e')));
       }
     } finally {
       if (mounted) setState(() => _isExporting = false);
@@ -356,7 +356,7 @@ class _ParticipantsScreenState extends ConsumerState<ParticipantsScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Text(
-                        'Filter & Urutkan',
+                        'Filter 'Filter & Urutkan' Sort',
                         style: TextStyle(
                           fontSize: 20,
                           fontWeight: FontWeight.w600,
@@ -365,7 +365,7 @@ class _ParticipantsScreenState extends ConsumerState<ParticipantsScreen> {
                       ),
                       const SizedBox(height: 8),
                       const Text(
-                        'Status dan kehadiran dapat digabungkan untuk hasil yang lebih spesifik.',
+                        'Status and attendance can be combined for more specific results.',
                         style: TextStyle(fontSize: 12, color: AppColors.onSurfaceVariant),
                       ),
                       const SizedBox(height: 16),
@@ -376,7 +376,7 @@ class _ParticipantsScreenState extends ConsumerState<ParticipantsScreen> {
                             children: [
                               // Filter 1: Status Pendaftaran
                               const Text(
-                                'Status Tiket',
+                                'Ticket Status',
                                 style: TextStyle(
                                   fontSize: 14,
                                   fontWeight: FontWeight.w500,
@@ -390,7 +390,7 @@ class _ParticipantsScreenState extends ConsumerState<ParticipantsScreen> {
                                 // [BUG-050] FIX: Tambah 'Draft' ke opsi filter status
                                 children:
                                     [
-                                      'Semua',
+                                      'All',
                                       'Pending',
                                       'Accepted',
                                       'Rejected',
@@ -407,7 +407,7 @@ class _ParticipantsScreenState extends ConsumerState<ParticipantsScreen> {
                                               // Status + attendance are
                                               // independent. Date filtering
                                               // remains a separate mode.
-                                              if (status != 'Semua') {
+                                              if (status != 'All') {
                                                 tempStartDate = null;
                                                 tempEndDate = null;
                                               }
@@ -432,7 +432,7 @@ class _ParticipantsScreenState extends ConsumerState<ParticipantsScreen> {
 
                               // Filter 2: Kehadiran (Attendance)
                               const Text(
-                                'Kehadiran (Check-in)',
+                                'Attendance (Check-in)',
                                 style: TextStyle(
                                   fontSize: 14,
                                   fontWeight: FontWeight.w500,
@@ -443,7 +443,7 @@ class _ParticipantsScreenState extends ConsumerState<ParticipantsScreen> {
                               Wrap(
                                 spacing: 8,
                                 runSpacing: 8,
-                                children: ['Semua', 'Belum Hadir', 'Hadir'].map((
+                                children: ['All', 'Not Present', 'Present'].map((
                                   att,
                                 ) {
                                   final isSelected = tempAttendance == att;
@@ -457,7 +457,7 @@ class _ParticipantsScreenState extends ConsumerState<ParticipantsScreen> {
                                           // Keep the registration status
                                           // selection so both dimensions
                                           // are sent to the API together.
-                                          if (att != 'Semua') {
+                                          if (att != 'All') {
                                             tempStartDate = null;
                                             tempEndDate = null;
                                           }
@@ -481,7 +481,7 @@ class _ParticipantsScreenState extends ConsumerState<ParticipantsScreen> {
 
                               // Filter 3: Waktu Pendaftaran
                               const Text(
-                                'Waktu Pendaftaran',
+                                'Registration Time',
                                 style: TextStyle(
                                   fontSize: 14,
                                   fontWeight: FontWeight.w500,
@@ -510,15 +510,15 @@ class _ParticipantsScreenState extends ConsumerState<ParticipantsScreen> {
                                   setSheetState(() {
                                     tempStartDate = firstDate;
                                     tempEndDate = lastDate;
-                                    tempStatus = 'Semua';
-                                    tempAttendance = 'Semua';
+                                    tempStatus = 'All';
+                                    tempAttendance = 'All';
                                   });
                                 },
                                 icon: const Icon(Icons.date_range),
                                 label: Text(
                                   tempStartDate != null && tempEndDate != null
                                       ? '${_formatDate(tempStartDate!)} - ${_formatDate(tempEndDate!)}'
-                                      : 'Pilih rentang tanggal',
+                                      : 'Select date range',
                                 ),
                               ),
                               if (tempStartDate != null || tempEndDate != null)
@@ -527,7 +527,7 @@ class _ParticipantsScreenState extends ConsumerState<ParticipantsScreen> {
                                     tempStartDate = null;
                                     tempEndDate = null;
                                   }),
-                                  child: const Text('Hapus rentang tanggal'),
+                                  child: const Text('Clear date range'),
                                 ),
                               const SizedBox(height: 12),
                               Wrap(
@@ -535,14 +535,14 @@ class _ParticipantsScreenState extends ConsumerState<ParticipantsScreen> {
                                 runSpacing: 8,
                                 children: [
                                   _buildSortChip(
-                                    'Terbaru',
+                                    'Newest',
                                     'desc',
                                     tempSort,
                                     (val) =>
                                         setSheetState(() => tempSort = val),
                                   ),
                                   _buildSortChip(
-                                    'Terlama',
+                                    'Oldest',
                                     'asc',
                                     tempSort,
                                     (val) =>
@@ -579,7 +579,7 @@ class _ParticipantsScreenState extends ConsumerState<ParticipantsScreen> {
                             Navigator.pop(context);
                           },
                           child: const Text(
-                            'Terapkan Filter',
+                            'Apply Filter',
                             style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w600,
@@ -650,7 +650,7 @@ class _ParticipantsScreenState extends ConsumerState<ParticipantsScreen> {
           onPressed: () => Navigator.of(context).pop(),
         ),
         title: const Text(
-          'Daftar Peserta',
+          'Participant List',
           style: TextStyle(
             color: AppColors.primary,
             fontSize: 20,
@@ -704,7 +704,7 @@ class _ParticipantsScreenState extends ConsumerState<ParticipantsScreen> {
                         onChanged:
                             _onSearchChanged, // [BUG-052] FIX: Fungsi pencarian sudah dihubungkan dengan API
                         decoration: const InputDecoration(
-                          hintText: 'Cari nama atau email...',
+                          hintText: 'Search name or email...',
                           prefixIcon: Icon(
                             Icons.search,
                             color: AppColors.outline,
@@ -727,8 +727,8 @@ class _ParticipantsScreenState extends ConsumerState<ParticipantsScreen> {
                         borderRadius: BorderRadius.circular(10),
                         border: Border.all(
                             color:
-                            (state.filterStatus != 'Semua' ||
-                                  state.filterAttendance != 'Semua' ||
+                            (state.filterStatus != 'All' ||
+                                  state.filterAttendance != 'All' ||
                                   state.filterStartDate != null ||
                                   state.filterEndDate != null)
                               ? AppColors.primary
@@ -738,8 +738,8 @@ class _ParticipantsScreenState extends ConsumerState<ParticipantsScreen> {
                       child: Icon(
                         Icons.tune,
                         color:
-                            (state.filterStatus != 'Semua' ||
-                                state.filterAttendance != 'Semua' ||
+                            (state.filterStatus != 'All' ||
+                                state.filterAttendance != 'All' ||
                                 state.filterStartDate != null ||
                                 state.filterEndDate != null)
                             ? AppColors.primary
@@ -769,7 +769,7 @@ class _ParticipantsScreenState extends ConsumerState<ParticipantsScreen> {
                     ? const Center(child: CircularProgressIndicator())
                     : state.participants.isEmpty
                     ? const Center(
-                        child: Text('Tidak ada pendaftar ditemukan.'),
+                        child: Text('No registrants found.'),
                       )
                     : ListView.builder(
                         controller: _scrollController,
@@ -846,7 +846,7 @@ class _ParticipantsScreenState extends ConsumerState<ParticipantsScreen> {
         if (participantId == null || participantId.toString().trim().isEmpty) {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Data pendaftar tidak tersedia.')),
+              const SnackBar(content: Text('Registrant data not available.')),
             );
           }
           return;

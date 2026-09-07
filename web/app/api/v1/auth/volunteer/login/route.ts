@@ -33,7 +33,7 @@ function storageUnavailableResponse(): NextResponse {
   return NextResponse.json(
     {
       status: 'error',
-      message: 'Layanan login sementara tidak tersedia.',
+      message: 'Login service temporarily unavailable.',
     },
     { status: 503 }
   );
@@ -47,7 +47,7 @@ export async function POST(req: Request) {
 
     if (!event_slug || !pin || !volunteer_name) {
       return NextResponse.json(
-        { status: 'error', message: 'event_slug, pin, dan volunteer_name wajib diisi' },
+        { status: 'error', message: 'event_slug, pin, and volunteer_name are required' },
         { status: 400 }
       );
     }
@@ -68,7 +68,7 @@ export async function POST(req: Request) {
     }
     if (!ipRateLimit.allowed) {
       return rateLimitResponse(
-        'Terlalu banyak percobaan login dari sumber ini, silakan coba lagi nanti',
+        'Too many login attempts from this source, please try again later',
         ipRateLimit.resetAt
       );
     }
@@ -83,7 +83,7 @@ export async function POST(req: Request) {
     }
     if (!eventRateLimit.allowed) {
       return rateLimitResponse(
-        'Terlalu banyak percobaan login untuk event ini, silakan coba lagi nanti',
+        'Too many login attempts for this event, please try again later',
         eventRateLimit.resetAt
       );
     }
@@ -98,14 +98,14 @@ export async function POST(req: Request) {
 
     if (!event) {
       return NextResponse.json(
-        { status: 'error', message: 'Event tidak ditemukan' },
+        { status: 'error', message: 'Event not found' },
         { status: 404 }
       );
     }
 
     if (!isPublicEventStatus(event.status)) {
       return NextResponse.json(
-        { status: 'error', message: 'Akses panitia tidak tersedia untuk event ini.' },
+        { status: 'error', message: 'Volunteer access is not available for this event.' },
         { status: 409 },
       );
     }
@@ -115,7 +115,7 @@ export async function POST(req: Request) {
 
     if (!isPinValid) {
       return NextResponse.json(
-        { status: 'error', message: 'PIN salah' },
+        { status: 'error', message: 'Incorrect PIN' },
         { status: 401 }
       );
     }
@@ -171,7 +171,7 @@ export async function POST(req: Request) {
   } catch {
     console.error('Volunteer login error');
     return NextResponse.json(
-      { status: 'error', message: 'Terjadi kesalahan internal server' },
+      { status: 'error', message: 'Internal server error' },
       { status: 500 }
     );
   }

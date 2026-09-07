@@ -15,19 +15,19 @@ export const runtime = 'nodejs';
 function rateLimitResponse(resetAt: number): NextResponse {
   const retryAfterSeconds = Math.max(1, Math.ceil((resetAt - Date.now()) / 1000));
   return NextResponse.json(
-    { status: 'error', message: 'Terlalu banyak percobaan OTP, silakan coba lagi nanti.' },
+    { status: 'error', message: 'Too many OTP attempts, please try again later.' },
     { status: 429, headers: { 'Retry-After': String(retryAfterSeconds) } },
   );
 }
 
 function storageUnavailableResponse(): NextResponse {
   return NextResponse.json(
-    { status: 'error', message: 'Layanan verifikasi OTP sementara tidak tersedia.' },
+    { status: 'error', message: 'OTP verification service temporarily unavailable.' },
     { status: 503 },
   );
 }
 
-const genericOtpError = 'Kode OTP tidak valid atau sudah tidak dapat digunakan.';
+const genericOtpError = 'Invalid or expired OTP code.';
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -65,7 +65,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       const result = await verifyOtpAction(registrationId, otpCode);
       await resetRateLimit(registrationKey);
 
-      return NextResponse.json({ status: 'success', message: 'OTP valid. Pendaftaran diproses.', data: result }, { status: 200 });
+      return NextResponse.json({ status: 'success', message: 'OTP valid. Registration processed.', data: result }, { status: 200 });
     } catch (error: any) {
       if (error instanceof Error && error.message.startsWith('InvalidOTP')) {
         return NextResponse.json({ status: 'error', message: genericOtpError }, { status: 400 });

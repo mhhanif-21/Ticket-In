@@ -17,7 +17,7 @@ export const TICKET_TEMPLATE_MAX_FILE_BYTES = 5 * 1024 * 1024;
  */
 export const TICKET_TEMPLATE_CANVAS_WIDTH = 1200;
 export const TICKET_TEMPLATE_MIN_FONT_SIZE = 12;
-export const TICKET_TEMPLATE_MAX_FONT_SIZE = 48;
+export const TICKET_TEMPLATE_MAX_FONT_SIZE = 120;
 export const TICKET_TEMPLATE_DEFAULT_FONT_SIZE = 24;
 export const TICKET_TEMPLATE_DEFAULT_TEXT_COLOR = '#111111';
 const LEGACY_TICKET_TEMPLATE_MIN_FONT_SCALE = 0.45;
@@ -187,7 +187,7 @@ export function parseTicketTemplateElements(value: unknown): TicketTemplateEleme
     throw new TicketTemplateValidationError(
       'TICKET_TEMPLATE_ELEMENT_INVALID',
       422,
-      'Posisi atau ukuran elemen template tidak valid.',
+      'Invalid template element position or size.',
     );
   }
 
@@ -196,7 +196,7 @@ export function parseTicketTemplateElements(value: unknown): TicketTemplateEleme
       throw new TicketTemplateValidationError(
         'TICKET_TEMPLATE_ELEMENT_INVALID',
         422,
-        'Posisi atau ukuran elemen template tidak valid.',
+        'Invalid template element position or size.',
       );
     }
 
@@ -205,7 +205,7 @@ export function parseTicketTemplateElements(value: unknown): TicketTemplateEleme
       throw new TicketTemplateValidationError(
         'TICKET_TEMPLATE_ELEMENT_INVALID',
         422,
-        'Ukuran teks template tidak valid.',
+        'Invalid template text size.',
       );
     }
 
@@ -214,7 +214,7 @@ export function parseTicketTemplateElements(value: unknown): TicketTemplateEleme
       throw new TicketTemplateValidationError(
         'TICKET_TEMPLATE_ELEMENT_INVALID',
         422,
-        'Warna teks template tidak valid.',
+        'Invalid template text color.',
       );
     }
 
@@ -239,7 +239,7 @@ export function parseTicketTemplateElements(value: unknown): TicketTemplateEleme
       throw new TicketTemplateValidationError(
         'TICKET_TEMPLATE_ELEMENT_INVALID',
         422,
-        'Posisi atau ukuran elemen template tidak valid.',
+        'Invalid template element position or size.',
       );
     }
 
@@ -251,7 +251,7 @@ export function parseTicketTemplateElements(value: unknown): TicketTemplateEleme
     throw new TicketTemplateValidationError(
       'TICKET_TEMPLATE_REQUIRED_ELEMENT_MISSING',
       422,
-      'Template kustom wajib memiliki satu QR Code dan satu kode tiket.',
+      'Custom template must contain exactly one QR Code and one Ticket Code.',
     );
   }
 
@@ -266,7 +266,7 @@ export function parseTicketTemplateElements(value: unknown): TicketTemplateEleme
       throw new TicketTemplateValidationError(
         'TICKET_TEMPLATE_ELEMENT_INVALID',
         422,
-        'Setiap elemen data peserta hanya boleh ditambahkan satu kali.',
+        'Each participant data element can only be added once.',
       );
     }
     if (identity) seenOptionalElements.add(identity);
@@ -295,7 +295,7 @@ export function validateTemplateFieldTokens(
     throw new TicketTemplateValidationError(
       'TICKET_TEMPLATE_ELEMENT_INVALID',
       422,
-      'Token data peserta tidak tersedia untuk event ini.',
+      'Participant data token is not available for this event.',
     );
   }
 }
@@ -307,7 +307,7 @@ export async function validateTicketTemplateBackground(
     throw new TicketTemplateValidationError(
       'TICKET_TEMPLATE_BACKGROUND_TOO_LARGE',
       413,
-      'Ukuran gambar template melebihi batas 5 MB.',
+      'Template image size exceeds 5 MB limit.',
     );
   }
 
@@ -321,20 +321,20 @@ export async function validateTicketTemplateBackground(
       throw new TicketTemplateValidationError(
         'TICKET_TEMPLATE_BACKGROUND_DIMENSIONS_INVALID',
         422,
-        'Dimensi gambar template terlalu besar. Maksimal 8192 px per sisi dan 20 megapiksel.',
+        'Template image dimensions too large. Max 8192 px per side and 20 megapixels.',
       );
     }
     if (error.kind === 'content') {
       throw new TicketTemplateValidationError(
         'TICKET_TEMPLATE_BACKGROUND_CONTENT_INVALID',
         415,
-        'Isi gambar template tidak valid.',
+        'Invalid template image content.',
       );
     }
     throw new TicketTemplateValidationError(
       'TICKET_TEMPLATE_BACKGROUND_TYPE_NOT_ALLOWED',
       415,
-      'Format gambar template tidak didukung. Gunakan JPG, PNG, atau WebP.',
+      'Template image format not supported. Use JPG, PNG, or WebP.',
     );
   }
 }
@@ -456,7 +456,7 @@ export function validateApprovalEmailTemplateTokens(
     throw new TicketTemplateValidationError(
       'EMAIL_TEMPLATE_TOKEN_INVALID',
       422,
-      'Token email tidak tersedia untuk event ini.',
+      'Email token is not available for this event.',
     );
   }
 }
@@ -495,7 +495,7 @@ export function renderApprovalEmailTemplate(
     body = body.split(`[${token}]`).join(escapeHtml(value));
   }
   if (kind === 'ticket') {
-    const ticketImage = `<img src="${escapeHtml(input.ticketImageUrl ?? '')}" alt="QR Code tiket" />`;
+    const ticketImage = `<img src="${escapeHtml(input.ticketImageUrl ?? '')}" alt="Ticket QR Code" />`;
     body = body.split('[TICKET_IMAGE]').join(ticketImage);
   }
 

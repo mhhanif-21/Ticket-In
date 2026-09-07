@@ -83,7 +83,7 @@ export default function ManualCheckInPage() {
         resultStatus = 'success';
         setScanResult({
           status: 'success',
-          message: 'Check-in Berhasil',
+          message: 'Check-in Successful',
           details: `${data.data.participant_name} - ${data.data.ticket_code}`
         });
       } else if (res.status === 409) {
@@ -91,14 +91,14 @@ export default function ManualCheckInPage() {
         const firstScan = new Date(data.data.first_scanned_at).toLocaleString('id-ID');
         setScanResult({
           status: 'duplicate',
-          message: 'Tiket Sudah Digunakan!',
-          details: `Pertama scan: ${firstScan}`
+          message: 'Ticket Already Used!',
+          details: `First scan: ${firstScan}`
         });
       } else {
         resultStatus = 'invalid';
         setScanResult({
           status: 'invalid',
-          message: data.message || 'Tiket Tidak Sah',
+          message: data.message || 'Invalid Ticket',
         });
       }
 
@@ -107,7 +107,7 @@ export default function ManualCheckInPage() {
       scheduleDismiss(resultStatus);
 
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Terjadi kesalahan jaringan';
+      const message = err instanceof Error ? err.message : 'A network error occurred';
       setScanResult({
         status: 'invalid',
         message
@@ -129,7 +129,7 @@ export default function ManualCheckInPage() {
         >
           <ArrowLeft className="w-6 h-6" />
         </Link>
-        <h1 className="font-semibold text-lg">Input Manual</h1>
+        <h1 className="font-semibold text-lg">Manual Input</h1>
         <div className="w-10"></div>
       </div>
 
@@ -140,9 +140,9 @@ export default function ManualCheckInPage() {
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-slate-800 mb-4">
             <Keyboard className="w-8 h-8 text-blue-400" />
           </div>
-          <h2 className="text-2xl font-bold">Ketik Kode Tiket</h2>
+          <h2 className="text-2xl font-bold">Enter Ticket Code</h2>
           <p className="text-slate-400 text-sm mt-1">
-            Gunakan mode ini jika kamera bermasalah atau QR tidak terbaca.
+            Use this mode if the camera has issues or QR is unreadable.
           </p>
         </div>
 
@@ -170,7 +170,7 @@ export default function ManualCheckInPage() {
               <Loader2 className="w-6 h-6 animate-spin" />
             ) : (
               <>
-                <span className="text-lg">Proses Tiket</span>
+                <span className="text-lg">Process Ticket</span>
                 <Send className="w-5 h-5 ml-1" />
               </>
             )}
@@ -198,7 +198,7 @@ export default function ManualCheckInPage() {
               <button
                 type="button"
                 onClick={dismissScanResult}
-                aria-label="Tutup hasil scan"
+                aria-label="Close scan result"
                 className="ml-auto shrink-0 w-9 h-9 rounded-full flex items-center justify-center text-white/90 hover:bg-white/15 transition-colors"
               >
                 <X className="w-5 h-5" />

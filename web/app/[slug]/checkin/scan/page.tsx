@@ -96,13 +96,13 @@ export default function WebScannerPage() {
       const errorName = typeof err === 'object' && err !== null && 'name' in err ? String(err.name) : '';
       const errorMessage = typeof err === 'object' && err !== null && 'message' in err ? String(err.message) : '';
       if (errorName === 'NotAllowedError' || errorMessage.includes('Permission denied')) {
-        setCameraError('Akses kamera ditolak. Mohon izinkan kamera pada browser.');
+        setCameraError('Camera access denied. Please allow camera access in your browser.');
         setHasCameras(false);
       } else if (facingMode === 'environment') {
         setFacingMode('user'); // Attempt fallback
       } else {
         setHasCameras(false);
-        setCameraError('Kamera tidak ditemukan atau tidak dapat diakses.');
+        setCameraError('Camera not found or cannot be accessed.');
       }
     } finally {
       isTransitioningRef.current = false;
@@ -169,27 +169,27 @@ export default function WebScannerPage() {
         setScanResult({
           status: 'success',
           title: `${data.data.participant_name || ticketCode} is Present!`,
-          subtitle: 'Check-in Sukses'
+          subtitle: 'Check-in Successful'
         });
       } else if (res.status === 409) {
         resultStatus = 'duplicate';
         setScanResult({
           status: 'duplicate',
-          title: 'Gagal: Peserta Sudah Hadir (Duplikat)',
+          title: 'Failed: Participant Already Present (Duplicate)',
           subtitle: 'Invalid Entry'
         });
       } else {
         resultStatus = 'invalid';
         setScanResult({
           status: 'invalid',
-          title: 'Gagal: Tiket Tidak Ditemukan/Tidak Valid',
+          title: 'Failed: Ticket Not Found/Invalid',
           subtitle: 'Invalid Entry'
         });
       }
     } catch {
       setScanResult({
         status: 'invalid',
-        title: 'Terjadi kesalahan jaringan',
+        title: 'A network error occurred',
         subtitle: 'Invalid Entry'
       });
     }
@@ -295,7 +295,7 @@ export default function WebScannerPage() {
           {!hasCameras ? (
             <div className="absolute inset-0 z-10 flex flex-col items-center justify-center p-6 text-center bg-black/60 backdrop-blur-sm text-white">
               <AlertCircle className="w-12 h-12 mb-4 text-error" />
-              <p className="font-headline-md font-semibold mb-2">{cameraError || 'Kamera tidak tersedia'}</p>
+              <p className="font-headline-md font-semibold mb-2">{cameraError || 'Camera not available'}</p>
               <button
                 onClick={() => {
                   setHasCameras(true);
@@ -303,7 +303,7 @@ export default function WebScannerPage() {
                 }}
                 className="mt-4 px-4 py-2 bg-primary text-on-primary rounded-lg font-label-caps active:scale-95"
               >
-                Coba Lagi
+                Try Again
               </button>
             </div>
           ) : (
@@ -336,7 +336,7 @@ export default function WebScannerPage() {
 
         {/* Manual Input Form */}
         <form onSubmit={handleManualSubmit} className="mt-stack-lg w-full max-w-md flex flex-col gap-2">
-          <label className="font-label-caps text-label-caps text-on-background dark:text-white" htmlFor="manual-code">Input Kode Manual</label>
+          <label className="font-label-caps text-label-caps text-on-background dark:text-white" htmlFor="manual-code">Manual Code Input</label>
           <div className="flex gap-2">
             <input
               id="manual-code"
@@ -355,7 +355,7 @@ export default function WebScannerPage() {
               className={`px-6 py-3 rounded-lg font-label-caps text-label-caps active:scale-95 transition-transform duration-150 disabled:opacity-50
                 bg-primary text-on-primary dark:bg-white dark:text-primary`}
             >
-              Kirim
+              Submit
             </button>
           </div>
         </form>
@@ -372,7 +372,7 @@ export default function WebScannerPage() {
             <button
               type="button"
               onClick={dismissScanResult}
-              aria-label="Tutup hasil scan"
+              aria-label="Close scan result"
               className="absolute top-4 right-4 w-10 h-10 rounded-full flex items-center justify-center text-on-surface-variant hover:bg-surface-container-high dark:text-white/70 dark:hover:bg-white/10 transition-colors"
             >
               <X className="w-5 h-5" />

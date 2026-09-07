@@ -19,6 +19,11 @@ class SessionInvalidationNotifier extends ChangeNotifier {
   void notifySessionInvalidated() => notifyListeners();
 }
 
+/// Describes whether a refresh failure is terminal for the current session.
+/// A temporary provider/network failure must not erase credentials that may
+/// still be usable once the auth service recovers.
+enum SessionRefreshResult { refreshed, invalid, unavailable }
+
 class SecureAuthSessionStore implements AuthSessionStore {
   final FlutterSecureStorage _storage;
 
@@ -134,7 +139,7 @@ class ApiClient {
   final AuthSessionStore _storage;
   final http.Client _httpClient;
   final SessionInvalidationNotifier _sessionEvents;
-  Future<bool>? _refreshInFlight;
+  Future<SessionRefreshResult>? _refreshInFlight;
 
   static final SessionInvalidationNotifier sessionEvents =
       SessionInvalidationNotifier();
@@ -165,11 +170,11 @@ class ApiClient {
     };
   }
 
-  Future<bool> _refreshSession() {
+  Future<SessionRefreshResult> _refreshSession() {
     final inFlight = _refreshInFlight;
     if (inFlight != null) return inFlight;
 
-    late final Future<bool> refresh;
+    late final Future<SessionRefreshResult> refresh;
     refresh = _refreshSessionInternal().whenComplete(() {
       if (identical(_refreshInFlight, refresh)) {
         _refreshInFlight = null;
@@ -179,11 +184,13 @@ class ApiClient {
     return refresh;
   }
 
-  Future<bool> _refreshSessionInternal() async {
-    final refreshToken = await _storage.read(key: refreshTokenKey);
-    if (refreshToken == null || refreshToken.isEmpty) return false;
-
+  Future<SessionRefreshResult> _refreshSessionInternal() async {
     try {
+      final refreshToken = await _storage.read(key: refreshTokenKey);
+      if (refreshToken == null || refreshToken.isEmpty) {
+        return _invalidateSession();
+      }
+
       final response = await _httpClient
           .post(
             buildUri('/v1/auth/admin/refresh'),
@@ -192,11 +199,18 @@ class ApiClient {
           )
           .timeout(_timeout);
 
+      if (response.statusCode == 401 || response.statusCode == 403) {
+        return _invalidateSession();
+      }
       if (response.statusCode != 200) {
-        throw StateError('Refresh session rejected');
+        return SessionRefreshResult.unavailable;
       }
 
-      final body = jsonDecode(response.body) as Map<String, dynamic>;
+      final decodedBody = jsonDecode(response.body);
+      if (decodedBody is! Map<String, dynamic>) {
+        return SessionRefreshResult.unavailable;
+      }
+      final body = decodedBody;
       final data = body['data'] as Map<String, dynamic>?;
       final accessToken = data?['access_token'];
       final nextRefreshToken = data?['refresh_token'];
@@ -204,22 +218,22 @@ class ApiClient {
           accessToken.isEmpty ||
           nextRefreshToken is! String ||
           nextRefreshToken.isEmpty) {
-        throw const FormatException('Refresh response tidak lengkap');
+        return SessionRefreshResult.unavailable;
       }
 
       await _storage.write(key: accessTokenKey, value: accessToken);
       await _storage.write(key: refreshTokenKey, value: nextRefreshToken);
-      return true;
+      return SessionRefreshResult.refreshed;
     } catch (_) {
-      await clearSession();
-      _sessionEvents.notifySessionInvalidated();
-      return false;
+      // Network errors, timeouts, and a temporary 5xx response are not proof
+      // that the refresh token is invalid. Keep the pair for the next retry.
+      return SessionRefreshResult.unavailable;
     }
   }
 
-  /// A stored token pair is not considered a valid session until its refresh
-  /// token is accepted by the API. This runs once during app bootstrap.
-  Future<bool> restoreSession() async {
+  /// Checks a stored token pair during app bootstrap. A temporary provider
+  /// failure keeps the pair so the next protected request can retry safely.
+  Future<SessionRefreshResult> restoreSession() async {
     final accessToken = await _storage.read(key: accessTokenKey);
     final refreshToken = await _storage.read(key: refreshTokenKey);
     if (accessToken == null ||
@@ -227,9 +241,15 @@ class ApiClient {
         refreshToken == null ||
         refreshToken.isEmpty) {
       await clearSession();
-      return false;
+      return SessionRefreshResult.invalid;
     }
     return _refreshSession();
+  }
+
+  Future<SessionRefreshResult> _invalidateSession() async {
+    await clearSession();
+    _sessionEvents.notifySessionInvalidated();
+    return SessionRefreshResult.invalid;
   }
 
   Future<void> clearSession() async {
@@ -241,7 +261,8 @@ class ApiClient {
     Future<http.Response> Function(Map<String, String> headers) request,
   ) async {
     final response = await request(await _getHeaders()).timeout(_timeout);
-    if (response.statusCode != 401 || !await _refreshSession()) {
+    if (response.statusCode != 401 ||
+        await _refreshSession() != SessionRefreshResult.refreshed) {
       return response;
     }
     return request(await _getHeaders()).timeout(_timeout);
@@ -251,7 +272,8 @@ class ApiClient {
     Future<http.StreamedResponse> Function() request,
   ) async {
     final response = await request();
-    if (response.statusCode != 401 || !await _refreshSession()) {
+    if (response.statusCode != 401 ||
+        await _refreshSession() != SessionRefreshResult.refreshed) {
       return response;
     }
     return request();

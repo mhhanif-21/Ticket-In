@@ -98,7 +98,7 @@ class _EditEventScreenState extends State<EditEventScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('Gagal memuat acara: $e')));
+      ).showSnackBar(SnackBar(content: Text('Failed to load event: $e')));
       Navigator.pop(context);
     }
   }
@@ -196,7 +196,7 @@ class _EditEventScreenState extends State<EditEventScreen> {
     }
     if (additions.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Foto yang dipilih sudah ada.')),
+        const SnackBar(content: Text('Selected photos already exist.')),
       );
       return;
     }
@@ -205,7 +205,7 @@ class _EditEventScreenState extends State<EditEventScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'Maksimal $maxEventPosterImages poster. Sisa slot: $remainingSlots.',
+            'Maximum $maxEventPosterImages posters. Remaining slots: $remainingSlots.',
           ),
         ),
       );
@@ -247,14 +247,14 @@ class _EditEventScreenState extends State<EditEventScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Ubah format poster?'),
+        title: const Text('Change poster format?'),
         content: const Text(
-          'Format poster berubah. Poster yang sudah ada perlu disesuaikan.',
+          'Poster format changed. Existing posters need to be adjusted.',
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: const Text('Batal'),
+            child: const Text('Cancel'),
           ),
           ElevatedButton(
             onPressed: () => Navigator.of(dialogContext).pop(true),
@@ -262,7 +262,7 @@ class _EditEventScreenState extends State<EditEventScreen> {
               backgroundColor: Colors.black,
               foregroundColor: Colors.white,
             ),
-            child: const Text('Sesuaikan Poster'),
+            child: const Text('Adjust Poster'),
           ),
         ],
       ),
@@ -290,7 +290,7 @@ class _EditEventScreenState extends State<EditEventScreen> {
         if (!mounted) return;
         if (cropped == null) {
           _showAspectChangeMessage(
-            'Penyesuaian poster dibatalkan. Format lama tetap digunakan.',
+            'Poster adjustment cancelled. Old format will still be used.',
           );
           return;
         }
@@ -298,7 +298,7 @@ class _EditEventScreenState extends State<EditEventScreen> {
         if (!mounted) return;
         if (validationError != null) {
           _showAspectChangeMessage(
-            'Poster tidak valid setelah disesuaikan. Format lama tetap digunakan.',
+            'Invalid poster after adjustment. Old format will still be used.',
           );
           return;
         }
@@ -317,12 +317,12 @@ class _EditEventScreenState extends State<EditEventScreen> {
       });
       _moveToMediaPage(0);
       _showAspectChangeMessage(
-        'Format poster diperbarui. Semua poster siap disimpan ulang.',
+        'Poster format updated. All posters ready to be re-saved.',
       );
     } catch (_) {
       if (mounted) {
         _showAspectChangeMessage(
-          'Poster belum dapat disesuaikan. Format lama tetap digunakan.',
+          'Poster could not be adjusted. Old format will still be used.',
         );
       }
     } finally {
@@ -354,7 +354,7 @@ class _EditEventScreenState extends State<EditEventScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Poster belum dapat dibuka untuk diedit.'),
+          content: Text('Poster could not be opened for editing.'),
         ),
       );
       return;
@@ -471,7 +471,7 @@ class _EditEventScreenState extends State<EditEventScreen> {
     if (_mediaItems.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Minimal satu poster acara harus dipilih.'),
+          content: Text('At least one event poster must be selected.'),
         ),
       );
       return;
@@ -480,7 +480,7 @@ class _EditEventScreenState extends State<EditEventScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'Maksimal $maxEventPosterImages poster acara. Hapus poster tambahan sebelum menyimpan.',
+            'Maximum $maxEventPosterImages event posters. Remove additional posters before saving.',
           ),
         ),
       );
@@ -507,7 +507,7 @@ class _EditEventScreenState extends State<EditEventScreen> {
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Acara berhasil diperbarui!')),
+        const SnackBar(content: Text('Event successfully updated!')),
       );
       Navigator.pop(context, true); // Return true to signal refresh
     } on EventMediaUploadException catch (error) {
@@ -516,12 +516,12 @@ class _EditEventScreenState extends State<EditEventScreen> {
         SnackBar(
           content: Text(
             metadataPersisted
-                ? 'Data acara sudah tersimpan, tetapi media belum diperbarui. ${error.message}'
+                ? 'Event data saved, but media not updated. ${error.message}'
                 : error.message,
           ),
           action: metadataPersisted && (_coverPending || _mediaChanged)
               ? SnackBarAction(
-                  label: 'UNGGAH ULANG',
+                  label: 'RE-UPLOAD',
                   onPressed: _retryPendingMedia,
                 )
               : null,
@@ -532,7 +532,7 @@ class _EditEventScreenState extends State<EditEventScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Acara belum dapat diperbarui. Silakan coba lagi.'),
+          content: Text('Event could not be updated. Please try again.'),
         ),
       );
       setState(() => _isLoading = false);
@@ -561,7 +561,7 @@ class _EditEventScreenState extends State<EditEventScreen> {
   Future<void> _syncPendingMedia() async {
     if (_mediaItems.isEmpty) {
       throw const EventMediaUploadException(
-        'Minimal satu poster acara harus dipilih sebelum menyimpan.',
+        'At least one event poster must be selected before saving.',
       );
     }
 
@@ -592,7 +592,7 @@ class _EditEventScreenState extends State<EditEventScreen> {
         .toList();
     if (remoteGalleryIds.any((id) => id.isEmpty)) {
       throw const EventMediaUploadException(
-        'Poster tambahan belum siap diperbarui. Silakan coba lagi.',
+        'Additional posters are not ready to be updated. Please try again.',
       );
     }
 
@@ -665,7 +665,7 @@ class _EditEventScreenState extends State<EditEventScreen> {
       }
       if (failedCount > 0) {
         throw const EventMediaUploadException(
-          'Sebagian foto galeri belum dapat diproses. Silakan unggah ulang foto yang gagal.',
+          'Some gallery photos could not be processed. Please re-upload failed photos.',
         );
       }
     }
@@ -673,7 +673,7 @@ class _EditEventScreenState extends State<EditEventScreen> {
     final galleryIds = _mediaItems.skip(1).map((item) => item.id).toList();
     if (galleryIds.any((id) => id.isEmpty)) {
       throw const EventMediaUploadException(
-        'Poster tambahan belum siap diperbarui. Silakan coba lagi.',
+        'Additional posters are not ready to be updated. Please try again.',
       );
     }
     await _eventService.replaceEventGallery(widget.eventId, galleryIds);
@@ -708,7 +708,7 @@ class _EditEventScreenState extends State<EditEventScreen> {
       event = await _eventService.getEventDetail(widget.eventId);
     } catch (_) {
       throw const EventMediaUploadException(
-        'Media sudah dikirim, tetapi status terbaru belum dapat dimuat. Silakan coba lagi.',
+        'Media uploaded, but the latest status could not be loaded. Please try again.',
       );
     }
 
@@ -717,7 +717,7 @@ class _EditEventScreenState extends State<EditEventScreen> {
     if (serverItems.length != expectedItems.length ||
         !expectedRemoteIds.every(serverIds.contains)) {
       throw const EventMediaUploadException(
-        'Media sudah dikirim, tetapi belum dapat dikonfirmasi dari server. Silakan coba lagi.',
+        'Media uploaded, but could not be confirmed from the server. Please try again.',
       );
     }
     if (!mounted) return;
@@ -760,7 +760,7 @@ class _EditEventScreenState extends State<EditEventScreen> {
           ),
           SizedBox(height: 8),
           Text(
-            'Belum ada poster acara',
+            'No event poster yet',
             style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w600,
@@ -780,7 +780,7 @@ class _EditEventScreenState extends State<EditEventScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Poster Acara ($count/$maxEventPosterImages)',
+          'Event Poster ($count/$maxEventPosterImages)',
           style: const TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w700,
@@ -789,7 +789,7 @@ class _EditEventScreenState extends State<EditEventScreen> {
         ),
         const SizedBox(height: 4),
         const Text(
-          'Satu koleksi gambar · maksimal 5 poster. Poster pertama menjadi poster utama.',
+          'One image collection · maximum 5 posters. The first poster becomes the main poster.',
           style: TextStyle(fontSize: 12, color: Color(0xFF5F6368)),
         ),
         const SizedBox(height: 8),
@@ -797,7 +797,7 @@ class _EditEventScreenState extends State<EditEventScreen> {
           key: const ValueKey('edit-poster-aspect-mode'),
           initialValue: _posterAspectMode,
           decoration: const InputDecoration(
-            labelText: 'Format poster acara',
+            labelText: 'Event poster format',
             border: OutlineInputBorder(),
           ),
           items: PosterAspectMode.values
@@ -811,8 +811,8 @@ class _EditEventScreenState extends State<EditEventScreen> {
         const SizedBox(height: 8),
         Text(
           _isChangingPosterAspect
-              ? 'Menyesuaikan semua poster...'
-              : 'Perubahan format akan meminta crop ulang untuk poster yang sudah ada.',
+              ? 'Adjusting all posters...'
+              : 'Format change will request re-crop for existing posters.',
           style: const TextStyle(fontSize: 11, color: Color(0xFF5F6368)),
         ),
         const SizedBox(height: 8),
@@ -820,7 +820,7 @@ class _EditEventScreenState extends State<EditEventScreen> {
           key: const ValueKey('edit-poster-upload'),
           onPressed: count >= maxEventPosterImages ? null : _pickPosterImages,
           icon: const Icon(Icons.add_photo_alternate_outlined),
-          label: Text(count == 0 ? 'Pilih Poster' : 'Tambah Poster'),
+          label: Text(count == 0 ? 'Select Poster' : 'Add Poster'),
         ),
         const SizedBox(height: 12),
         AspectRatio(
@@ -866,7 +866,7 @@ class _EditEventScreenState extends State<EditEventScreen> {
                             const SizedBox(width: 4),
                             IconButton.filledTonal(
                               key: ValueKey('edit-poster-remove-$index'),
-                              tooltip: 'Hapus poster ${index + 1}',
+                              tooltip: 'Remove poster ${index + 1}',
                               onPressed: () => _removeMediaAt(index),
                               icon: const Icon(Icons.close),
                             ),
@@ -924,14 +924,14 @@ class _EditEventScreenState extends State<EditEventScreen> {
         const SizedBox(height: 4),
         Text(
           count == 0
-              ? 'Poster belum dipilih.'
-              : 'Poster terpilih ($count/$maxEventPosterImages).',
+              ? 'No poster selected.'
+              : 'Selected posters ($count/$maxEventPosterImages).',
           style: const TextStyle(fontSize: 12, color: Color(0xFF5F6368)),
         ),
         if (count > maxEventPosterImages) ...[
           const SizedBox(height: 4),
           const Text(
-            'Koleksi lama melebihi batas baru. Hapus poster tambahan sebelum menyimpan.',
+            'Old collection exceeds new limit. Remove additional posters before saving.',
             style: TextStyle(color: Color(0xFFBA1A1A), fontSize: 12),
           ),
         ],
@@ -1019,7 +1019,7 @@ class _EditEventScreenState extends State<EditEventScreen> {
         centerTitle: true,
         iconTheme: const IconThemeData(color: Color(0xFF444748)),
         title: const Text(
-          'Lihat/Edit Detail Acara',
+          'View/Edit Event Details',
           style: TextStyle(
             color: Color(0xFF1A1C1C),
             fontSize: 16,
@@ -1050,58 +1050,58 @@ class _EditEventScreenState extends State<EditEventScreen> {
 
                     // Forms
                     _buildTextField(
-                      label: 'Nama Acara',
-                      hint: 'Masukkan nama acara...',
+                      label: 'Event Name',
+                      hint: 'Enter event name...',
                       controller: _nameController,
-                      validator: (v) => v!.isEmpty ? 'Harus diisi' : null,
+                      validator: (v) => v!.isEmpty ? 'Required' : null,
                     ),
                     const SizedBox(height: 16),
 
                     _buildTextField(
-                      label: 'Lokasi',
-                      hint: 'Lokasi acara...',
+                      label: 'Location',
+                      hint: 'Event location...',
                       icon: Icons.location_on,
                       controller: _locationController,
-                      validator: (v) => v!.isEmpty ? 'Harus diisi' : null,
+                      validator: (v) => v!.isEmpty ? 'Required' : null,
                     ),
                     const SizedBox(height: 16),
 
                     _buildTextField(
-                      label: 'Batas Kuota',
+                      label: 'Capacity Limit',
                       hint: '0',
                       icon: Icons.group,
                       keyboardType: TextInputType.number,
                       controller: _capacityController,
                       // [MOB-BUG-007] FIX: Validasi kapasitas komprehensif (seperti di CreateEventScreen)
                       validator: (v) {
-                        if (v == null || v.isEmpty) return 'Harus diisi';
+                        if (v == null || v.isEmpty) return 'Required';
                         final parsed = int.tryParse(v);
                         if (parsed == null) {
-                          return 'Harus berupa angka (misal: 100)';
+                          return 'Must be a number (e.g. 100)';
                         }
-                        if (parsed <= 0) return 'Kuota harus lebih dari 0';
+                        if (parsed <= 0) return 'Capacity must be greater than 0';
                         return null;
                       },
                     ),
                     const SizedBox(height: 16),
 
                     _buildTextField(
-                      label: 'Tanggal',
+                      label: 'Date',
                       hint: _selectedDate == null
-                          ? 'Pilih Tanggal Acara'
+                          ? 'Select Event Date'
                           : DateFormat('dd MMM yyyy').format(_selectedDate!),
                       icon: Icons.calendar_today,
                       controller: _dateController,
                       readOnly: true,
                       onTap: _pickDate,
                       validator: (v) =>
-                          _selectedDate == null ? 'Harus diisi' : null,
+                          _selectedDate == null ? 'Required' : null,
                     ),
                     const SizedBox(height: 16),
 
                     _buildTextField(
-                      label: 'Deskripsi Tambahan',
-                      hint: 'Detail tambahan acara...',
+                      label: 'Additional Description',
+                      hint: 'Additional event details...',
                       controller: _descriptionController,
                       maxLines: 3,
                     ),
@@ -1112,7 +1112,7 @@ class _EditEventScreenState extends State<EditEventScreen> {
                         const Padding(
                           padding: EdgeInsets.only(left: 4, bottom: 4),
                           child: Text(
-                            'Mode Pendaftaran',
+                            'Registration Mode',
                             style: TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.w500,
@@ -1193,7 +1193,7 @@ class _EditEventScreenState extends State<EditEventScreen> {
                         ),
                       ),
                       child: const Text(
-                        'Simpan Perubahan',
+                        'Save Changes',
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w600,

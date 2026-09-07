@@ -67,7 +67,7 @@ class _AddFieldDialogState extends State<_AddFieldDialog> {
         .where((text) => text.isNotEmpty)
         .toList();
     if (_needsOptions && validOptions.length < 2) {
-      _showValidationMessage('Minimal 2 opsi jawaban harus diisi');
+      _showValidationMessage('Minimum 2 answer options must be filled');
       return;
     }
 
@@ -81,7 +81,7 @@ class _AddFieldDialogState extends State<_AddFieldDialog> {
   Widget build(BuildContext context) {
     return AlertDialog(
       title: Text(
-        _needsOptions ? 'Pertanyaan: ${widget.title}' : 'Pertanyaan Baru',
+        _needsOptions ? 'Question: ${widget.title}' : 'New Question',
         style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
       ),
       content: SingleChildScrollView(
@@ -92,8 +92,8 @@ class _AddFieldDialogState extends State<_AddFieldDialog> {
             TextField(
               controller: _nameController,
               decoration: InputDecoration(
-                labelText: 'Judul Pertanyaan',
-                hintText: 'Contoh: Jenis Kelamin',
+                labelText: 'Question Title',
+                hintText: 'Example: Gender',
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
                 ),
@@ -107,7 +107,7 @@ class _AddFieldDialogState extends State<_AddFieldDialog> {
             if (_needsOptions) ...[
               const SizedBox(height: 16),
               const Text(
-                'Opsi Jawaban',
+                'Answer Options',
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
@@ -126,8 +126,8 @@ class _AddFieldDialogState extends State<_AddFieldDialog> {
                         child: TextField(
                           controller: controller,
                           decoration: InputDecoration(
-                            labelText: 'Opsi ${index + 1}',
-                            hintText: 'Isi opsi jawaban...',
+                            labelText: 'Option ${index + 1}',
+                            hintText: 'Fill in the answer option...',
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(8),
                             ),
@@ -165,7 +165,7 @@ class _AddFieldDialogState extends State<_AddFieldDialog> {
                 },
                 icon: const Icon(Icons.add, size: 18, color: Color(0xFF000000)),
                 label: const Text(
-                  'Tambah Opsi',
+                  'Add Option',
                   style: TextStyle(
                     color: Color(0xFF000000),
                     fontWeight: FontWeight.w500,
@@ -180,7 +180,7 @@ class _AddFieldDialogState extends State<_AddFieldDialog> {
         TextButton(
           onPressed: () => Navigator.pop(context),
           child: const Text(
-            'Batal',
+            'Cancel',
             style: TextStyle(color: Color(0xFF444748)),
           ),
         ),
@@ -193,7 +193,7 @@ class _AddFieldDialogState extends State<_AddFieldDialog> {
             ),
           ),
           onPressed: _submit,
-          child: const Text('Tambah'),
+          child: const Text('Add'),
         ),
       ],
     );
@@ -298,7 +298,7 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('Gagal memuat form: $e')));
+      ).showSnackBar(SnackBar(content: Text('Failed to load form: $e')));
       Navigator.pop(context);
     }
   }
@@ -308,7 +308,7 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
     if (_fields.length >= 23) {
       // 25 max - 2 locked fields
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Maksimal 23 field kustom diperbolehkan')),
+        const SnackBar(content: Text('Maximum 23 custom fields allowed')),
       );
       return;
     }
@@ -348,7 +348,7 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     const Text(
-                      'Pilih Tipe Pertanyaan',
+                      'Select Question Type',
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
@@ -376,23 +376,23 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
                     children: [
                       _buildFieldTypeBtn(
                         'text',
-                        'Teks Singkat',
+                        'Short Text',
                         Icons.short_text,
                       ),
                       _buildFieldTypeBtn(
                         'textarea',
-                        'Teks Panjang',
+                        'Long Text',
                         Icons.notes,
                       ),
-                      _buildFieldTypeBtn('number', 'Angka', Icons.numbers),
+                      _buildFieldTypeBtn('number', 'Number', Icons.numbers),
                       _buildFieldTypeBtn(
                         'radio',
-                        'Pilihan Ganda',
+                        'Multiple Choice',
                         Icons.radio_button_checked,
                       ),
                       _buildFieldTypeBtn(
                         'checkbox',
-                        'Kotak Centang',
+                        'Checkbox',
                         Icons.check_box,
                       ),
                       _buildFieldTypeBtn(
@@ -402,17 +402,17 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
                       ),
                       _buildFieldTypeBtn(
                         'file',
-                        'Unggah Berkas',
+                        'Upload File',
                         Icons.upload_file,
                       ),
                       _buildFieldTypeBtn(
                         'image',
-                        'Unggah Gambar',
+                        'Upload Image',
                         Icons.image_outlined,
                       ),
                       _buildFieldTypeBtn(
                         'email',
-                        'Email Tambahan',
+                        'Additional Email',
                         Icons.alternate_email,
                       ),
                     ],
@@ -465,16 +465,16 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
   // Keep field-dialog controllers owned by the dialog route. Disposing them in
   // this parent immediately after Navigator.pop races route deactivation.
   String? _validateCustomFieldName(String name) {
-    if (name.isEmpty) return 'Judul pertanyaan tidak boleh kosong';
+    if (name.isEmpty) return 'Question title cannot be empty';
     if (staticFormFieldKindFor(name) != null) {
-      return 'Nama dan Email adalah field sistem dan tidak dapat dibuat ulang.';
+      return 'Name and Email are system fields and cannot be recreated.';
     }
     if (_fields.any(
       (field) =>
           normalizeFormFieldLabel(field.fieldName) ==
           normalizeFormFieldLabel(name),
     )) {
-      return 'Nama field kustom tidak boleh duplikat.';
+      return 'Custom field name cannot be duplicate.';
     }
     return null;
   }
@@ -507,23 +507,23 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
   String _getTypeLabel(String type) {
     switch (type) {
       case 'radio':
-        return 'Pilihan Ganda';
+        return 'Multiple Choice';
       case 'checkbox':
-        return 'Kotak Centang';
+        return 'Checkbox';
       case 'select':
         return 'Dropdown';
       case 'textarea':
-        return 'Teks Panjang';
+        return 'Long Text';
       case 'number':
-        return 'Angka';
+        return 'Number';
       case 'file':
-        return 'Unggah Berkas';
+        return 'Upload File';
       case 'image':
-        return 'Unggah Gambar';
+        return 'Upload Image';
       case 'email':
-        return 'Email Tambahan';
+        return 'Additional Email';
       default:
-        return 'Teks Singkat';
+        return 'Short Text';
     }
   }
 
@@ -548,7 +548,7 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
-            'Form berhasil disimpan! Sekarang simpan konfigurasi tiket.',
+            'Form saved successfully! Now save the ticket configuration.',
           ),
         ),
       );
@@ -587,7 +587,7 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
         centerTitle: false,
         iconTheme: const IconThemeData(color: primaryColor),
         title: const Text(
-          'Susun Form Pendaftaran',
+          'Build Registration Form',
           style: TextStyle(
             color: Color(0xFF1A1C1C),
             fontSize: 16,
@@ -626,7 +626,7 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
                           SizedBox(width: 8),
                           Expanded(
                             child: Text(
-                              'Susun form pendaftaran acara Anda. Field Nama & Email sudah otomatis terkunci.',
+                              'Build your event registration form. Name & Email fields are automatically locked.',
                               style: TextStyle(
                                 fontSize: 12,
                                 color: Color(0xFF000000),
@@ -651,7 +651,7 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
                         ),
                         const SizedBox(width: 6),
                         const Text(
-                          'Field Wajib (Tidak dapat dihapus)',
+                          'Required Fields (Cannot be deleted)',
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
@@ -689,7 +689,7 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
                         ),
                         const SizedBox(width: 6),
                         Text(
-                          'Field Kustom (${_fields.length} / 23)',
+                          'Custom Fields (${_fields.length} / 23)',
                           style: const TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
@@ -785,7 +785,7 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
                         ),
                       )
                     : const Text(
-                        'Simpan',
+                        'Save',
                         style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w600,
@@ -838,7 +838,7 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
                     ),
                     const SizedBox(width: 6),
                     _buildBadge(
-                      'WAJIB',
+                      'REQUIRED',
                       const Color(0xFFBA1A1A),
                       const Color(0xFFFFDAD6),
                     ),
@@ -901,7 +901,7 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
                       if (field.isRequired) ...[
                         const SizedBox(width: 6),
                         _buildBadge(
-                          'WAJIB',
+                          'REQUIRED',
                           const Color(0xFFBA1A1A),
                           const Color(0xFFFFDAD6),
                         ),
@@ -914,7 +914,7 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
                     Text(
                       field.options!.take(3).join(' • ') +
                           (field.options!.length > 3
-                              ? ' +${field.options!.length - 3} lagi'
+                              ? ' +${field.options!.length - 3} more'
                               : ''),
                       style: const TextStyle(
                         fontSize: 11,

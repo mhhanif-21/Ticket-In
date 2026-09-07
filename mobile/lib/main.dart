@@ -25,7 +25,7 @@ class SplashScreen extends StatelessWidget {
   const SplashScreen({super.key});
 
   Widget build(BuildContext context) {
-    // Layar putih bersih dengan loading indicator saat cek token
+    // Clean white screen with loading indicator while checking token
     return const Scaffold(
       backgroundColor: Color(0xFFF9F9F9),
       body: Center(
@@ -131,8 +131,8 @@ GoRouter buildAppRouter(AuthSessionController authSession) => GoRouter(
     ),
     GoRoute(
       path: '/form-builder/:id',
-      // [BUG-054] FIX: isFirstSetup=true jika datang dari create-event
-      // create_event_screen mengirim pushReplacement ke route ini tanpa extra → isFirstSetup=true by default
+      // [BUG-054] FIX: isFirstSetup=true when coming from create-event
+      // create_event_screen sends pushReplacement to this route without extra → isFirstSetup=true by default
       builder: (context, state) => FormBuilderScreen(
         eventId: state.pathParameters['id']!,
         isFirstSetup: state.extra == 'first_setup',
@@ -150,7 +150,7 @@ GoRouter buildAppRouter(AuthSessionController authSession) => GoRouter(
         isFirstSetup: state.extra == 'first_setup',
       ),
     ),
-    // [BUG-048] FIX: Route baru untuk halaman detail event menggantikan Bottom Sheet
+    // [BUG-048] FIX: New route for event detail page replacing Bottom Sheet
     GoRoute(
       path: '/event-detail/:id',
       builder: (context, state) =>
@@ -202,11 +202,11 @@ class _InvalidReviewDetailScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Detail Pendaftar')),
+    appBar: AppBar(title: const Text('Registrant Detail')),
     body: Center(
       child: ElevatedButton(
         onPressed: () => context.go('/admin-dashboard'),
-        child: const Text('Data pendaftar tidak tersedia'),
+        child: const Text('Registrant data not available'),
       ),
     ),
   );

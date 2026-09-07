@@ -123,10 +123,10 @@ class EventService {
     final serviceMessage = _messageFromResponse(response.body, '');
     final isServerFailure = response.statusCode >= 500;
     final message = isServerFailure || serviceMessage == 'Internal server error'
-        ? 'Daftar acara sementara tidak tersedia. Silakan coba lagi.'
+        ? 'Event list temporarily unavailable. Please try again.'
         : serviceMessage.isNotEmpty
         ? serviceMessage
-        : 'Daftar acara belum dapat dimuat.';
+        : 'Event list could not be loaded.';
     throw EventCatalogException(
       message,
       statusCode: response.statusCode,
@@ -161,11 +161,9 @@ class EventService {
       },
     );
 
-    if (createResponse.statusCode == 201 || createResponse.statusCode == 200) {
+    if (createResponse.statusCode == 200 || createResponse.statusCode == 201) {
       final jsonBody = jsonDecode(createResponse.body);
-      final String id = jsonBody['data'] is List
-          ? jsonBody['data'][0]['id'].toString()
-          : jsonBody['data']['id'].toString();
+      final id = jsonBody['data']['id'].toString();
 
       if (posterPath != null) {
         try {
@@ -176,7 +174,7 @@ class EventService {
           );
         } on EventMediaUploadException catch (error) {
           throw EventMediaUploadException(
-            'Acara sudah tersimpan, tetapi media belum terunggah. ${error.message}',
+            'Event has been saved, but media could not be uploaded. ${error.message}',
             eventId: id,
             metadataPersisted: true,
           );
@@ -189,10 +187,10 @@ class EventService {
     final isServerFailure = createResponse.statusCode >= 500;
     throw EventCreationException(
       isServerFailure || serviceMessage == 'Internal server error'
-          ? 'Acara belum dapat dibuat. Silakan coba lagi.'
+          ? 'Event could not be created. Please try again.'
           : serviceMessage.isNotEmpty
           ? serviceMessage
-          : 'Acara belum dapat dibuat. Silakan coba lagi.',
+          : 'Event could not be created. Please try again.',
       statusCode: createResponse.statusCode,
       isRetryable:
           createResponse.statusCode == 408 ||
@@ -246,7 +244,7 @@ class EventService {
 
     if (galleryPaths.length > maxEventPosterImages - 1) {
       throw const EventMediaUploadException(
-        'Maksimal 5 poster acara, termasuk poster utama.',
+        'Maximum 5 event posters, including the main poster.',
       );
     }
     for (final galleryPath in galleryPaths) {
@@ -271,13 +269,13 @@ class EventService {
       throw EventMediaUploadException(
         _messageFromResponse(
           responseBody,
-          'Media acara belum dapat diunggah. Silakan coba lagi.',
+          'Event media could not be uploaded. Please try again.',
         ),
       );
     }
     _throwIfErrorPayload(
       responseBody,
-      'Media acara belum dapat diunggah. Silakan coba lagi.',
+      'Event media could not be uploaded. Please try again.',
     );
   }
 
@@ -300,13 +298,13 @@ class EventService {
       throw EventMediaUploadException(
         _messageFromResponse(
           responseBody,
-          'Poster acara belum dapat diunggah. Silakan coba lagi.',
+          'Event poster could not be uploaded. Please try again.',
         ),
       );
     }
     _throwIfErrorPayload(
       responseBody,
-      'Poster acara belum dapat diunggah. Silakan coba lagi.',
+      'Event poster could not be uploaded. Please try again.',
     );
   }
 
@@ -317,7 +315,7 @@ class EventService {
     if (galleryPaths.isEmpty) return const [];
     if (galleryPaths.length > maxEventPosterImages - 1) {
       throw const EventMediaUploadException(
-        'Maksimal 5 poster acara, termasuk poster utama.',
+        'Maximum 5 event posters, including the main poster.',
       );
     }
     for (final galleryPath in galleryPaths) {
@@ -340,13 +338,13 @@ class EventService {
       throw EventMediaUploadException(
         _messageFromResponse(
           body,
-          'Galeri acara belum dapat diunggah. Silakan coba lagi.',
+          'Event gallery could not be uploaded. Please try again.',
         ),
       );
     }
     _throwIfErrorPayload(
       body,
-      'Galeri acara belum dapat diunggah. Silakan coba lagi.',
+      'Event gallery could not be uploaded. Please try again.',
     );
     // A successful upload is still an acknowledgement when a proxy returns
     // an empty/non-JSON body. The edit screen performs a detail read-back and
@@ -372,7 +370,7 @@ class EventService {
   ) async {
     if (galleryMediaIds.length > maxEventPosterImages - 1) {
       throw const EventMediaUploadException(
-        'Maksimal 5 poster acara, termasuk poster utama.',
+        'Maximum 5 event posters, including the main poster.',
       );
     }
     final response = await _apiClient.patch('/v1/events/$id/media', {
@@ -383,20 +381,20 @@ class EventService {
       throw EventMediaUploadException(
         _messageFromResponse(
           response.body,
-          'Galeri acara belum dapat diperbarui. Silakan coba lagi.',
+          'Event gallery could not be updated. Please try again.',
         ),
       );
     }
     _throwIfErrorPayload(
       response.body,
-      'Galeri acara belum dapat diperbarui. Silakan coba lagi.',
+      'Event gallery could not be updated. Please try again.',
     );
   }
 
   Future<void> promoteEventMedia(String eventId, String mediaId) async {
     if (mediaId.isEmpty) {
       throw const EventMediaUploadException(
-        'Poster utama belum siap diperbarui. Silakan coba lagi.',
+        'Main poster not ready to be updated. Please try again.',
       );
     }
     final response = await _apiClient.patch('/v1/events/$eventId/media', {
@@ -406,13 +404,13 @@ class EventService {
       throw EventMediaUploadException(
         _messageFromResponse(
           response.body,
-          'Poster utama belum dapat diperbarui. Silakan coba lagi.',
+          'Main poster could not be updated. Please try again.',
         ),
       );
     }
     _throwIfErrorPayload(
       response.body,
-      'Poster utama belum dapat diperbarui. Silakan coba lagi.',
+      'Main poster could not be updated. Please try again.',
     );
   }
 
@@ -426,7 +424,7 @@ class EventService {
   Future<TicketTemplateModel> getTicketTemplate(String id) async {
     final response = await _apiClient.get('/v1/events/$id/ticket-template');
     if (response.statusCode != 200) {
-      throw const EventTemplateException('Template tiket belum dapat dimuat.');
+      throw const EventTemplateException('Ticket template could not be loaded.');
     }
     final body = jsonDecode(response.body) as Map<String, dynamic>;
     return TicketTemplateModel.fromJson(body['data'] as Map<String, dynamic>);
@@ -451,7 +449,7 @@ class EventService {
       throw EventTemplateException(
         _messageFromResponse(
           responseBody,
-          'Gambar template belum dapat diunggah. Silakan coba lagi.',
+          'Template image could not be uploaded. Please try again.',
         ),
       );
     }
@@ -473,7 +471,7 @@ class EventService {
       throw EventTemplateException(
         _messageFromResponse(
           response.body,
-          'Template tiket belum dapat disimpan. Silakan coba lagi.',
+          'Ticket template could not be saved. Please try again.',
         ),
       );
     }
@@ -495,7 +493,7 @@ class EventService {
       '/v1/events/$id/approval-email-template?kind=$kind',
     );
     if (response.statusCode != 200) {
-      throw const EventTemplateException('Template email belum dapat dimuat.');
+      throw const EventTemplateException('Email template could not be loaded.');
     }
     final body = jsonDecode(response.body) as Map<String, dynamic>;
     return ApprovalEmailTemplateModel.fromJson(
@@ -554,7 +552,7 @@ class EventService {
       throw EventTemplateException(
         _messageFromResponse(
           response.body,
-          'Template email belum dapat disimpan. Silakan coba lagi.',
+          'Email template could not be saved. Please try again.',
         ),
       );
     }

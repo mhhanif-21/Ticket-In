@@ -130,7 +130,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
             .toList();
 
     if (selectedFiles.isEmpty) {
-      setState(() => _posterError = 'Foto yang dipilih sudah ada.');
+      setState(() => _posterError = 'Selected photos already exist.');
       return;
     }
 
@@ -138,8 +138,8 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
     if (selectedFiles.length > remainingSlots) {
       setState(
         () => _posterError =
-            'Maksimal $maxEventPosterImages poster. '
-            'Anda memilih ${selectedFiles.length}, sisa slot: $remainingSlots.',
+            'Maximum $maxEventPosterImages posters. '
+            'You selected ${selectedFiles.length}, remaining slots: $remainingSlots.',
       );
       return;
     }
@@ -195,10 +195,10 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
 
   bool _validateMediaSelection() {
     final posterError = _posterFiles.isEmpty
-        ? 'Poster acara wajib diunggah.'
+        ? 'Event poster is required.'
         : null;
     final tooManyError = _posterFiles.length > maxEventPosterImages
-        ? 'Maksimal $maxEventPosterImages poster acara.'
+        ? 'Maximum $maxEventPosterImages event posters.'
         : null;
 
     setState(() {
@@ -214,7 +214,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
     if (_selectedDate == null) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('Pilih tanggal acara')));
+      ).showSnackBar(const SnackBar(content: Text('Select event date')));
       return;
     }
     setState(() => _isLoading = true);
@@ -242,7 +242,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
-            'Acara berhasil dibuat! Sekarang susun form pendaftaran.',
+            'Event created! Now set up the registration form.',
           ),
         ),
       );
@@ -261,7 +261,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
           action: _pendingMediaEventId == null
               ? null
               : SnackBarAction(
-                  label: 'UNGGAH ULANG',
+                  label: 'RE-UPLOAD',
                   onPressed: _retryPendingMedia,
                 ),
         ),
@@ -275,7 +275,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Acara belum dapat dibuat. Silakan coba lagi.'),
+          content: Text('Event could not be created. Please try again.'),
         ),
       );
     } finally {
@@ -299,12 +299,12 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
         refreshedEvent = await _eventService.getEventDetail(eventId);
       } catch (_) {
         throw const EventMediaUploadException(
-          'Media sudah dikirim, tetapi status terbaru belum dapat dimuat. Silakan coba lagi.',
+          'Media uploaded, but the latest status could not be loaded. Please try again.',
         );
       }
       if (!_hasPersistedMedia(refreshedEvent)) {
         throw const EventMediaUploadException(
-          'Media sudah dikirim, tetapi belum dapat dikonfirmasi dari server. Silakan coba lagi.',
+          'Media uploaded, but could not be confirmed from the server. Please try again.',
         );
       }
       if (!mounted) return;
@@ -312,7 +312,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
-            'Media berhasil diunggah. Sekarang susun form pendaftaran.',
+            'Media successfully uploaded. Now set up the registration form.',
           ),
         ),
       );
@@ -408,7 +408,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
             ),
             SizedBox(height: 8),
             Text(
-              'Unggah Poster Acara',
+              'Upload Event Poster',
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
@@ -448,7 +448,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                           ? _buildPosterPlaceholder()
                           : Semantics(
                               button: true,
-                              label: 'Lihat $title layar penuh',
+                              label: 'View $title in full screen',
                               child: InkWell(
                                 onTap: () => _showImagePreview(image, title),
                                 borderRadius: BorderRadius.circular(10),
@@ -469,7 +469,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                           top: 8,
                           child: IconButton.filledTonal(
                             key: ValueKey('event-poster-remove-$index'),
-                            tooltip: 'Hapus $title',
+                            tooltip: 'Remove $title',
                             onPressed: () => _removePosterAt(index),
                             icon: const Icon(Icons.close),
                           ),
@@ -485,8 +485,8 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
             padding: const EdgeInsets.only(top: 4),
             child: Text(
               _activeMediaIndex == 0
-                  ? 'Poster utama'
-                  : 'Poster ${_activeMediaIndex + 1} dari ${_posterFiles.length}',
+                  ? 'Main poster'
+                  : 'Poster ${_activeMediaIndex + 1} of ${_posterFiles.length}',
               style: const TextStyle(fontSize: 12, color: Color(0xFF5F6368)),
             ),
           ),
@@ -499,7 +499,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Poster Acara (${_posterFiles.length}/$maxEventPosterImages)',
+          'Event Poster (${_posterFiles.length}/$maxEventPosterImages)',
           style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w700,
@@ -508,7 +508,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
         ),
         const SizedBox(height: 4),
         const Text(
-          'Wajib 1 gambar, maksimal 5 · JPG, PNG, atau WebP · maks. 5 MB.',
+          'Minimum 1 image, maximum 5 · JPG, PNG, or WebP · max 5 MB.',
           style: TextStyle(fontSize: 12, color: Color(0xFF5F6368)),
         ),
         const SizedBox(height: 8),
@@ -516,7 +516,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
           key: const ValueKey('event-poster-aspect-mode'),
           initialValue: _posterAspectMode,
           decoration: const InputDecoration(
-            labelText: 'Format poster',
+            labelText: 'Poster format',
             border: OutlineInputBorder(),
           ),
           items: PosterAspectMode.values
@@ -541,7 +541,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
           const Padding(
             padding: EdgeInsets.only(top: 4),
             child: Text(
-              'Format dikunci setelah poster pertama dipilih.',
+              'Format is locked after the first poster is selected.',
               style: TextStyle(fontSize: 11, color: Color(0xFF5F6368)),
             ),
           ),
@@ -550,9 +550,9 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
         const SizedBox(height: 4),
         Text(
           _posterFiles.isEmpty
-              ? 'Poster belum dipilih.'
-              : 'Poster terpilih (${_posterFiles.length}/$maxEventPosterImages). '
-                    'Gambar pertama menjadi poster utama.',
+              ? 'No poster selected.'
+              : 'Selected posters (${_posterFiles.length}/$maxEventPosterImages). '
+                    'The first image becomes the main poster.',
           style: const TextStyle(fontSize: 12, color: Color(0xFF5F6368)),
         ),
         const SizedBox(height: 8),
@@ -562,7 +562,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
               ? null
               : _pickPosterImages,
           icon: const Icon(Icons.add_photo_alternate_outlined),
-          label: Text(_posterFiles.isEmpty ? 'Pilih Poster' : 'Tambah Poster'),
+          label: Text(_posterFiles.isEmpty ? 'Select Poster' : 'Add Poster'),
         ),
         if (_posterError != null) ...[
           const SizedBox(height: 8),
@@ -655,7 +655,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
         centerTitle: true,
         iconTheme: const IconThemeData(color: Color(0xFF444748)),
         title: const Text(
-          'Buat Acara Baru',
+          'Create New Event',
           style: TextStyle(
             color: Color(0xFF1A1C1C),
             fontSize: 16,
@@ -686,58 +686,58 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
 
                     // Forms
                     _buildTextField(
-                      label: 'Nama Acara',
-                      hint: 'Masukkan nama acara...',
+                      label: 'Event Name',
+                      hint: 'Enter event name...',
                       controller: _nameController,
-                      validator: (v) => v!.isEmpty ? 'Harus diisi' : null,
+                      validator: (v) => v!.isEmpty ? 'Required' : null,
                     ),
                     const SizedBox(height: 16),
 
                     _buildTextField(
-                      label: 'Lokasi',
-                      hint: 'Lokasi acara...',
+                      label: 'Location',
+                      hint: 'Event location...',
                       icon: Icons.location_on,
                       controller: _locationController,
-                      validator: (v) => v!.isEmpty ? 'Harus diisi' : null,
+                      validator: (v) => v!.isEmpty ? 'Required' : null,
                     ),
                     const SizedBox(height: 16),
 
                     _buildTextField(
-                      label: 'Batas Kuota',
+                      label: 'Capacity Limit',
                       hint: '100',
                       icon: Icons.group,
                       keyboardType: TextInputType.number,
                       controller: _capacityController,
                       // [BUG-066] FIX: Validasi harus angka positif, bukan hanya tidak kosong
                       validator: (v) {
-                        if (v == null || v.isEmpty) return 'Harus diisi';
+                        if (v == null || v.isEmpty) return 'Required';
                         final parsed = int.tryParse(v);
                         if (parsed == null) {
-                          return 'Harus berupa angka (misal: 100)';
+                          return 'Must be a number (e.g. 100)';
                         }
-                        if (parsed <= 0) return 'Kuota harus lebih dari 0';
+                        if (parsed <= 0) return 'Capacity must be greater than 0';
                         return null;
                       },
                     ),
                     const SizedBox(height: 16),
 
                     _buildTextField(
-                      label: 'Tanggal',
+                      label: 'Date',
                       hint: _selectedDate == null
-                          ? 'Pilih Tanggal Acara'
+                          ? 'Select Event Date'
                           : DateFormat('dd MMM yyyy').format(_selectedDate!),
                       icon: Icons.calendar_today,
                       controller: _dateController,
                       readOnly: true,
                       onTap: _pickDate,
                       validator: (v) =>
-                          _selectedDate == null ? 'Harus diisi' : null,
+                          _selectedDate == null ? 'Required' : null,
                     ),
                     const SizedBox(height: 16),
 
                     _buildTextField(
-                      label: 'Deskripsi Tambahan',
-                      hint: 'Detail tambahan acara...',
+                      label: 'Additional Description',
+                      hint: 'Additional event details...',
                       controller: _descriptionController,
                       maxLines: 3,
                     ),
@@ -748,7 +748,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                         const Padding(
                           padding: EdgeInsets.only(left: 4, bottom: 4),
                           child: Text(
-                            'Mode Pendaftaran',
+                            'Registration Mode',
                             style: TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.w500,
@@ -832,8 +832,8 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                 ),
                 child: Text(
                   _pendingMediaEventId == null
-                      ? 'Simpan Acara'
-                      : 'Unggah Ulang Media',
+                      ? 'Save Event'
+                      : 'Re-upload Media',
                   style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,

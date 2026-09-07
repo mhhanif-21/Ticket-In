@@ -25,7 +25,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       console.error(`QStash publish failed for export job ${job.id}:`, qErr);
       return NextResponse.json({
         status: 'error',
-        message: 'Export job gagal dikirim ke worker dan dapat dicoba ulang.',
+        message: 'Export job failed to be sent to worker and can be retried.',
         data: { job_id: job.id, status: 'failed', retryable: true },
       }, { status: 503 });
     }

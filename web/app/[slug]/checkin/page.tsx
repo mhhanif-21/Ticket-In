@@ -17,7 +17,7 @@ export default function CheckInLoginPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!volunteerName.trim() || !pin.trim()) {
-      setError('Nama dan PIN wajib diisi');
+      setError('Name and PIN are required');
       return;
     }
 
@@ -38,16 +38,16 @@ export default function CheckInLoginPage() {
       const data = await res.json();
 
       if (!res.ok) {
-        throw new Error(data.message || 'Login gagal, periksa PIN Anda');
+        throw new Error(data.message || 'Login failed, check your PIN');
       }
 
       if (data.data?.access_token) {
         router.push(`/${eventSlug}/checkin/scan`);
       } else {
-        throw new Error('Token tidak diterima dari server');
+        throw new Error('Token not received from server');
       }
     } catch (err: any) {
-      setError(err.message || 'Terjadi kesalahan jaringan');
+      setError(err.message || 'A network error occurred');
     } finally {
       setLoading(false);
     }
@@ -57,8 +57,8 @@ export default function CheckInLoginPage() {
     <main className="flex flex-1 items-center justify-center p-margin-mobile md:p-margin-desktop">
         <div className="w-full max-w-[600px] bg-surface-container-lowest dark:bg-primary custom-shadow rounded-[16px] p-margin-mobile md:p-stack-lg border dark:border-on-primary/20">
           <div className="text-center mb-stack-lg">
-            <h2 className="font-display-lg-mobile text-display-lg-mobile text-primary dark:text-on-primary mb-stack-sm md:font-display-lg md:text-display-lg">Portal Panitia</h2>
-            <p className="font-body-md text-body-md text-on-surface-variant dark:text-on-primary/70">Akses khusus relawan dan staf acara.</p>
+            <h2 className="font-display-lg-mobile text-display-lg-mobile text-primary dark:text-on-primary mb-stack-sm md:font-display-lg md:text-display-lg">Committee Portal</h2>
+            <p className="font-body-md text-body-md text-on-surface-variant dark:text-on-primary/70">Exclusive access for volunteers and event staff.</p>
           </div>
 
           <form onSubmit={handleSubmit} className="flex flex-col gap-stack-md">
@@ -78,14 +78,14 @@ export default function CheckInLoginPage() {
             </div>
 
             <div className="flex flex-col gap-stack-sm">
-              <label className="font-label-caps text-label-caps text-on-surface dark:text-on-primary uppercase" htmlFor="volunteerName">Nama Relawan</label>
+              <label className="font-label-caps text-label-caps text-on-surface dark:text-on-primary uppercase" htmlFor="volunteerName">Volunteer Name</label>
               <div className="relative">
                 <User className="absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant w-5 h-5" aria-hidden="true" />
                 <input
                   className="w-full pl-10 pr-4 py-3 rounded-DEFAULT border border-outline-variant bg-surface-container-lowest text-on-surface focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none input-border font-body-md text-body-md placeholder-on-surface-variant disabled:opacity-50 dark:bg-primary dark:border-on-primary/30 dark:text-on-primary dark:placeholder-on-primary/50 dark:focus:ring-on-primary"
                   id="volunteerName"
                   name="volunteerName"
-                  placeholder="Masukkan nama lengkap Anda"
+                  placeholder="Enter your full name"
                   required
                   type="text"
                   value={volunteerName}
@@ -96,7 +96,7 @@ export default function CheckInLoginPage() {
             </div>
 
             <div className="flex flex-col gap-stack-sm">
-              <label className="font-label-caps text-label-caps text-on-surface dark:text-on-primary uppercase" htmlFor="pin">PIN Panitia</label>
+              <label className="font-label-caps text-label-caps text-on-surface dark:text-on-primary uppercase" htmlFor="pin">Committee PIN</label>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant w-5 h-5" aria-hidden="true" />
                 <input
@@ -129,11 +129,11 @@ export default function CheckInLoginPage() {
                 {loading ? (
                   <>
                     <Loader2 className="w-5 h-5 animate-spin" />
-                    Memverifikasi...
+                    Verifying...
                   </>
                 ) : (
                   <>
-                    Masuk
+                    Sign In
                     <ArrowRight className="w-5 h-5" aria-hidden="true" />
                   </>
                 )}

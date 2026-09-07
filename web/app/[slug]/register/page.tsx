@@ -58,7 +58,7 @@ export default function RegisterPage() {
     if (correctionRegistrationId) {
       const stored = loadRegistrationResubmitState(slug);
       if (!stored || stored.registrationId !== correctionRegistrationId) {
-        setError('Sesi perubahan email tidak tersedia. Silakan mulai pendaftaran kembali.');
+        setError('Email change session not available. Please restart the registration.');
       } else {
         setResubmitState(stored);
       }
@@ -70,10 +70,10 @@ export default function RegisterPage() {
         if (data.status === 'success') {
           setEventData(data.data);
         } else {
-          setError('Event tidak ditemukan');
+          setError('Event not found');
         }
       })
-      .catch(() => setError('Gagal memuat event'))
+      .catch(() => setError('Failed to load event'))
       .finally(() => setLoading(false));
   }, [correctionRegistrationId, slug]);
 
@@ -84,7 +84,7 @@ export default function RegisterPage() {
 
     if (Object.keys(fileErrors).length > 0) {
       setSubmitting(false);
-      setError('Perbaiki berkas yang ditandai sebelum mengirim formulir.');
+      setError('Fix the flagged files before submitting the form.');
       return;
     }
 
@@ -99,7 +99,7 @@ export default function RegisterPage() {
 
       if (correctionMode) {
         if (!resubmitState || resubmitState.registrationId !== correctionRegistrationId) {
-          throw new Error('Sesi perubahan email tidak tersedia. Silakan mulai pendaftaran kembali.');
+          throw new Error('Email change session not available. Please restart the registration.');
         }
         formData.set('registration_id', resubmitState.registrationId);
         formData.set('resubmit_token', resubmitState.resubmitToken);
@@ -145,7 +145,7 @@ export default function RegisterPage() {
           router.push(`/${slug}/verify-otp?regId=${encodeURIComponent(retryState.registrationId)}&deliveryRetry=1`);
           return;
         }
-        throw new Error(result.message || 'Gagal mendaftar');
+        throw new Error(result.message || 'Registration failed');
       }
 
       // Fix BUG-011: Conditional Routing based on Registration Mode (Manual Review vs Auto-Accept)
@@ -156,7 +156,7 @@ export default function RegisterPage() {
 
       if (regStatus === 'Draft') {
         if (!regId || !result.data?.resubmitToken || !statusToken || !statusTokenExpiresAt) {
-          throw new Error('Bukti pengiriman OTP tidak tersedia. Silakan coba lagi.');
+          throw new Error('OTP delivery proof not available. Please try again.');
         }
         const nextState: RegistrationResubmitState = {
           registrationId: regId,
@@ -199,7 +199,7 @@ export default function RegisterPage() {
         return rest;
       });
     } catch (validationError) {
-      const message = validationError instanceof Error ? validationError.message : 'Berkas tidak valid.';
+      const message = validationError instanceof Error ? validationError.message : 'Invalid file.';
       setFileErrors((current) => ({ ...current, [fieldKey]: message }));
     }
   };
@@ -212,7 +212,7 @@ export default function RegisterPage() {
     return (
       <main className="flex-grow w-full max-w-[1200px] mx-auto px-margin-mobile md:px-margin-desktop py-stack-lg flex flex-col items-center justify-center">
         <h1 className="font-display-lg-mobile text-display-lg-mobile text-error mb-stack-sm">{error}</h1>
-        <Link href={`/${slug}`} className="font-body-md text-body-md text-primary underline hover:text-secondary">Kembali ke Event</Link>
+        <Link href={`/${slug}`} className="font-body-md text-body-md text-primary underline hover:text-secondary">Back to Event</Link>
       </main>
     );
   }
@@ -222,13 +222,13 @@ export default function RegisterPage() {
       {/* Registration stays focused on the form; media belongs to the event landing page. */}
       <div className="w-full max-w-[720px] flex flex-col justify-center">
         <div className="mb-stack-lg">
-          <h2 className="font-display-lg-mobile md:font-display-lg text-display-lg-mobile md:text-display-lg text-primary mb-stack-sm">{correctionMode ? 'Ubah Email Pendaftaran' : 'Isi Data Pendaftaran'}</h2>
-          <p className="font-description text-description text-secondary">{correctionMode ? 'Perbarui email Anda. Bukti perubahan hanya berlaku sekali.' : 'Silakan lengkapi formulir di bawah ini untuk mengonfirmasi pendaftaran Anda.'}</p>
+          <h2 className="font-display-lg-mobile md:font-display-lg text-display-lg-mobile md:text-display-lg text-primary mb-stack-sm">{correctionMode ? 'Change Registration Email' : 'Fill Registration Data'}</h2>
+          <p className="font-description text-description text-secondary">{correctionMode ? 'Update your email. The proof of change is only valid once.' : 'Please complete the form below to confirm your registration.'}</p>
         </div>
         <div className="bg-surface-container-lowest dark:bg-[#1e1e1e] rounded-[16px] shadow-[0_4px_12px_rgba(0,0,0,0.05)] p-margin-mobile md:p-margin-desktop">
           {correctionMode && (
             <div className="p-4 mb-6 bg-primary-container/20 text-primary rounded-lg font-medium text-sm">
-              Perubahan email akan mengirim OTP baru ke alamat yang Anda masukkan.
+              Changing your email will send a new OTP to the address you entered.
             </div>
           )}
           {error && (
@@ -239,19 +239,19 @@ export default function RegisterPage() {
           <form key={correctionMode ? resubmitState?.registrationId || 'correction-pending' : 'new-registration'} onSubmit={handleSubmit} className="flex flex-col gap-stack-md">
             {/* Field Statis / Default */}
             <div className="flex flex-col gap-stack-sm">
-              <label className="font-label-caps text-label-caps text-primary dark:text-white/80 uppercase">Nama Lengkap <span className="text-primary dark:text-white">*</span></label>
+              <label className="font-label-caps text-label-caps text-primary dark:text-white/80 uppercase">Full Name <span className="text-primary dark:text-white">*</span></label>
               <input
                 type="text"
                 name="name"
                 defaultValue={resubmitState?.name || ''}
                 required
                 className="w-full h-[48px] px-4 bg-transparent dark:bg-white/5 border border-outline-variant dark:border-white/20 rounded-DEFAULT font-body-md text-primary dark:text-white placeholder-on-surface-variant dark:placeholder-white/40 focus:outline-none input-border focus:border-primary dark:focus:border-white/60"
-                placeholder="Nama lengkap Anda"
+                placeholder="Your full name"
               />
             </div>
 
             <div className="flex flex-col gap-stack-sm">
-              <label className="font-label-caps text-label-caps text-primary dark:text-white/80 uppercase">Email Aktif <span className="text-primary dark:text-white">*</span></label>
+              <label className="font-label-caps text-label-caps text-primary dark:text-white/80 uppercase">Active Email <span className="text-primary dark:text-white">*</span></label>
               <input
                 type="email"
                 name="email"
@@ -287,7 +287,7 @@ export default function RegisterPage() {
                 disabled={submitting}
                 className="btn-interaction w-full bg-primary text-on-primary hover:bg-inverse-surface rounded-[10px] py-4 px-6 font-body-md text-body-md font-semibold flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 disabled:opacity-70 disabled:cursor-not-allowed"
               >
-                {submitting ? 'Memproses...' : 'Submit Pendaftaran'}
+                {submitting ? 'Processing...' : 'Submit Registration'}
                 {!submitting && <span className="material-symbols-outlined text-[20px]">arrow_forward</span>}
               </button>
             </div>

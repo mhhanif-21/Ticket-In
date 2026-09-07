@@ -54,7 +54,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const { id } = await params;
   const context = await getEventAndTokenLabels(id);
   if (!context) {
-    return NextResponse.json({ status: 'error', message: 'Event tidak ditemukan.' }, { status: 404 });
+    return NextResponse.json({ status: 'error', message: 'Event not found.' }, { status: 404 });
   }
 
   const template = await getTicketTemplateConfig(id);
@@ -87,7 +87,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     const { id } = await params;
     const context = await getEventAndTokenLabels(id);
     if (!context) {
-      return NextResponse.json({ status: 'error', message: 'Event tidak ditemukan.' }, { status: 404 });
+      return NextResponse.json({ status: 'error', message: 'Event not found.' }, { status: 404 });
     }
 
     const body = await request.json();
@@ -96,7 +96,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
       throw new TicketTemplateValidationError(
         'TICKET_TEMPLATE_ELEMENT_INVALID',
         422,
-        'Konfigurasi template tidak valid.',
+        'Invalid template configuration.',
       );
     }
 
@@ -107,7 +107,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
         throw new TicketTemplateValidationError(
           'TICKET_TEMPLATE_BACKGROUND_REQUIRED',
           422,
-          'Unggah gambar latar sebelum mengaktifkan template kustom.',
+          'Upload background image before activating custom template.',
         );
       }
       validateTemplateFieldTokens(elements, context.tokenLabels);
@@ -128,12 +128,12 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
         set: { mode, elements, updatedAt: now },
       });
 
-    return NextResponse.json({ status: 'success', message: 'Template tiket berhasil disimpan.' });
+    return NextResponse.json({ status: 'success', message: 'Ticket template saved successfully.' });
   } catch (error) {
     if (error instanceof TicketTemplateValidationError) return validationResponse(error);
     console.error('Ticket template save failed');
     return NextResponse.json(
-      { status: 'error', message: 'Template tiket belum dapat disimpan. Silakan coba lagi.' },
+      { status: 'error', message: 'Ticket template could not be saved. Please try again.' },
       { status: 500 },
     );
   }

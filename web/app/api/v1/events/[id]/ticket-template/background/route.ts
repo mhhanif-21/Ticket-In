@@ -40,7 +40,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     const { id } = await params;
     const [event] = await db.select({ id: events.id }).from(events).where(eq(events.id, id)).limit(1);
     if (!event) {
-      return NextResponse.json({ status: 'error', message: 'Event tidak ditemukan.' }, { status: 404 });
+      return NextResponse.json({ status: 'error', message: 'Event not found.' }, { status: 404 });
     }
 
     const formData = await request.formData();
@@ -49,7 +49,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       throw new TicketTemplateValidationError(
         'TICKET_TEMPLATE_BACKGROUND_REQUIRED',
         422,
-        'Pilih gambar latar template terlebih dahulu.',
+        'Select template background image first.',
       );
     }
     const background = await validateTicketTemplateBackground(candidate);
@@ -119,7 +119,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       error: error instanceof Error ? error.name : 'unknown',
     });
     return NextResponse.json(
-      { status: 'error', message: 'Gambar template belum dapat diunggah. Silakan coba lagi.' },
+      { status: 'error', message: 'Template image could not be uploaded. Please try again.' },
       { status: 500 },
     );
   }

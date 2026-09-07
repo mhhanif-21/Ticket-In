@@ -24,7 +24,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     const { id } = await params;
     const [event] = await db.select({ id: events.id }).from(events).where(eq(events.id, id)).limit(1);
     if (!event) {
-      return NextResponse.json({ status: 'error', message: 'Event tidak ditemukan' }, { status: 404 });
+      return NextResponse.json({ status: 'error', message: 'Event not found' }, { status: 404 });
     }
 
     const gallery = (await req.formData()).getAll('gallery').filter(isMediaFile);
@@ -32,7 +32,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       return NextResponse.json({
         status: 'error',
         code: 'MEDIA_FILE_MISSING',
-        message: 'Pilih minimal satu foto galeri.',
+        message: 'Select at least one gallery photo.',
       }, { status: 400 });
     }
 
@@ -49,7 +49,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     return NextResponse.json({
       status: 'error',
       code: 'MEDIA_UPLOAD_UNAVAILABLE',
-      message: 'Galeri acara sementara tidak tersedia. Silakan coba lagi.',
+      message: 'Event gallery temporarily unavailable. Please try again.',
     }, { status: 503 });
   }
 }

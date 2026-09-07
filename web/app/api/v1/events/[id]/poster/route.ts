@@ -25,7 +25,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     const { id } = await params;
     const [event] = await db.select({ id: events.id }).from(events).where(eq(events.id, id)).limit(1);
     if (!event) {
-      return NextResponse.json({ status: 'error', message: 'Event tidak ditemukan' }, { status: 404 });
+      return NextResponse.json({ status: 'error', message: 'Event not found' }, { status: 404 });
     }
 
     const formData = await req.formData();
@@ -34,7 +34,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       return NextResponse.json({
         status: 'error',
         code: 'MEDIA_FILE_MISSING',
-        message: 'Poster acara wajib diunggah.',
+        message: 'Event poster is required.',
       }, { status: 400 });
     }
 
@@ -47,7 +47,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
     return NextResponse.json({
       status: 'success',
-      message: 'Poster berhasil diunggah',
+      message: 'Poster uploaded successfully',
       data: result,
     });
   } catch (error) {
@@ -62,7 +62,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     return NextResponse.json({
       status: 'error',
       code: 'MEDIA_UPLOAD_UNAVAILABLE',
-      message: 'Media acara sementara tidak tersedia. Silakan coba lagi.',
+      message: 'Event media temporarily unavailable. Please try again.',
     }, { status: 503 });
   }
 }

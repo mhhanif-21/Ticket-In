@@ -10,6 +10,13 @@ const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 const SUPABASE_AUTH_TIMEOUT_MS = 4_000;
 const EVENT_UUID_PATH = /^\/api\/v1\/events\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+type TokenVerification = {
+  valid: boolean;
+  payload: Record<string, unknown> | null;
+  role: 'volunteer' | 'admin' | 'user' | null;
+  failure?: 'invalid' | 'unavailable';
+};
+
 function requestIdFor(req: NextRequest): string {
   return req.headers.get('x-request-id')?.trim()
     || req.headers.get('x-vercel-id')?.trim()
@@ -42,37 +49,86 @@ async function withTimeout<T>(operation: Promise<T>, timeoutMs: number): Promise
   }
 }
 
+function invalidToken(): TokenVerification {
+  return { valid: false, payload: null, role: null, failure: 'invalid' };
+}
+
+function unavailableAuthProvider(): TokenVerification {
+  return { valid: false, payload: null, role: null, failure: 'unavailable' };
+}
+
+function isInvalidSupabaseAuthError(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false;
+
+  const candidate = error as {
+    status?: unknown;
+    statusCode?: unknown;
+    code?: unknown;
+  };
+  const status = candidate.status ?? candidate.statusCode;
+  return status === 400
+    || status === 401
+    || status === 403
+    || candidate.code === 'bad_jwt'
+    || candidate.code === 'invalid_token';
+}
+
 export async function middleware(req: NextRequest) {
   const url = req.nextUrl;
   const startedAt = Date.now();
 
   // Extract token verification logic
-  async function verifyToken(token: string) {
+  async function verifyToken(token: string): Promise<TokenVerification> {
+    let decoded: Record<string, unknown>;
     try {
       const { decodeJwt } = await import('jose');
-      const decoded = decodeJwt(token);
+      decoded = decodeJwt(token) as Record<string, unknown>;
+    } catch {
+      return invalidToken();
+    }
 
-      if (decoded && decoded.role === 'volunteer') {
+    if (decoded.role === 'volunteer') {
+      try {
         const payload = await verifyVolunteerToken(token);
-        return { valid: true, payload, role: 'volunteer' as const };
-      } else {
-        if (!supabaseUrl || !supabaseAnonKey) throw new Error('Supabase credentials missing');
-        const supabase = createClient(supabaseUrl, supabaseAnonKey, { auth: { persistSession: false } });
-        const { data, error } = await withTimeout(
-          supabase.auth.getUser(token),
-          SUPABASE_AUTH_TIMEOUT_MS,
-        );
-        if (error || !data.user) throw new Error('Supabase token invalid');
-
-        const isAdmin = isAdminUser(data.user);
         return {
           valid: true,
-          payload: { id: data.user.id, email: data.user.email },
-          role: isAdmin ? ('admin' as const) : ('user' as const),
+          payload: payload as unknown as Record<string, unknown>,
+          role: 'volunteer',
         };
+      } catch {
+        return invalidToken();
       }
+    }
+
+    if (!supabaseUrl || !supabaseAnonKey) {
+      return unavailableAuthProvider();
+    }
+
+    try {
+      const supabase = createClient(supabaseUrl, supabaseAnonKey, { auth: { persistSession: false } });
+      const { data, error } = await withTimeout(
+        supabase.auth.getUser(token),
+        SUPABASE_AUTH_TIMEOUT_MS,
+      );
+
+      if (error) {
+        return isInvalidSupabaseAuthError(error)
+          ? invalidToken()
+          : unavailableAuthProvider();
+      }
+      if (!data.user) return invalidToken();
+
+      const isAdmin = isAdminUser(data.user);
+      return {
+        valid: true,
+        payload: { id: data.user.id, email: data.user.email },
+        role: isAdmin ? 'admin' : 'user',
+      };
     } catch {
-      return { valid: false, payload: null, role: null };
+      // Timeouts and provider/network failures are temporary infrastructure
+      // failures. They must not be converted to 401, otherwise mobile clients
+      // will erase a still-valid refresh session and force an unnecessary logout.
+      return unavailableAuthProvider();
     }
   }
 
@@ -132,6 +188,16 @@ export async function middleware(req: NextRequest) {
 
     if (!verification.valid) {
       logMiddlewareTiming(req, 'redirectDecision', startedAt);
+      if (verification.failure === 'unavailable') {
+        return NextResponse.json(
+          {
+            status: 'error',
+            code: 'AUTH_UNAVAILABLE',
+            message: 'Layanan autentikasi sementara tidak tersedia. Silakan coba lagi.',
+          },
+          { status: 503 },
+        );
+      }
       return NextResponse.json({ status: 'error', message: 'Token tidak valid atau kedaluwarsa' }, { status: 401 });
     }
 

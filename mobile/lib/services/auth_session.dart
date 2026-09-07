@@ -6,9 +6,10 @@ enum AuthSessionStatus { initializing, authenticated, unauthenticated }
 
 /// Single source of truth for routes that require an authenticated admin.
 ///
-/// The API client broadcasts a refresh failure through [SessionInvalidationNotifier],
-/// so a 401 caused by an expired refresh token sends every protected route back to
-/// login instead of leaving the user on a broken screen.
+/// The API client broadcasts a terminal refresh failure through
+/// [SessionInvalidationNotifier], so a 401 caused by an expired refresh token
+/// sends every protected route back to login instead of leaving the user on a
+/// broken screen. Temporary provider failures do not invalidate the session.
 class AuthSessionController extends ChangeNotifier {
   AuthSessionController({
     ApiClient? apiClient,
@@ -28,10 +29,14 @@ class AuthSessionController extends ChangeNotifier {
   bool get isAuthenticated => _status == AuthSessionStatus.authenticated;
 
   Future<void> bootstrap() async {
-    final restored = await _apiClient.restoreSession();
-    if (_status == AuthSessionStatus.unauthenticated && !restored) return;
+    final refreshResult = await _apiClient.restoreSession();
+
+    // A concurrent invalidation (or an explicit login) owns the router state;
+    // do not let a late bootstrap result overwrite it.
+    if (_status != AuthSessionStatus.initializing) return;
+
     _setStatus(
-      restored
+      refreshResult != SessionRefreshResult.invalid
           ? AuthSessionStatus.authenticated
           : AuthSessionStatus.unauthenticated,
     );

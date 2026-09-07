@@ -18,22 +18,22 @@ EventStatusPresentation eventStatusPresentation(String status) {
   switch (status) {
     case 'Draft':
       return const EventStatusPresentation(
-        label: 'Draf',
+        label: 'Draft',
         color: Color(0xFF8A5A00),
       );
     case 'Cancelled':
       return const EventStatusPresentation(
-        label: 'Dibatalkan',
+        label: 'Cancelled',
         color: Color(0xFFBA1A1A),
       );
     case 'Published':
       return const EventStatusPresentation(
-        label: 'Dipublikasikan',
+        label: 'Published',
         color: Color(0xFF006E1C),
       );
     default:
       return const EventStatusPresentation(
-        label: 'Status tidak diketahui',
+        label: 'Unknown status',
         color: Color(0xFF5D5D5D),
       );
   }
@@ -121,7 +121,7 @@ class _HomeScreenState extends State<HomeScreen> {
       if (!mounted || requestGeneration != _catalogRequestGeneration) return;
       final message = error is EventCatalogException
           ? error.message
-          : 'Daftar acara belum dapat dimuat.';
+          : 'Event list could not be loaded.';
       setState(() {
         _loadError = message;
         _isLoading = false;
@@ -182,7 +182,7 @@ class _HomeScreenState extends State<HomeScreen> {
         centerTitle: false,
         titleSpacing: 20,
         title: const Text(
-          'Semua Event',
+          'All Events',
           style: TextStyle(
             color: primaryColor,
             fontSize: 20,
@@ -215,7 +215,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           child: TextField(
                             onChanged: _onSearchChanged,
                             decoration: const InputDecoration(
-                              hintText: 'Cari nama event...',
+                              hintText: 'Search event name...',
                               hintStyle: TextStyle(
                                 color: outlineColor,
                                 fontSize: 14,
@@ -255,8 +255,8 @@ class _HomeScreenState extends State<HomeScreen> {
                             children: [
                               Text(
                                 _sortOrder == 'newest'
-                                    ? 'Tanggal: Terbaru'
-                                    : 'Tanggal: Terlama',
+                                    ? 'Date: Newest'
+                                    : 'Date: Oldest',
                                 style: const TextStyle(
                                   color: secondaryColor,
                                   fontSize: 12,
@@ -298,7 +298,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                     const SizedBox(height: 16),
                                     const Center(
                                       child: Text(
-                                        'Daftar acara belum dapat dimuat',
+                                        'Event list could not be loaded',
                                         style: TextStyle(
                                           color: onSurfaceColor,
                                           fontSize: 16,
@@ -324,7 +324,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                       child: OutlinedButton.icon(
                                         onPressed: _loadEvents,
                                         icon: const Icon(Icons.refresh),
-                                        label: const Text('Coba lagi'),
+                                        label: const Text('Try again'),
                                       ),
                                     ),
                                   ],
@@ -336,7 +336,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                     SizedBox(height: 200),
                                     Center(
                                       child: Text(
-                                        'Belum ada acara. Silakan buat baru.',
+                                        'No events yet. Create a new one.',
                                         style: TextStyle(
                                           color: onSurfaceVariantColor,
                                         ),
@@ -552,7 +552,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 _buildNavItem(Icons.settings, 'Settings', false, () {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
-                      content: Text('⚙️ Pengaturan — Segera Hadir'),
+                      content: Text('⚙️ Settings — Coming Soon'),
                       duration: Duration(seconds: 2),
                     ),
                   );

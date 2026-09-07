@@ -25,7 +25,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ job_
         .createSignedUrl(job.storagePath, 5 * 60);
       if (error || !data?.signedUrl) {
         console.error('Export signed URL failed', { jobId, code: error?.statusCode });
-        return NextResponse.json({ status: 'error', message: 'File export belum dapat diakses' }, { status: 503 });
+        return NextResponse.json({ status: 'error', message: 'Export file is not yet accessible' }, { status: 503 });
       }
       fileUrl = data.signedUrl;
     }

@@ -35,7 +35,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
     if (email.isEmpty || password.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Email dan Password tidak boleh kosong')),
+        const SnackBar(content: Text('Email and Password cannot be empty')),
       );
       return;
     }
@@ -78,7 +78,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         }
       } else {
         final body = jsonDecode(response.body);
-        final errorMessage = body['message'] ?? 'Login gagal';
+        final errorMessage = body['message'] ?? 'Login failed';
         if (mounted) {
           ScaffoldMessenger.of(
             context,
@@ -88,7 +88,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Terjadi kesalahan koneksi: $e')),
+          SnackBar(content: Text('Connection error: $e')),
         );
       }
     } finally {
@@ -153,7 +153,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       children: [
                         // Welcome Text
                         const Text(
-                          'Masuk ke Akun',
+                          'Sign In',
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             fontSize: 20,
@@ -163,7 +163,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         ),
                         const SizedBox(height: 8),
                         const Text(
-                          'Kelola event dan pendaftaran Anda di satu tempat.',
+                          'Manage your events and registrations in one place.',
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             fontSize: 14,
@@ -279,7 +279,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
                                     Text(
-                                      'Masuk',
+                                      'Sign In',
                                       style: TextStyle(
                                         fontSize: 16,
                                         fontWeight: FontWeight.w600,
@@ -300,7 +300,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text(
-                        'Bantuan',
+                        'Help',
                         style: TextStyle(
                           fontSize: 12,
                           color: Color(0xFF747878),
@@ -310,7 +310,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       Text('•', style: TextStyle(color: outlineVariantColor)),
                       SizedBox(width: 16),
                       Text(
-                        'Privasi',
+                        'Privacy',
                         style: TextStyle(
                           fontSize: 12,
                           color: Color(0xFF747878),

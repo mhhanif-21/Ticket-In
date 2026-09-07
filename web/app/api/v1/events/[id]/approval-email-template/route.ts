@@ -22,7 +22,7 @@ function parseKind(value: unknown): EmailTemplateKind {
     throw new TicketTemplateValidationError(
       'EMAIL_TEMPLATE_KIND_INVALID',
       422,
-      'Jenis template email tidak valid.',
+      'Invalid email template kind.',
     );
   }
   return value;
@@ -64,7 +64,7 @@ function unsupportedForAutoAccept() {
   return NextResponse.json({
     status: 'error',
     code: 'EMAIL_TEMPLATE_MODE_UNSUPPORTED',
-    message: 'Template email kustom hanya tersedia untuk event Manual Review.',
+    message: 'Custom email templates are only available for Manual Review events.',
   }, { status: 409 });
 }
 
@@ -89,7 +89,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     const { id } = await params;
     const kind = getKindFromRequest(request);
     const context = await getEmailContext(id, kind);
-    if (!context) return NextResponse.json({ status: 'error', message: 'Event tidak ditemukan.' }, { status: 404 });
+    if (!context) return NextResponse.json({ status: 'error', message: 'Event not found.' }, { status: 404 });
     if (context.event.registrationMode !== 'Manual Review') return unsupportedForAutoAccept();
 
     const templateContent = context.template
@@ -109,7 +109,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   } catch (error) {
     if (error instanceof TicketTemplateValidationError) return validationResponse(error);
     console.error('Approval email template load failed');
-    return NextResponse.json({ status: 'error', message: 'Template email belum dapat dimuat.' }, { status: 500 });
+    return NextResponse.json({ status: 'error', message: 'Email template could not be loaded.' }, { status: 500 });
   }
 }
 
@@ -123,7 +123,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     const body = await request.json();
     const kind = parseKind(body.kind ?? getKindFromRequest(request));
     const context = await getEmailContext(id, kind);
-    if (!context) return NextResponse.json({ status: 'error', message: 'Event tidak ditemukan.' }, { status: 404 });
+    if (!context) return NextResponse.json({ status: 'error', message: 'Event not found.' }, { status: 404 });
     if (context.event.registrationMode !== 'Manual Review') return unsupportedForAutoAccept();
 
     const isActive = body.is_active === true;
@@ -135,7 +135,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
       throw new TicketTemplateValidationError(
         'EMAIL_TEMPLATE_TOKEN_INVALID',
         422,
-        'Subjek dan isi email wajib diisi saat template diaktifkan.',
+        'Email subject and body are required when template is activated.',
       );
     }
     if (isActive) {
@@ -167,10 +167,10 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
           : { isActive, updatedAt: now },
       });
 
-    return NextResponse.json({ status: 'success', message: 'Template email berhasil disimpan.' });
+    return NextResponse.json({ status: 'success', message: 'Email template saved successfully.' });
   } catch (error) {
     if (error instanceof TicketTemplateValidationError) return validationResponse(error);
     console.error('Approval email template save failed');
-    return NextResponse.json({ status: 'error', message: 'Template email belum dapat disimpan. Silakan coba lagi.' }, { status: 500 });
+    return NextResponse.json({ status: 'error', message: 'Email template could not be saved. Please try again.' }, { status: 500 });
   }
 }

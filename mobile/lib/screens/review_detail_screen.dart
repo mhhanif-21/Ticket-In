@@ -63,7 +63,7 @@ class _ReviewDetailScreenState extends State<ReviewDetailScreen> {
       // body with a final-status/blank state when the refresh is unavailable.
       setState(() {
         _isLoadingDetail = false;
-        _detailLoadError = 'Data terbaru belum dapat dimuat.';
+        _detailLoadError = 'Latest data could not be loaded.';
       });
     }
   }
@@ -78,7 +78,7 @@ class _ReviewDetailScreenState extends State<ReviewDetailScreen> {
       await _adminService.reviewParticipant(registrationId, action);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Status berhasil diubah menjadi $status')),
+          SnackBar(content: Text('Status changed to $status')),
         );
         Navigator.pop(context, status);
       }
@@ -86,7 +86,7 @@ class _ReviewDetailScreenState extends State<ReviewDetailScreen> {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('Gagal: $e')));
+        ).showSnackBar(SnackBar(content: Text('Failed: $e')));
       }
     } finally {
       if (mounted) setState(() => _isProcessing = false);
@@ -102,7 +102,7 @@ class _ReviewDetailScreenState extends State<ReviewDetailScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Retry penerbitan tiket berhasil dikirim'),
+            content: Text('Ticket issuance retry submitted'),
           ),
         );
       }
@@ -110,7 +110,7 @@ class _ReviewDetailScreenState extends State<ReviewDetailScreen> {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('Gagal retry tiket: $e')));
+        ).showSnackBar(SnackBar(content: Text('Failed to retry ticket: $e')));
       }
     } finally {
       if (mounted) setState(() => _isProcessing = false);
@@ -137,7 +137,7 @@ class _ReviewDetailScreenState extends State<ReviewDetailScreen> {
                     fit: BoxFit.contain,
                     errorBuilder: (_, _, _) => const Center(
                       child: Text(
-                        'Foto belum dapat ditampilkan.',
+                        'Photo could not be displayed.',
                         style: TextStyle(color: Colors.white),
                       ),
                     ),
@@ -154,7 +154,7 @@ class _ReviewDetailScreenState extends State<ReviewDetailScreen> {
                 top: 8,
                 right: 8,
                 child: IconButton(
-                  tooltip: 'Tutup',
+                  tooltip: 'Close',
                   onPressed: () => Navigator.of(dialogContext).pop(),
                   icon: const Icon(Icons.close, color: Colors.white),
                 ),
@@ -171,7 +171,7 @@ class _ReviewDetailScreenState extends State<ReviewDetailScreen> {
     final registrationId = _participantId;
     if (registrationId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Data pendaftar tidak tersedia.')),
+        const SnackBar(content: Text('Registrant data not available.')),
       );
       return;
     }
@@ -187,14 +187,14 @@ class _ReviewDetailScreenState extends State<ReviewDetailScreen> {
         final url = resource.url;
         if (!await canLaunchUrl(url) ||
             !await launchUrl(url, mode: LaunchMode.externalApplication)) {
-          throw Exception('Aplikasi tidak dapat membuka ${resource.fileName}.');
+          throw Exception('Application cannot open ${resource.fileName}.');
         }
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('Gagal membuka berkas: $e')));
+        ).showSnackBar(SnackBar(content: Text('Failed to open file: $e')));
       }
     } finally {
       if (mounted) setState(() => _isProcessing = false);
@@ -246,7 +246,7 @@ class _ReviewDetailScreenState extends State<ReviewDetailScreen> {
           onPressed: () => Navigator.of(context).pop(),
         ),
         title: const Text(
-          'Review Pendaftar',
+          'Review Registrant',
           style: TextStyle(
             color: AppColors.onSurface,
             fontSize: 20,
@@ -279,7 +279,7 @@ class _ReviewDetailScreenState extends State<ReviewDetailScreen> {
                   ),
                   TextButton(
                     onPressed: _isLoadingDetail ? null : _loadLatestDetail,
-                    child: const Text('Coba lagi'),
+                    child: const Text('Try again'),
                   ),
                 ],
               ),
@@ -342,7 +342,7 @@ class _ReviewDetailScreenState extends State<ReviewDetailScreen> {
             ),
             const SizedBox(height: 32),
             const Text(
-              'Informasi Dasar',
+              'Basic Information',
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
@@ -353,12 +353,12 @@ class _ReviewDetailScreenState extends State<ReviewDetailScreen> {
             _buildDetailRow('Email', _textValue(_participantValue('email'))),
             const SizedBox(height: 12),
             _buildDetailRow(
-              'Waktu Daftar',
+              'Registration Time',
               _textValue(_participantValue('createdAt')),
             ),
             const SizedBox(height: 32),
             const Text(
-              'Jawaban Form',
+              'Form Answers',
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
@@ -367,7 +367,7 @@ class _ReviewDetailScreenState extends State<ReviewDetailScreen> {
             ),
             const SizedBox(height: 16),
             if (answerRows.isEmpty)
-              _buildDetailRow('Jawaban', '-')
+              _buildDetailRow('Answers', '-')
             else
               ...answerRows.map((row) {
                 return Padding(
@@ -388,7 +388,7 @@ class _ReviewDetailScreenState extends State<ReviewDetailScreen> {
                             size: 16,
                           ),
                           label: Text(
-                            row.isImage ? 'Lihat foto' : 'Buka/unduh PDF',
+                            row.isImage ? 'View photo' : 'Open/download PDF',
                           ),
                         ),
                     ],
@@ -426,7 +426,7 @@ class _ReviewDetailScreenState extends State<ReviewDetailScreen> {
                             ),
                           ),
                           child: const Text(
-                            'Tolak',
+                            'Reject',
                             style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w600,
@@ -458,7 +458,7 @@ class _ReviewDetailScreenState extends State<ReviewDetailScreen> {
                                   ),
                                 )
                               : const Text(
-                                  'Setujui',
+                                  'Approve',
                                   style: TextStyle(
                                     fontSize: 16,
                                     fontWeight: FontWeight.w600,
@@ -496,7 +496,7 @@ class _ReviewDetailScreenState extends State<ReviewDetailScreen> {
                                     strokeWidth: 2,
                                   ),
                                 )
-                              : const Text('Retry Penerbitan Tiket'),
+                              : const Text('Retry Ticket Issuance'),
                         ),
                       ],
                     ],
@@ -553,13 +553,13 @@ class _ReviewDetailScreenState extends State<ReviewDetailScreen> {
   String _statusMessage(String status) {
     switch (status) {
       case 'Accepted':
-        return 'Peserta telah diterima.';
+        return 'Registrant has been accepted.';
       case 'Rejected':
-        return 'Peserta telah ditolak.';
+        return 'Registrant has been rejected.';
       case 'Draft':
-        return 'Peserta masih berupa draft.';
+        return 'Registrant is still a draft.';
       default:
-        return 'Tidak ada aksi review untuk status ini.';
+        return 'No review action for this status.';
     }
   }
 

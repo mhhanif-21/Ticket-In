@@ -5,12 +5,12 @@ import { eq, and } from 'drizzle-orm';
 
 export const runtime = 'nodejs';
 
-const INVALID_TICKET_MESSAGE = 'Tiket tidak terdaftar di sistem atau pendaftaran belum disetujui.';
+const INVALID_TICKET_MESSAGE = 'Ticket not registered in the system or registration not approved.';
 const ALLOWED_SCAN_METHODS = new Set(['Camera', 'Manual']);
 
 export async function POST(req: Request) {
   try {
-    // 1. Dapatkan role, session, dan event_id dari middleware headers
+    // 1. Get role, session, and event_id from middleware headers
     const role = req.headers.get('x-user-role');
     const sessionId = req.headers.get('x-session-id');
     const eventIdFromHeader = req.headers.get('x-event-id');
@@ -18,7 +18,7 @@ export async function POST(req: Request) {
 
     if (role !== 'volunteer' || !sessionId || !eventIdFromHeader || !sessionVersionFromHeader) {
       return NextResponse.json(
-        { status: 'error', message: 'Akses ditolak: Hanya panitia yang dapat melakukan scan' },
+        { status: 'error', message: 'Access denied: Only volunteers can scan' },
         { status: 403 }
       );
     }
@@ -29,14 +29,14 @@ export async function POST(req: Request) {
 
     if (typeof scan_method !== 'string' || !ALLOWED_SCAN_METHODS.has(scan_method)) {
       return NextResponse.json(
-        { status: 'error', message: 'scan_method harus bernilai Camera atau Manual' },
+        { status: 'error', message: 'scan_method must be Camera or Manual' },
         { status: 400 }
       );
     }
 
     if (body.event_id && body.event_id !== eventIdFromHeader) {
       return NextResponse.json(
-        { status: 'error', message: 'Event pada tiket tidak sesuai dengan akses panitia' },
+        { status: 'error', message: 'Event on the ticket does not match volunteer access' },
         { status: 403 }
       );
     }
@@ -46,15 +46,15 @@ export async function POST(req: Request) {
 
     if (typeof ticket_code !== 'string' || !event_id || !Number.isSafeInteger(sessionVersion)) {
       return NextResponse.json(
-        { status: 'error', message: 'ticket_code dan event_id wajib diisi' },
+        { status: 'error', message: 'ticket_code and event_id are required' },
         { status: 400 }
       );
     }
     
-    // Normalisasi input (S6-T3)
+    // Normalize input (S6-T3)
     ticket_code = ticket_code.trim().toUpperCase();
 
-    // 2. Lakukan transaksi database
+    // 2. Execute database transaction
     return await db.transaction(async (tx) => {
       const [session] = await tx
         .select({
@@ -81,12 +81,12 @@ export async function POST(req: Request) {
         || session.eventSessionVersion !== sessionVersion
       ) {
         return NextResponse.json(
-          { status: 'error', message: 'Sesi check-in tidak lagi aktif untuk event ini.' },
+          { status: 'error', message: 'Check-in session is no longer active for this event.' },
           { status: 403 },
         );
       }
 
-      // 2a. Cari Registrasi berdasarkan ticket_code & event_id
+      // 2a. Find Registration based on ticket_code & event_id
       const regRecords = await tx
         .select()
         .from(registrations)
@@ -101,12 +101,12 @@ export async function POST(req: Request) {
 
       const reg = regRecords[0];
 
-      // 2b. Validasi (TDS-008): Jika tidak ada atau bukan Accepted
+      // 2b. Validation (TDS-008): If not exists or not Accepted
       if (!reg || reg.status !== 'Accepted') {
-        // Catat sebagai Invalid. Jika tiket ada tapi salah acara, id reg bisa disisipkan.
+        // Record as Invalid. If ticket exists but wrong event, reg id can be inserted.
         await tx.insert(checkInLogs).values({
           checkInSessionId: sessionId,
-          registrationId: reg?.id || null, // null jika sama sekali tidak ada di DB
+          registrationId: reg?.id || null, // null if it does not exist in DB at all
           scannedTicketCode: ticket_code,
           scanMethod: scan_method,
           scanStatus: 'Invalid',
@@ -118,9 +118,9 @@ export async function POST(req: Request) {
         );
       }
 
-      // 2c. Validasi (TDS-003): Cek apakah sudah pernah di-scan
+      // 2c. Validation (TDS-003): Check if already scanned
       if (reg.presenceStatus === 'Present') {
-        // Cari kapan tiket pertama kali sukses di-scan
+        // Find when the ticket was first successfully scanned
         const successLogs = await tx
           .select({ createdAt: checkInLogs.createdAt })
           .from(checkInLogs)
@@ -135,7 +135,7 @@ export async function POST(req: Request) {
 
         const firstScannedAt = successLogs.length > 0 ? successLogs[0].createdAt : null;
 
-        // Catat kejadian Duplicate ini
+        // Record this Duplicate event
         await tx.insert(checkInLogs).values({
           checkInSessionId: sessionId,
           registrationId: reg.id,
@@ -147,7 +147,7 @@ export async function POST(req: Request) {
         return NextResponse.json(
           { 
             status: 'error', 
-            message: 'Tiket Sudah Digunakan!', 
+            message: 'Ticket Already Used!', 
             data: {
               first_scanned_at: firstScannedAt,
               scanned_by_role: 'volunteer',
@@ -157,7 +157,7 @@ export async function POST(req: Request) {
         );
       }
 
-      // 2d. Kondisi Sukses
+      // 2d. Success Condition
       // Update registration status
       const attendanceTime = new Date();
       await tx
@@ -165,7 +165,7 @@ export async function POST(req: Request) {
         .set({ presenceStatus: 'Present', updatedAt: attendanceTime })
         .where(and(eq(registrations.id, reg.id), eq(registrations.presenceStatus, 'Absent')));
 
-      // Catat log Success
+      // Record Success log
       await tx.insert(checkInLogs).values({
         checkInSessionId: sessionId,
         registrationId: reg.id,
@@ -177,7 +177,7 @@ export async function POST(req: Request) {
       return NextResponse.json(
         { 
           status: 'success', 
-          message: 'Check-in Berhasil',
+          message: 'Check-in Successful',
           data: {
             participant_name: reg.name,
             ticket_code: reg.ticketCode,
@@ -191,7 +191,7 @@ export async function POST(req: Request) {
   } catch (error: any) {
     console.error('Scan Ticket Error:', error);
     return NextResponse.json(
-      { status: 'error', message: 'Terjadi kesalahan pada server saat memproses scan' },
+      { status: 'error', message: 'A server error occurred while processing the scan' },
       { status: 500 }
     );
   }

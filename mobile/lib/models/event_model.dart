@@ -1,13 +1,13 @@
 import 'poster_aspect.dart';
 
 const double ticketTemplateMinFontSize = 12;
-const double ticketTemplateMaxFontSize = 48;
+const double ticketTemplateMaxFontSize = 120;
 const double ticketTemplateDefaultFontSize = 24;
 const String ticketTemplateDefaultTextColor = '#111111';
 // Keep in sync with the logical canvas used by the server ticket renderer.
 const double ticketTemplateCanvasWidth = 1200;
 const double ticketTemplateMinQrSize = 0.12;
-const double ticketTemplateMaxQrSize = 0.60;
+const double ticketTemplateMaxQrSize = 0.85;
 
 class FormFieldModel {
   final String? id;
@@ -278,6 +278,7 @@ class EventModel {
   final String? posterUrl;
   final String? publicRegistrationUrl;
   final String? publicQrCodeUrl;
+  final String? volunteerPin;
   final List<FormFieldModel> formFields;
   final List<EventMediaModel> media;
 
@@ -295,6 +296,7 @@ class EventModel {
     this.posterUrl,
     this.publicRegistrationUrl,
     this.publicQrCodeUrl,
+    this.volunteerPin,
     this.formFields = const [],
     this.media = const [],
   });
@@ -338,6 +340,7 @@ class EventModel {
       publicRegistrationUrl:
           json['public_registration_url'] ?? json['publicRegistrationUrl'],
       publicQrCodeUrl: json['public_qr_code_url'] ?? json['publicQrCodeUrl'],
+      volunteerPin: json['volunteer_pin']?.toString() ?? json['volunteerPin']?.toString(),
       formFields: formFieldsList,
       media: mediaList,
     );
@@ -358,6 +361,7 @@ class EventModel {
       'poster_url': posterUrl,
       'public_registration_url': publicRegistrationUrl,
       'public_qr_code_url': publicQrCodeUrl,
+      if (volunteerPin != null) 'volunteer_pin': volunteerPin,
       'form_fields': formFields.map((field) => field.toJson()).toList(),
       'media': media
           .map(
@@ -371,4 +375,40 @@ class EventModel {
           .toList(),
     };
   }
+
+  EventModel copyWith({
+    String? id,
+    String? name,
+    String? slug,
+    int? capacity,
+    String? location,
+    String? description,
+    DateTime? date,
+    String? status,
+    String? registrationMode,
+    PosterAspectMode? posterAspectMode,
+    String? posterUrl,
+    String? publicRegistrationUrl,
+    String? publicQrCodeUrl,
+    String? volunteerPin,
+    List<FormFieldModel>? formFields,
+    List<EventMediaModel>? media,
+  }) => EventModel(
+    id: id ?? this.id,
+    name: name ?? this.name,
+    slug: slug ?? this.slug,
+    capacity: capacity ?? this.capacity,
+    location: location ?? this.location,
+    description: description ?? this.description,
+    date: date ?? this.date,
+    status: status ?? this.status,
+    registrationMode: registrationMode ?? this.registrationMode,
+    posterAspectMode: posterAspectMode ?? this.posterAspectMode,
+    posterUrl: posterUrl ?? this.posterUrl,
+    publicRegistrationUrl: publicRegistrationUrl ?? this.publicRegistrationUrl,
+    publicQrCodeUrl: publicQrCodeUrl ?? this.publicQrCodeUrl,
+    volunteerPin: volunteerPin ?? this.volunteerPin,
+    formFields: formFields ?? this.formFields,
+    media: media ?? this.media,
+  );
 }

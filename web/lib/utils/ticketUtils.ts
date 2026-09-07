@@ -188,7 +188,7 @@ async function generateCustomTicket(
     }
 
     const text = escapeXml(getTemplateText(element, context));
-    const fontSize = Math.max(12, Math.min(48, Math.round(getTicketTemplateFontSize(element.fontSize))));
+    const fontSize = Math.max(12, Math.min(120, Math.round(getTicketTemplateFontSize(element.fontSize))));
     const textPosition = getTicketTemplateTextPosition(width, height, fontSize);
     const textColor = escapeXml(getTicketTemplateTextColor(element.color));
     const textSvg = Buffer.from(
@@ -236,7 +236,7 @@ async function generateDefaultQrCodeWithText(ticketCode: string, participantName
       <rect x="0" y="0" width="${width}" height="140" fill="#4f46e5" rx="24"/>
       <rect x="0" y="100" width="${width}" height="40" fill="#4f46e5"/> <!-- To square bottom of header -->
       <text x="50%" y="70" font-family="${TICKET_FONT_FAMILY}" font-size="28" font-weight="bold" fill="#ffffff" text-anchor="middle">
-        TICKET KELUAR MASUK
+        EVENT TICKET
       </text>
       <text x="50%" y="110" font-family="${TICKET_FONT_FAMILY}" font-size="20" font-weight="normal" fill="#e0e7ff" text-anchor="middle">
         ${safeEvent}
@@ -244,7 +244,7 @@ async function generateDefaultQrCodeWithText(ticketCode: string, participantName
 
       <!-- Bottom Section: Participant & Ticket Code -->
       <text x="50%" y="540" font-family="${TICKET_FONT_FAMILY}" font-size="16" fill="#6b7280" text-anchor="middle" letter-spacing="2">
-        NAMA PESERTA
+        PARTICIPANT NAME
       </text>
       <text x="50%" y="580" font-family="${TICKET_FONT_FAMILY}" font-size="32" font-weight="bold" fill="#111827" text-anchor="middle">
         ${safeName}
@@ -256,7 +256,7 @@ async function generateDefaultQrCodeWithText(ticketCode: string, participantName
       <circle cx="500" cy="620" r="16" fill="#f3f4f6"/>
 
       <text x="50%" y="670" font-family="${TICKET_FONT_FAMILY}" font-size="16" fill="#6b7280" text-anchor="middle" letter-spacing="2">
-        KODE TIKET
+        TICKET CODE
       </text>
       <text x="50%" y="710" font-family="${TICKET_FONT_FAMILY}" font-size="36" font-weight="bold" fill="#4f46e5" text-anchor="middle" letter-spacing="4">
         ${ticketCode}

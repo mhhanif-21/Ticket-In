@@ -25,13 +25,13 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
       .limit(1);
 
     if (!registration) {
-      return NextResponse.json({ status: 'error', message: 'Registrasi tidak ditemukan' }, { status: 404 });
+      return NextResponse.json({ status: 'error', message: 'Registration not found' }, { status: 404 });
     }
 
     if (registration.status !== 'Accepted') {
       return NextResponse.json({
         status: 'error',
-        message: 'Penerbitan tiket hanya dapat diulang untuk registrasi Accepted',
+        message: 'Ticket generation can only be retried for Accepted registrations',
       }, { status: 409 });
     }
 
@@ -39,7 +39,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
     if (job.status === 'completed') {
       return NextResponse.json({
         status: 'error',
-        message: 'Penerbitan tiket sudah selesai',
+        message: 'Ticket generation already completed',
         data: { registrationId: id, jobId: job.id, jobStatus: job.status },
       }, { status: 409 });
     }
@@ -47,7 +47,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
     if (!['queued', 'failed'].includes(job.status)) {
       return NextResponse.json({
         status: 'error',
-        message: 'Penerbitan tiket sedang diproses',
+        message: 'Ticket generation is processing',
         data: { registrationId: id, jobId: job.id, jobStatus: job.status },
       }, { status: 409 });
     }
@@ -56,7 +56,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
       const published = await publishTicketGenerationJob(id);
       return NextResponse.json({
         status: 'success',
-        message: 'Retry penerbitan tiket dikirim',
+        message: 'Ticket retry queued',
         data: { registrationId: id, jobId: published.id, jobStatus: published.status },
       });
     } catch (error) {
@@ -64,7 +64,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
       const failedJob = await getTicketGenerationJob(id);
       return NextResponse.json({
         status: 'error',
-        message: 'Retry penerbitan tiket gagal dikirim',
+        message: 'Ticket retry failed to send',
         data: { registrationId: id, jobId: failedJob?.id || job.id, jobStatus: failedJob?.status || 'failed', retryable: true },
       }, { status: 503 });
     }

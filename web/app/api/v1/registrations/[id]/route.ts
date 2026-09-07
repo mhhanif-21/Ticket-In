@@ -52,7 +52,7 @@ export async function GET(
 
     if (!data) {
       return NextResponse.json(
-        { status: 'error', code: 'PARTICIPANT_NOT_FOUND', message: 'Pendaftar tidak ditemukan.' },
+        { status: 'error', code: 'PARTICIPANT_NOT_FOUND', message: 'Registrant not found.' },
         { status: 404 },
       );
     }
@@ -66,7 +66,7 @@ export async function GET(
       errorName: error instanceof Error ? error.name : 'UnknownError',
     });
     return NextResponse.json(
-      { status: 'error', code: 'PARTICIPANT_DETAIL_READ_FAILED', message: 'Detail pendaftar belum dapat dimuat.' },
+      { status: 'error', code: 'PARTICIPANT_DETAIL_READ_FAILED', message: 'Registrant details could not be loaded.' },
       { status: 500 },
     );
   }

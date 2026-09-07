@@ -17,7 +17,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     const { action } = body;
 
     if (action !== 'Approve' && action !== 'Reject') {
-      return NextResponse.json({ status: 'error', message: 'Aksi tidak valid. Gunakan Approve atau Reject.' }, { status: 400 });
+      return NextResponse.json({ status: 'error', message: 'Invalid action. Use Approve or Reject.' }, { status: 400 });
     }
 
     if (action === 'Reject') {
@@ -27,10 +27,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         .returning({ id: registrations.id });
 
       if (rejection.length === 0) {
-        return NextResponse.json({ status: 'error', message: 'Registrasi tidak ditemukan atau bukan berstatus Pending' }, { status: 409 });
+        return NextResponse.json({ status: 'error', message: 'Registration not found or not Pending' }, { status: 409 });
       }
 
-      return NextResponse.json({ status: 'success', message: 'Pendaftaran ditolak' });
+      return NextResponse.json({ status: 'success', message: 'Registration rejected' });
     }
 
     if (action === 'Approve') {
@@ -52,7 +52,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       if (!transition) {
         return NextResponse.json({
           status: 'error',
-          message: 'Registrasi tidak ditemukan atau bukan berstatus Pending. Status final tidak dapat diubah ulang.',
+          message: 'Registration not found or not Pending. Final status cannot be changed.',
         }, { status: 409 });
       }
 
@@ -60,7 +60,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         const job = await publishTicketGenerationJob(id);
         return NextResponse.json({
           status: 'success',
-          message: 'Pendaftaran disetujui',
+          message: 'Registration approved',
           data: { registrationId: id, jobId: job.id, jobStatus: job.status },
         });
       } catch (publishError) {
@@ -68,13 +68,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         const job = await getTicketGenerationJob(id);
         return NextResponse.json({
           status: 'error',
-          message: 'Pendaftaran diterima, tetapi pekerjaan penerbitan tiket gagal dikirim dan dapat dicoba ulang.',
+          message: 'Registration accepted, but ticket generation job failed to send and can be retried.',
           data: { registrationId: id, jobId: job?.id || transition.jobId, jobStatus: job?.status || 'failed', retryable: true },
         }, { status: 503 });
       }
     }
 
-    return NextResponse.json({ status: 'error', message: 'Aksi tidak valid.' }, { status: 400 });
+    return NextResponse.json({ status: 'error', message: 'Invalid action.' }, { status: 400 });
 
   } catch (error) {
     console.error('Review Registration Error:', error);

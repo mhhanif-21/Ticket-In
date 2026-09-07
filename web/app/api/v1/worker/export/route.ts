@@ -46,7 +46,7 @@ export async function POST(request: Request) {
       .limit(1);
 
     if (!job) {
-      return NextResponse.json({ error: 'Export job tidak ditemukan untuk event ini' }, { status: 404 });
+      return NextResponse.json({ error: 'Export job not found for this event' }, { status: 404 });
     }
 
     if (job.status === 'completed' && job.storagePath) {
@@ -134,7 +134,7 @@ export async function POST(request: Request) {
     }
     return NextResponse.json({
       status: 'error',
-      message: 'Export worker gagal memproses job.',
+      message: 'Export worker failed to process job.',
       data: { job_id: jobId, event_id: eventId, status: 'failed', retryable: true },
     }, { status: 500 });
   }

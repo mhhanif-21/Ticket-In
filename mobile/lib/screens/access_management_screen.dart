@@ -47,7 +47,7 @@ class _AccessManagementScreenState extends State<AccessManagementScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('Gagal memuat acara: $e')));
+      ).showSnackBar(SnackBar(content: Text('Failed to load event: $e')));
       Navigator.pop(context);
     }
   }
@@ -56,14 +56,14 @@ class _AccessManagementScreenState extends State<AccessManagementScreen> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Konfirmasi Regenerasi PIN'),
+        title: const Text('Confirm PIN Regeneration'),
         content: const Text(
-          'PIN sebelumnya tidak akan valid lagi untuk panitia login. Lanjutkan?',
+          'The previous PIN will no longer be valid for committee login. Continue?',
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Batal'),
+            child: const Text('Cancel'),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
@@ -71,7 +71,7 @@ class _AccessManagementScreenState extends State<AccessManagementScreen> {
             ),
             onPressed: () => Navigator.pop(context, true),
             child: const Text(
-              'Ya, Regenerate',
+              'Yes, Regenerate',
               style: TextStyle(color: Colors.white),
             ),
           ),
@@ -88,13 +88,14 @@ class _AccessManagementScreenState extends State<AccessManagementScreen> {
       if (!mounted) return;
       setState(() {
         _newPin = pin;
+        _event = _event?.copyWith(volunteerPin: pin);
         _isLoading = false;
       });
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('Gagal membuat PIN: $e')));
+      ).showSnackBar(SnackBar(content: Text('Failed to generate PIN: $e')));
       setState(() => _isLoading = false);
     }
   }
@@ -103,7 +104,14 @@ class _AccessManagementScreenState extends State<AccessManagementScreen> {
     Clipboard.setData(ClipboardData(text: text));
     ScaffoldMessenger.of(
       context,
-    ).showSnackBar(const SnackBar(content: Text('Tautan disalin!')));
+    ).showSnackBar(const SnackBar(content: Text('Link copied!')));
+  }
+
+  void _copyPin(String pin) {
+    Clipboard.setData(ClipboardData(text: pin));
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('PIN copied to clipboard!')));
   }
 
   void _retryQr() {
@@ -122,7 +130,7 @@ class _AccessManagementScreenState extends State<AccessManagementScreen> {
             const Icon(Icons.qr_code_2, size: 30, color: Color(0xFF777777)),
             const SizedBox(height: 4),
             const Text(
-              'QR pendaftaran belum tersedia.',
+              'Registration QR not available yet.',
               textAlign: TextAlign.center,
               style: TextStyle(fontSize: 11, color: Color(0xFF444748)),
             ),
@@ -134,7 +142,7 @@ class _AccessManagementScreenState extends State<AccessManagementScreen> {
                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 padding: const EdgeInsets.symmetric(horizontal: 8),
               ),
-              child: const Text('Coba Lagi'),
+              child: const Text('Try Again'),
             ),
           ],
         ),
@@ -189,7 +197,7 @@ class _AccessManagementScreenState extends State<AccessManagementScreen> {
             ),
             const SizedBox(height: 16),
             Text(
-              cancelled ? 'Acara dibatalkan' : 'Acara belum dipublikasikan',
+              cancelled ? 'Event cancelled' : 'Event not published yet',
               textAlign: TextAlign.center,
               style: const TextStyle(
                 fontSize: 18,
@@ -200,8 +208,8 @@ class _AccessManagementScreenState extends State<AccessManagementScreen> {
             const SizedBox(height: 8),
             Text(
               cancelled
-                  ? 'Link pendaftaran, QR pendaftaran, dan akses scanner tidak tersedia untuk acara yang dibatalkan.'
-                  : 'Link pendaftaran, QR pendaftaran, dan akses scanner akan tersedia setelah acara dipublikasikan.',
+                  ? 'Registration link, registration QR, and scanner access are not available for cancelled events.'
+                  : 'Registration link, registration QR, and scanner access will be available after the event is published.',
               textAlign: TextAlign.center,
               style: const TextStyle(
                 fontSize: 14,
@@ -229,7 +237,7 @@ class _AccessManagementScreenState extends State<AccessManagementScreen> {
       return Scaffold(
         backgroundColor: bgColor,
         appBar: AppBar(
-          title: const Text('Kelola Akses Acara'),
+          title: const Text('Manage Event Access'),
           backgroundColor: bgColor,
         ),
         body: const Center(
@@ -242,10 +250,10 @@ class _AccessManagementScreenState extends State<AccessManagementScreen> {
       return Scaffold(
         backgroundColor: bgColor,
         appBar: AppBar(
-          title: const Text('Kelola Akses Acara'),
+          title: const Text('Manage Event Access'),
           backgroundColor: bgColor,
         ),
-        body: const Center(child: Text('Data tidak ditemukan')),
+        body: const Center(child: Text('Data not found')),
       );
     }
 
@@ -253,7 +261,7 @@ class _AccessManagementScreenState extends State<AccessManagementScreen> {
       return Scaffold(
         backgroundColor: bgColor,
         appBar: AppBar(
-          title: const Text('Kelola Akses Acara'),
+          title: const Text('Manage Event Access'),
           backgroundColor: bgColor,
         ),
         body: SingleChildScrollView(
@@ -281,7 +289,7 @@ class _AccessManagementScreenState extends State<AccessManagementScreen> {
         centerTitle: false,
         iconTheme: const IconThemeData(color: onSurfaceVariant),
         title: const Text(
-          'Kelola Akses Acara',
+          'Manage Event Access',
           style: TextStyle(
             color: primaryColor,
             fontSize: 16,
@@ -310,7 +318,7 @@ class _AccessManagementScreenState extends State<AccessManagementScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                    'Akses Pendaftaran Peserta',
+                    'Participant Registration Access',
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
@@ -333,7 +341,7 @@ class _AccessManagementScreenState extends State<AccessManagementScreen> {
                       children: [
                         Expanded(
                           child: Text(
-                            regUrl ?? 'Tautan pendaftaran belum tersedia.',
+                            regUrl ?? 'Registration link not available yet.',
                             style: const TextStyle(
                               fontSize: 14,
                               color: onSurfaceVariant,
@@ -368,7 +376,7 @@ class _AccessManagementScreenState extends State<AccessManagementScreen> {
                           child: OutlinedButton.icon(
                             icon: const Icon(Icons.download, size: 18),
                             label: const Text(
-                              'Download QR Pendaftaran',
+                              'Download Registration QR',
                               style: TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w500,
@@ -409,7 +417,7 @@ class _AccessManagementScreenState extends State<AccessManagementScreen> {
                                         ).showSnackBar(
                                           const SnackBar(
                                             content: Text(
-                                              'Gagal membuka tautan QR',
+                                              'Failed to open QR link',
                                             ),
                                           ),
                                         );
@@ -438,7 +446,7 @@ class _AccessManagementScreenState extends State<AccessManagementScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                    'Akses Scanner Panitia',
+                    'Committee Scanner Access',
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
@@ -484,81 +492,111 @@ class _AccessManagementScreenState extends State<AccessManagementScreen> {
                     ),
                   ),
                   const SizedBox(height: 16),
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(vertical: 32),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF3F3F3),
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: const Color(0xFFC4C7C7)),
-                    ),
-                    child: Stack(
-                      clipBehavior: Clip.none,
-                      children: [
-                        Positioned(
-                          right: -30,
-                          top: -30,
-                          child: Icon(
-                            Icons.lock_outline,
-                            size: 140,
-                            color: const Color(0xFFE5E2E1).withOpacity(0.1),
+                  Builder(builder: (context) {
+                    final activePin = _newPin ?? _event?.volunteerPin;
+
+                    return Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(vertical: 32),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF3F3F3),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: const Color(0xFFC4C7C7)),
+                      ),
+                      child: Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          Positioned(
+                            right: -30,
+                            top: -30,
+                            child: Icon(
+                              Icons.lock_outline,
+                              size: 140,
+                              color: const Color(0xFFE5E2E1).withOpacity(0.1),
+                            ),
                           ),
-                        ),
-                        Center(
-                          child: Column(
-                            children: [
-                              // BUG-F FIX: Tampilkan instruksi jelas jika PIN belum di-generate
-                              if (_newPin == null) ...[
-                                const Icon(
-                                  Icons.lock_outline,
-                                  size: 40,
-                                  color: Color(0xFF000000),
-                                ),
-                                const SizedBox(height: 12),
-                                const Text(
-                                  'PIN belum dibuat',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w600,
-                                    color: Color(0xFF1C1B1B),
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                const Text(
-                                  'Tap \'Generate PIN Baru\' di bawah',
-                                  style: TextStyle(
-                                    fontSize: 12,
+                          Center(
+                            child: Column(
+                              children: [
+                                if (activePin == null || activePin.isEmpty) ...[
+                                  const Icon(
+                                    Icons.lock_outline,
+                                    size: 40,
                                     color: Color(0xFF000000),
                                   ),
-                                ),
-                              ] else ...[
-                                Text(
-                                  _newPin!,
-                                  style: const TextStyle(
-                                    fontSize: 48,
-                                    fontWeight: FontWeight.w700,
-                                    letterSpacing: 12.0,
-                                    color: Color(0xFF1C1B1B),
-                                    fontFamily: 'monospace',
+                                  const SizedBox(height: 12),
+                                  const Text(
+                                    'PIN not generated yet',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w600,
+                                      color: Color(0xFF1C1B1B),
+                                    ),
                                   ),
-                                ),
-                                const SizedBox(height: 8),
-                                const Text(
-                                  'PIN AKTIF',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w600,
-                                    letterSpacing: 2.0,
-                                    color: Color(0xFF000000),
+                                  const SizedBox(height: 4),
+                                  const Text(
+                                    'Tap \'Generate New PIN\' below',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Color(0xFF000000),
+                                    ),
                                   ),
-                                ),
+                                ] else ...[
+                                  InkWell(
+                                    onTap: () => _copyPin(activePin),
+                                    borderRadius: BorderRadius.circular(12),
+                                    child: Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 16,
+                                        vertical: 8,
+                                      ),
+                                      child: Column(
+                                        children: [
+                                          Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.center,
+                                            children: [
+                                              Text(
+                                                activePin,
+                                                style: const TextStyle(
+                                                  fontSize: 48,
+                                                  fontWeight: FontWeight.w700,
+                                                  letterSpacing: 12.0,
+                                                  color: Color(0xFF1C1B1B),
+                                                  fontFamily: 'monospace',
+                                                ),
+                                              ),
+                                              const SizedBox(width: 8),
+                                              const Icon(
+                                                Icons.content_copy,
+                                                size: 24,
+                                                color: primaryColor,
+                                              ),
+                                            ],
+                                          ),
+                                          const SizedBox(height: 8),
+                                          const Text(
+                                            'PIN ACTIVE (Tap to copy)',
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w600,
+                                              letterSpacing: 2.0,
+                                              color: Color(0xFF000000),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ],
-                            ],
+                            ),
                           ),
-                        ),
-                      ],
-                    ),
-                  ),
+                        ],
+                      ),
+                    );
+                  }),
                   const SizedBox(height: 16),
                   SizedBox(
                     width: double.infinity,
@@ -566,7 +604,7 @@ class _AccessManagementScreenState extends State<AccessManagementScreen> {
                     child: ElevatedButton.icon(
                       icon: const Icon(Icons.refresh, size: 20),
                       label: const Text(
-                        'Generate PIN Baru',
+                        'Generate New PIN',
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
@@ -585,7 +623,7 @@ class _AccessManagementScreenState extends State<AccessManagementScreen> {
                   ),
                   const SizedBox(height: 16),
                   const Text(
-                    '*Berikan URL dan PIN ini kepada relawan lapangan untuk login ke Web Scanner.',
+                    '*Provide this URL and PIN to field volunteers to log in to the Web Scanner.',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 12,

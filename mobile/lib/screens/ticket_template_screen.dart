@@ -111,7 +111,7 @@ class _TicketTemplateScreenState extends State<TicketTemplateScreen> {
       _showMessage(error.message);
       if (mounted) setState(() => _isLoading = false);
     } catch (_) {
-      _showMessage('Konfigurasi tiket belum dapat dimuat.');
+      _showMessage('Ticket configuration could not be loaded.');
       if (mounted) setState(() => _isLoading = false);
     }
   }
@@ -178,7 +178,7 @@ class _TicketTemplateScreenState extends State<TicketTemplateScreen> {
   Future<void> _openFullscreenEditor() async {
     if (!_customMode) return;
     if (_backgroundUrl == null && _localBackground == null) {
-      _showMessage('Unggah gambar latar sebelum mengedit template tiket.');
+      _showMessage('Upload a background image before editing the ticket template.');
       return;
     }
 
@@ -200,7 +200,7 @@ class _TicketTemplateScreenState extends State<TicketTemplateScreen> {
     setState(() {
       _elements = List<TicketTemplateElementModel>.of(editedElements);
     });
-    _showMessage('Perubahan template tiket berhasil disimpan.');
+    _showMessage('Ticket template changes saved successfully.');
   }
 
   Future<void> _pickBackground() async {
@@ -224,7 +224,7 @@ class _TicketTemplateScreenState extends State<TicketTemplateScreen> {
     } on EventTemplateException catch (error) {
       _showMessage(error.message);
     } catch (_) {
-      _showMessage('Gambar template belum dapat diunggah. Silakan coba lagi.');
+      _showMessage('Template image could not be uploaded. Please try again.');
     }
   }
 
@@ -233,15 +233,15 @@ class _TicketTemplateScreenState extends State<TicketTemplateScreen> {
       case 'qr':
         return 'QR Code';
       case 'ticket_code':
-        return 'Kode Tiket';
+        return 'Ticket Code';
       case 'name':
-        return 'Nama';
+        return 'Name';
       case 'email':
         return 'Email';
       case 'event_name':
-        return 'Nama Event';
+        return 'Event Name';
       case 'field':
-        return element.token ?? 'Data Peserta';
+        return element.token ?? 'Participant Data';
       default:
         return 'Data';
     }
@@ -255,13 +255,13 @@ class _TicketTemplateScreenState extends State<TicketTemplateScreen> {
 
   Future<void> _saveTicketTemplate() async {
     if (_customMode && _backgroundUrl == null) {
-      _showMessage('Unggah gambar latar sebelum mengaktifkan template kustom.');
+      _showMessage('Upload a background image before enabling custom template.');
       return;
     }
     if (_customMode &&
         (!_elements.any((element) => element.type == 'qr') ||
             !_elements.any((element) => element.type == 'ticket_code'))) {
-      _showMessage('QR dan Kode Tiket wajib tersedia.');
+      _showMessage('QR and Ticket Code are required.');
       return;
     }
     setState(() => _isSavingTicket = true);
@@ -273,11 +273,11 @@ class _TicketTemplateScreenState extends State<TicketTemplateScreen> {
         elements: _customMode ? _elements : const [],
       );
       saved = true;
-      _showMessage('Template tiket berhasil disimpan.');
+      _showMessage('Ticket template saved successfully.');
     } on EventTemplateException catch (error) {
       _showMessage(error.message);
     } catch (_) {
-      _showMessage('Template tiket belum dapat disimpan. Silakan coba lagi.');
+      _showMessage('Ticket template could not be saved. Please try again.');
     } finally {
       if (mounted) setState(() => _isSavingTicket = false);
     }
@@ -292,15 +292,15 @@ class _TicketTemplateScreenState extends State<TicketTemplateScreen> {
       context: context,
       barrierDismissible: false,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Acara siap dipublikasikan'),
+        title: const Text('Event ready to publish'),
         content: const Text(
-          'Acara sudah tersimpan. Anda dapat mempublikasikannya sekarang atau melanjutkan sebagai draft.',
+          'Event has been saved. You can publish it now or continue as a draft.',
         ),
         actions: [
           TextButton(
             onPressed: () =>
                 Navigator.of(dialogContext).pop(_PublicationDecision.later),
-            child: const Text('Nanti Saja'),
+            child: const Text('Later'),
           ),
           ElevatedButton(
             onPressed: () => Navigator.of(
@@ -310,7 +310,7 @@ class _TicketTemplateScreenState extends State<TicketTemplateScreen> {
               backgroundColor: Colors.black,
               foregroundColor: Colors.white,
             ),
-            child: const Text('Publikasikan Sekarang'),
+            child: const Text('Publish Now'),
           ),
         ],
       ),
@@ -330,7 +330,7 @@ class _TicketTemplateScreenState extends State<TicketTemplateScreen> {
     } catch (_) {
       if (!mounted) return;
       _showMessage(
-        'Acara belum dapat dipublikasikan. Periksa koneksi lalu coba lagi.',
+        'Event could not be published. Check your connection and try again.',
       );
     } finally {
       if (mounted) setState(() => _isPublishing = false);
@@ -385,14 +385,14 @@ class _TicketTemplateScreenState extends State<TicketTemplateScreen> {
         body: _emailBodyController(kind).text,
       );
       _showMessage(
-        'Template bawaan digunakan untuk email ${kind == 'otp' ? 'OTP' : 'ticket'}.',
+        'Default template is used for ${kind == 'otp' ? 'OTP' : 'ticket'} email.',
       );
     } on EventTemplateException catch (error) {
       if (mounted) setState(() => _setEmailActive(kind, previous));
       _showMessage(error.message);
     } catch (_) {
       if (mounted) setState(() => _setEmailActive(kind, previous));
-      _showMessage('Status template email belum dapat diperbarui.');
+      _showMessage('Email template status could not be updated.');
     }
   }
 
@@ -421,12 +421,12 @@ class _TicketTemplateScreenState extends State<TicketTemplateScreen> {
         body: _emailBodyController(kind).text,
       );
       _showMessage(
-        'Template email ${kind == 'otp' ? 'OTP' : 'ticket'} berhasil disimpan.',
+        '${kind == 'otp' ? 'OTP' : 'Ticket'} email template saved successfully.',
       );
     } on EventTemplateException catch (error) {
       _showMessage(error.message);
     } catch (_) {
-      _showMessage('Template email belum dapat disimpan. Silakan coba lagi.');
+      _showMessage('Email template could not be saved. Please try again.');
     } finally {
       if (mounted) setState(() => _setEmailSaving(kind, false));
     }
@@ -446,10 +446,10 @@ class _TicketTemplateScreenState extends State<TicketTemplateScreen> {
           SizedBox(width: 8),
           Expanded(
             child: Text(
-              'Petunjuk penyusunan template\n'
-              'Pilih latar, tambahkan data dari palette, lalu geser elemen pada preview. '
-              'Tap elemen untuk mengubah ukuran atau menghapusnya. QR dan Kode Tiket wajib; '
-              'elemen yang sudah dipakai hilang dari palette.',
+              'Template setup guide\n'
+              'Select a background, add data from the palette, then drag elements on the preview. '
+              'Tap an element to resize or delete it. QR and Ticket Code are required; '
+              'elements already in use are removed from the palette.',
               style: TextStyle(fontSize: 12, height: 1.35),
             ),
           ),
@@ -482,7 +482,7 @@ class _TicketTemplateScreenState extends State<TicketTemplateScreen> {
                     Image.network(_backgroundUrl!, fit: BoxFit.contain)
                   else
                     const Center(
-                      child: Text('Unggah gambar latar untuk melihat preview'),
+                      child: Text('Upload a background image to see preview'),
                     ),
                   if (_customMode && _elements.isNotEmpty)
                     ..._elements.asMap().entries.map((entry) {
@@ -578,7 +578,7 @@ class _TicketTemplateScreenState extends State<TicketTemplateScreen> {
         children: [
           SwitchListTile.adaptive(
             contentPadding: EdgeInsets.zero,
-            title: const Text('Aktifkan email kustom'),
+            title: const Text('Enable custom email'),
             subtitle: Text(description),
             value: active,
             activeThumbColor: Colors.black,
@@ -594,13 +594,13 @@ class _TicketTemplateScreenState extends State<TicketTemplateScreen> {
                 color: const Color(0xFFF2F2F2),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: const Text('Template bawaan sedang digunakan.'),
+              child: const Text('Default template is currently in use.'),
             )
           else ...[
             TextField(
               controller: subjectController,
               decoration: const InputDecoration(
-                labelText: 'Subjek email',
+                labelText: 'Email subject',
                 border: OutlineInputBorder(),
               ),
             ),
@@ -610,13 +610,13 @@ class _TicketTemplateScreenState extends State<TicketTemplateScreen> {
               minLines: 6,
               maxLines: 10,
               decoration: const InputDecoration(
-                labelText: 'Isi email',
+                labelText: 'Email body',
                 border: OutlineInputBorder(),
                 alignLabelWithHint: true,
               ),
             ),
             const SizedBox(height: 10),
-            const Text('Token tersedia'),
+            const Text('Available tokens'),
             const SizedBox(height: 6),
             Wrap(
               spacing: 8,
@@ -640,7 +640,7 @@ class _TicketTemplateScreenState extends State<TicketTemplateScreen> {
                   foregroundColor: Colors.white,
                 ),
                 child: Text(
-                  _emailIsSaving(kind) ? 'Menyimpan...' : 'Simpan Template',
+                  _emailIsSaving(kind) ? 'Saving...' : 'Save Template',
                 ),
               ),
             ),
@@ -685,7 +685,7 @@ class _TicketTemplateScreenState extends State<TicketTemplateScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFF5F5F5),
       appBar: AppBar(
-        title: const Text('Template Tiket & Email'),
+        title: const Text('Ticket & Email Template'),
         backgroundColor: Colors.white,
         foregroundColor: Colors.black,
       ),
@@ -694,15 +694,15 @@ class _TicketTemplateScreenState extends State<TicketTemplateScreen> {
         padding: const EdgeInsets.all(16),
         children: [
           _sectionCard(
-            title: 'Template Tiket',
+            title: 'Ticket Template',
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 SwitchListTile.adaptive(
                   contentPadding: EdgeInsets.zero,
-                  title: const Text('Gunakan template kustom'),
+                  title: const Text('Use custom template'),
                   subtitle: const Text(
-                    'Template bawaan tetap dipakai bila opsi ini nonaktif.',
+                    'Default template is used when this option is off.',
                   ),
                   value: _customMode,
                   activeThumbColor: Colors.black,
@@ -717,8 +717,8 @@ class _TicketTemplateScreenState extends State<TicketTemplateScreen> {
                     icon: const Icon(Icons.upload_file),
                     label: Text(
                       _backgroundUrl == null
-                          ? 'Unggah Gambar Latar'
-                          : 'Ganti Gambar Latar',
+                          ? 'Upload Background'
+                          : 'Change Background',
                     ),
                   ),
                   Align(
@@ -727,7 +727,7 @@ class _TicketTemplateScreenState extends State<TicketTemplateScreen> {
                       key: const ValueKey('ticket-template-edit-toggle'),
                       onPressed: _openFullscreenEditor,
                       icon: const Icon(Icons.open_in_full),
-                      label: const Text('Edit Template Tiket'),
+                      label: const Text('Edit Ticket Template'),
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -746,10 +746,10 @@ class _TicketTemplateScreenState extends State<TicketTemplateScreen> {
                     ),
                     child: Text(
                       _isPublishing
-                          ? 'Mempublikasikan...'
+                          ? 'Publishing...'
                           : _isSavingTicket
-                          ? 'Menyimpan...'
-                          : 'Simpan Template Tiket',
+                          ? 'Saving...'
+                          : 'Save Ticket Template',
                     ),
                   ),
                 ),
@@ -761,14 +761,14 @@ class _TicketTemplateScreenState extends State<TicketTemplateScreen> {
             _buildEmailEditor(
               kind: 'otp',
               title: 'Email OTP',
-              description: 'Dikirim saat peserta melakukan verifikasi OTP.',
+              description: 'Sent when participants verify via OTP.',
             ),
             const SizedBox(height: 16),
             _buildEmailEditor(
               kind: 'ticket',
-              title: 'Email Ticket / Persetujuan',
+              title: 'Ticket / Approval Email',
               description:
-                  'Dikirim setelah peserta Manual Review diterima dan ticket tersedia.',
+                  'Sent after Manual Review participants are approved and ticket is available.',
             ),
           ],
         ],

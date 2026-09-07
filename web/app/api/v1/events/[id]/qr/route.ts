@@ -16,7 +16,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     .limit(1);
 
   if (!event) {
-    return NextResponse.json({ status: 'error', message: 'Event tidak ditemukan' }, { status: 404 });
+    return NextResponse.json({ status: 'error', message: 'Event not found' }, { status: 404 });
   }
 
   const baseUrl = getCanonicalBaseUrl(request);

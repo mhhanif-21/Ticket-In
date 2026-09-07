@@ -38,11 +38,15 @@ class TicketTemplateEditorScreen extends StatefulWidget {
 
 class _TicketTemplateEditorScreenState
     extends State<TicketTemplateEditorScreen> {
-  static const _minimumTextWidth = 0.02;
-  static const _minimumTextHeight = 0.012;
-  static const _textHorizontalPadding = 4.0;
-  static const _textVerticalPadding = 4.0;
-  static const _resizeHandleDiameter = 14.0;
+  // ── Layout constants ──────────────────────────────────────────────────
+  static const _minimumTextWidth = 0.04;
+  static const _minimumTextHeight = 0.02;
+  static const _maximumTextWidth = 0.95;
+  static const _maximumTextHeight = 0.50;
+  static const _textHorizontalPadding = 8.0;
+  static const _textVerticalPadding = 6.0;
+  static const _resizeHandleDiameter = 20.0;
+  static const _resizeHandleTouchPadding = 8.0;
   static const _selectionInset = _resizeHandleDiameter / 2;
   static const _paletteTokens = <String>['NAME', 'EMAIL', 'EVENT_NAME'];
 
@@ -54,7 +58,12 @@ class _TicketTemplateEditorScreenState
     '#2563EB',
     '#16A34A',
     '#EAB308',
+    '#7C3AED',
+    '#EC4899',
   ];
+
+  // ── Selection accent ──────────────────────────────────────────────────
+  static const _selectionColor = Color(0xFF2979FF);
 
   late List<TicketTemplateElementModel> _elements;
   late final double _backgroundAspectRatio;
@@ -103,9 +112,6 @@ class _TicketTemplateEditorScreenState
   TicketTemplateElementModel _normalizeElement(
     TicketTemplateElementModel element,
   ) {
-    // QR owns its physical square. Text owns only its glyph bounds; persisted
-    // width/height are regenerated from the canonical font size to prevent an
-    // old layout rectangle from becoming a group-like selection box.
     final minimumWidth = element.type == 'qr'
         ? ticketTemplateMinQrSize
         : _minimumTextWidth;
@@ -124,17 +130,24 @@ class _TicketTemplateEditorScreenState
     var x = _clamp(element.x, 0.0, 1.0 - previousWidth);
     var y = _clamp(element.y, 0.0, 1.0 - previousHeight);
     if (element.type != 'qr') {
-      // Existing templates positioned text in a broad container. Preserve the
-      // visual centre while replacing that container with its compact bounds.
-      final centerX = x + previousWidth / 2;
-      final centerY = y + previousHeight / 2;
+      // For text elements, use the persisted width/height directly if they
+      // are above the minimum. Only fall back to intrinsic measurement for
+      // elements that have never been freely resized.
       final intrinsic = _intrinsicTextGeometry(
         element.copyWith(fontSize: fontSize),
       );
-      width = _clamp(intrinsic.width, minimumWidth, 0.75);
-      height = _clamp(intrinsic.height, minimumHeight, 0.20);
-      x = _clamp(centerX - width / 2, 0.0, 1.0 - width);
-      y = _clamp(centerY - height / 2, 0.0, 1.0 - height);
+      width = _clamp(
+        math.max(previousWidth, intrinsic.width),
+        minimumWidth,
+        _maximumTextWidth,
+      );
+      height = _clamp(
+        math.max(previousHeight, intrinsic.height),
+        minimumHeight,
+        _maximumTextHeight,
+      );
+      x = _clamp(x, 0.0, 1.0 - width);
+      y = _clamp(y, 0.0, 1.0 - height);
     }
     return element.copyWith(
       x: x,
@@ -156,19 +169,19 @@ class _TicketTemplateEditorScreenState
       ),
       maxLines: 1,
       textDirection: TextDirection.ltr,
-    )..layout(maxWidth: ticketTemplateCanvasWidth * 0.8);
+    )..layout(maxWidth: ticketTemplateCanvasWidth * 0.9);
     final canonicalCanvasHeight =
         ticketTemplateCanvasWidth / _backgroundAspectRatio;
     return Size(
       _clamp(
         (painter.width + _textHorizontalPadding) / ticketTemplateCanvasWidth,
         _minimumTextWidth,
-        0.75,
+        _maximumTextWidth,
       ),
       _clamp(
         (painter.height + _textVerticalPadding) / canonicalCanvasHeight,
         _minimumTextHeight,
-        0.20,
+        _maximumTextHeight,
       ),
     );
   }
@@ -198,15 +211,15 @@ class _TicketTemplateEditorScreenState
       case 'qr':
         return 'QR Code';
       case 'ticket_code':
-        return 'Kode Tiket';
+        return 'Ticket Code';
       case 'name':
-        return 'Nama';
+        return 'Name';
       case 'email':
         return 'Email';
       case 'event_name':
-        return 'Nama Event';
+        return 'Event Name';
       default:
-        return 'Elemen';
+        return 'Element';
     }
   }
 
@@ -264,91 +277,61 @@ class _TicketTemplateEditorScreenState
       return;
     }
 
+    // ── Free-form text resize ─────────────────────────────────────────
+    // Unlike the old "semantic" resize that only scaled font size, this
+    // allows the user to freely resize the text bounding box (like in
+    // Canva). Font size scales proportionally with the box height change.
     final dx = delta.dx / canvasSize.width;
     final dy = delta.dy / canvasSize.height;
-    final scaleDelta = switch (handle) {
-      _ResizeHandle.bottomRight => math.max(
-        dx / current.width,
-        dy / current.height,
-      ),
-      _ResizeHandle.topLeft => math.max(
-        -dx / current.width,
-        -dy / current.height,
-      ),
-      _ResizeHandle.topRight => math.max(
-        dx / current.width,
-        -dy / current.height,
-      ),
-      _ResizeHandle.bottomLeft => math.max(
-        -dx / current.width,
-        dy / current.height,
-      ),
-    };
-    final minimumScale = math.max(
-      _minimumTextWidth / current.width,
-      _minimumTextHeight / current.height,
-    );
-    final right = current.x + current.width;
-    final bottom = current.y + current.height;
-    final maximumScale = switch (handle) {
-      _ResizeHandle.topLeft => math.min(
-        right / current.width,
-        bottom / current.height,
-      ),
-      _ResizeHandle.topRight => math.min(
-        (1.0 - current.x) / current.width,
-        bottom / current.height,
-      ),
-      _ResizeHandle.bottomLeft => math.min(
-        right / current.width,
-        (1.0 - current.y) / current.height,
-      ),
-      _ResizeHandle.bottomRight => math.min(
-        (1.0 - current.x) / current.width,
-        (1.0 - current.y) / current.height,
-      ),
-    };
-    final scale = _clamp(
-      1.0 + scaleDelta,
-      minimumScale,
-      math.max(minimumScale, maximumScale),
-    );
+
+    var newX = current.x;
+    var newY = current.y;
+    var newWidth = current.width;
+    var newHeight = current.height;
+
+    switch (handle) {
+      case _ResizeHandle.bottomRight:
+        newWidth = current.width + dx;
+        newHeight = current.height + dy;
+      case _ResizeHandle.topLeft:
+        newX = current.x + dx;
+        newY = current.y + dy;
+        newWidth = current.width - dx;
+        newHeight = current.height - dy;
+      case _ResizeHandle.topRight:
+        newY = current.y + dy;
+        newWidth = current.width + dx;
+        newHeight = current.height - dy;
+      case _ResizeHandle.bottomLeft:
+        newX = current.x + dx;
+        newWidth = current.width - dx;
+        newHeight = current.height + dy;
+    }
+
+    // Clamp dimensions
+    newWidth = _clamp(newWidth, _minimumTextWidth, _maximumTextWidth);
+    newHeight = _clamp(newHeight, _minimumTextHeight, _maximumTextHeight);
+
+    // Ensure element stays within canvas
+    newX = _clamp(newX, 0.0, 1.0 - newWidth);
+    newY = _clamp(newY, 0.0, 1.0 - newHeight);
+
+    // Scale font proportionally to height change ratio
+    final heightRatio = newHeight / current.height;
     final fontSize = _clamp(
-      current.fontSize * scale,
+      current.fontSize * heightRatio,
       ticketTemplateMinFontSize,
       ticketTemplateMaxFontSize,
     );
-    // Resize is semantic for text: first scale the font, then measure the
-    // resulting label again. This keeps the selection bounds tight around the
-    // actual one-line text instead of merely growing an empty box.
-    final intrinsic = _intrinsicTextGeometry(
-      current.copyWith(fontSize: fontSize),
-    );
-    final width = _clamp(intrinsic.width, _minimumTextWidth, 0.75);
-    final height = _clamp(intrinsic.height, _minimumTextHeight, 0.20);
-    var x = current.x;
-    var y = current.y;
-    switch (handle) {
-      case _ResizeHandle.topLeft:
-        x = right - width;
-        y = bottom - height;
-      case _ResizeHandle.topRight:
-        y = bottom - height;
-      case _ResizeHandle.bottomLeft:
-        x = right - width;
-      case _ResizeHandle.bottomRight:
-        break;
-    }
-    x = _clamp(x, 0.0, 1.0 - width);
-    y = _clamp(y, 0.0, 1.0 - height);
+
     setState(() {
       _selectedIndex = index;
       _dirty = true;
       _elements[index] = current.copyWith(
-        x: x,
-        y: y,
-        width: width,
-        height: height,
+        x: newX,
+        y: newY,
+        width: newWidth,
+        height: newHeight,
         fontSize: fontSize,
       );
     });
@@ -376,7 +359,7 @@ class _TicketTemplateEditorScreenState
     final minSize =
         ticketTemplateMinQrSize * math.min(canvasSize.width, canvasSize.height);
     final maxSize = math.min(
-      math.min(canvasSize.width, canvasSize.height),
+      ticketTemplateMaxQrSize * math.min(canvasSize.width, canvasSize.height),
       math.min(
         handle == _ResizeHandle.topLeft || handle == _ResizeHandle.bottomLeft
             ? currentRight
@@ -489,7 +472,7 @@ class _TicketTemplateEditorScreenState
     final isQr = element.type == 'qr';
     final fontSize =
         (element.fontSize * canvasSize.width / ticketTemplateCanvasWidth)
-            .clamp(1.0, 160.0)
+            .clamp(1.0, 200.0)
             .toDouble();
 
     final outerInset = selected ? _selectionInset : 0.0;
@@ -519,7 +502,7 @@ class _TicketTemplateEditorScreenState
                 decoration: BoxDecoration(
                   color: isQr ? Colors.white : Colors.transparent,
                   border: selected
-                      ? Border.all(color: Colors.white70, width: 1)
+                      ? Border.all(color: _selectionColor, width: 1.5)
                       : null,
                 ),
                 child: Center(
@@ -573,21 +556,31 @@ class _TicketTemplateEditorScreenState
       _ResizeHandle.bottomRight => elementSize.height,
     };
     return Positioned(
-      left: left,
-      top: top,
+      left: left - _resizeHandleTouchPadding,
+      top: top - _resizeHandleTouchPadding,
       child: GestureDetector(
         key: ValueKey(keyName),
         behavior: HitTestBehavior.opaque,
         onPanStart: (_) => _select(index),
         onPanUpdate: (details) =>
             _resizeElement(index, handle, details.delta, canvasSize),
-        child: Container(
-          width: _resizeHandleDiameter,
-          height: _resizeHandleDiameter,
-          decoration: BoxDecoration(
-            color: Colors.white,
-            border: Border.all(color: Colors.black87, width: 1.2),
-            shape: BoxShape.circle,
+        child: Padding(
+          padding: const EdgeInsets.all(_resizeHandleTouchPadding),
+          child: Container(
+            width: _resizeHandleDiameter,
+            height: _resizeHandleDiameter,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              border: Border.all(color: _selectionColor, width: 2.0),
+              shape: BoxShape.circle,
+              boxShadow: const [
+                BoxShadow(
+                  color: Colors.black26,
+                  blurRadius: 3,
+                  offset: Offset(0, 1),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -634,7 +627,7 @@ class _TicketTemplateEditorScreenState
                           color: Color(0xFF292929),
                           child: Center(
                             child: Text(
-                              'Gambar latar tidak dapat dimuat',
+                              'Background image could not be loaded',
                               style: TextStyle(color: Colors.white),
                             ),
                           ),
@@ -658,7 +651,7 @@ class _TicketTemplateEditorScreenState
                               vertical: 7,
                             ),
                             child: Text(
-                              'Geser elemen untuk memindahkan. Tarik sudut untuk mengubah ukuran.',
+                              'Drag elements to move. Pull corners to resize.',
                               textAlign: TextAlign.center,
                               style: TextStyle(
                                 color: Colors.white,
@@ -710,7 +703,7 @@ class _TicketTemplateEditorScreenState
                 color: _colorFromHex(color),
                 shape: BoxShape.circle,
                 border: Border.all(
-                  color: selected ? Colors.blue : Colors.black38,
+                  color: selected ? _selectionColor : Colors.black38,
                   width: selected ? 3 : 1,
                 ),
               ),
@@ -750,7 +743,7 @@ class _TicketTemplateEditorScreenState
                   children: [
                     Expanded(
                       child: Text(
-                        'Elemen dipilih: ${_elementLabel(selectedElement)}',
+                        'Selected: ${_elementLabel(selectedElement)}',
                         style: const TextStyle(fontWeight: FontWeight.w700),
                       ),
                     ),
@@ -759,22 +752,22 @@ class _TicketTemplateEditorScreenState
                         key: const ValueKey('ticket-template-delete-element'),
                         onPressed: _removeSelectedElement,
                         icon: const Icon(Icons.delete_outline),
-                        label: const Text('Hapus'),
+                        label: const Text('Delete'),
                       )
                     else
                       const Text(
-                        'Wajib',
+                        'Required',
                         style: TextStyle(fontWeight: FontWeight.w600),
                       ),
                   ],
                 ),
                 if (selectedElement.type != 'qr') ...[
                   const SizedBox(height: 4),
-                  const Text('Warna teks'),
+                  const Text('Text color'),
                   const SizedBox(height: 6),
                   _buildColorPicker(),
                 ] else
-                  const Text('QR wajib dan selalu berbentuk square.'),
+                  const Text('QR is required and always square.'),
               ],
             ),
           ),
@@ -793,7 +786,7 @@ class _TicketTemplateEditorScreenState
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
-                'Tambah elemen',
+                'Add element',
                 style: TextStyle(fontWeight: FontWeight.w700),
               ),
               const SizedBox(height: 6),
@@ -802,7 +795,7 @@ class _TicketTemplateEditorScreenState
                 child: _availableTokens.isEmpty
                     ? const Align(
                         alignment: Alignment.centerLeft,
-                        child: Text('Semua elemen opsional sudah digunakan.'),
+                        child: Text('All optional elements are in use.'),
                       )
                     : ListView.separated(
                         scrollDirection: Axis.horizontal,
@@ -833,14 +826,14 @@ class _TicketTemplateEditorScreenState
         await showDialog<bool>(
               context: context,
               builder: (dialogContext) => AlertDialog(
-                title: const Text('Buang perubahan?'),
+                title: const Text('Discard changes?'),
                 content: const Text(
-                  'Perubahan template yang belum disimpan akan hilang.',
+                  'Unsaved template changes will be lost.',
                 ),
                 actions: [
                   TextButton(
                     onPressed: () => Navigator.of(dialogContext).pop(false),
-                    child: const Text('Batal'),
+                    child: const Text('Cancel'),
                   ),
                   ElevatedButton(
                     onPressed: () => Navigator.of(dialogContext).pop(true),
@@ -848,7 +841,7 @@ class _TicketTemplateEditorScreenState
                       backgroundColor: Colors.black,
                       foregroundColor: Colors.white,
                     ),
-                    child: const Text('Buang'),
+                    child: const Text('Discard'),
                   ),
                 ],
               ),
@@ -863,7 +856,7 @@ class _TicketTemplateEditorScreenState
     if (!_elements.any((element) => element.type == 'qr') ||
         !_elements.any((element) => element.type == 'ticket_code')) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('QR dan Kode Tiket wajib tersedia.')),
+        const SnackBar(content: Text('QR and Ticket Code are required.')),
       );
       return;
     }
@@ -887,7 +880,7 @@ class _TicketTemplateEditorScreenState
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text(
-              'Template tiket belum dapat disimpan. Silakan coba lagi.',
+              'Ticket template could not be saved. Please try again.',
             ),
           ),
         );
@@ -910,17 +903,17 @@ class _TicketTemplateEditorScreenState
           backgroundColor: Colors.white,
           foregroundColor: Colors.black,
           leading: IconButton(
-            tooltip: 'Kembali',
+            tooltip: 'Back',
             onPressed: _handleBack,
             icon: const Icon(Icons.close),
           ),
-          title: const Text('Edit Template Tiket'),
+          title: const Text('Edit Ticket Template'),
           actions: [
             TextButton(
               key: const ValueKey('ticket-template-editor-done'),
               onPressed: _isSaving ? null : _saveAndClose,
               child: Text(
-                _isSaving ? 'Menyimpan...' : 'Selesai',
+                _isSaving ? 'Saving...' : 'Done',
                 style: const TextStyle(fontWeight: FontWeight.w700),
               ),
             ),

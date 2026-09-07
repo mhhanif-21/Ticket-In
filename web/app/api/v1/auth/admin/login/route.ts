@@ -12,7 +12,7 @@ export async function POST(req: Request) {
 
     if (!email || !password) {
       return NextResponse.json(
-        { status: 'error', message: 'Email dan password wajib diisi' },
+        { status: 'error', message: 'Email and password are required' },
         { status: 400 }
       );
     }
@@ -23,7 +23,7 @@ export async function POST(req: Request) {
 
     if (error || !data.session || !data.user) {
       return NextResponse.json(
-        { status: 'error', message: 'Kredensial tidak valid' },
+        { status: 'error', message: 'Invalid credentials' },
         { status: 401 }
       );
     }
@@ -31,7 +31,7 @@ export async function POST(req: Request) {
     // WEB-BUG-005: Enforce explicit admin role / allowlist validation
     if (!isAdminUser(data.user)) {
       return NextResponse.json(
-        { status: 'error', message: 'Akun tidak memiliki hak akses admin' },
+        { status: 'error', message: 'Account does not have admin access' },
         { status: 403 }
       );
     }
@@ -45,7 +45,7 @@ export async function POST(req: Request) {
     );
   } catch (error: any) {
     return NextResponse.json(
-      { status: 'error', message: 'Terjadi kesalahan internal server' },
+      { status: 'error', message: 'Internal server error' },
       { status: 500 }
     );
   }

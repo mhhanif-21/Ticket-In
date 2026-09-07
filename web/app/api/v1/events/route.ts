@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { db } from '@/db';
 import { events } from '@/db/schema';
 import { and, asc, count, desc, eq, gte, ilike, lte, or } from 'drizzle-orm';
+import bcrypt from 'bcryptjs';
 import { EventValidationError, validateEventCreatePayload } from '@/lib/validation/event';
 
 export const runtime = 'nodejs';
@@ -31,7 +32,7 @@ function catalogFailureResponse(request: Request, error: unknown) {
       {
         status: 'error',
         code: 'EVENT_CATALOG_UNAVAILABLE',
-        message: 'Daftar acara sementara tidak tersedia. Silakan coba lagi.',
+        message: 'Event list temporarily unavailable. Please try again.',
       },
       { status: 503 },
     );
@@ -45,7 +46,7 @@ function catalogFailureResponse(request: Request, error: unknown) {
     {
       status: 'error',
       code: 'EVENT_CATALOG_FAILED',
-      message: 'Daftar acara sementara tidak tersedia. Silakan coba lagi.',
+      message: 'Event list temporarily unavailable. Please try again.',
     },
     { status: 500 },
   );
@@ -57,7 +58,7 @@ function eventCreationFailureResponse(request: Request, error: unknown) {
   const body = {
     status: 'error',
     code: databaseCode ? 'EVENT_CREATE_UNAVAILABLE' : 'EVENT_CREATE_FAILED',
-    message: 'Acara belum dapat dibuat. Silakan coba lagi.',
+    message: 'Event could not be created. Please try again.',
   };
 
   if (databaseCode) {
@@ -97,7 +98,7 @@ export async function POST(req: Request) {
       return NextResponse.json({
         status: 'error',
         code: 'IDEMPOTENCY_KEY_REQUIRED',
-        message: 'Permintaan pembuatan acara tidak valid. Silakan coba lagi.',
+        message: 'Invalid event creation request. Please try again.',
       }, { status: 400 });
     }
 
@@ -109,7 +110,7 @@ export async function POST(req: Request) {
     if (existingByKey) {
       return NextResponse.json({
         status: 'success',
-        message: 'Event sebelumnya digunakan kembali',
+        message: 'Previous event reused',
         data: existingByKey,
         idempotent_replay: true,
       }, { status: 200 });
@@ -119,7 +120,7 @@ export async function POST(req: Request) {
     try {
       body = await req.json();
     } catch {
-      return NextResponse.json({ status: 'error', code: 'EVENT_PAYLOAD_INVALID', message: 'Payload JSON tidak valid.' }, { status: 400 });
+      return NextResponse.json({ status: 'error', code: 'EVENT_PAYLOAD_INVALID', message: 'Invalid JSON payload.' }, { status: 400 });
     }
 
     const eventInput = validateEventCreatePayload(body);
@@ -137,6 +138,10 @@ export async function POST(req: Request) {
       counter++;
     }
 
+    const initialPin = Math.floor(100000 + Math.random() * 900000).toString();
+    const salt = await bcrypt.genSalt(10);
+    const initialPinHash = await bcrypt.hash(initialPin, salt);
+
     const insertedEvents = await db.insert(events).values({
       name: eventInput.name,
       slug,
@@ -146,7 +151,8 @@ export async function POST(req: Request) {
       description: eventInput.description,
       registrationMode: eventInput.registrationMode,
       posterAspectMode: eventInput.posterAspectMode,
-      volunteerPinHash: '', // Dummy for now, generated in S3-T4
+      volunteerPin: initialPin,
+      volunteerPinHash: initialPinHash,
       creationKey: idempotencyKey,
       status: 'Draft',
     }).onConflictDoNothing({ target: events.creationKey }).returning();
@@ -161,7 +167,7 @@ export async function POST(req: Request) {
       if (replayedEvent) {
         return NextResponse.json({
           status: 'success',
-          message: 'Event sebelumnya digunakan kembali',
+          message: 'Previous event reused',
           data: replayedEvent,
           idempotent_replay: true,
         }, { status: 200 });
@@ -170,7 +176,7 @@ export async function POST(req: Request) {
     }
 
     return NextResponse.json(
-      { status: 'success', message: 'Event berhasil dibuat', data: newEvent, idempotent_replay: false },
+      { status: 'success', message: 'Event created successfully', data: newEvent, idempotent_replay: false },
       { status: 201 }
     );
   } catch (error: unknown) {
@@ -198,7 +204,7 @@ export async function GET(req: Request) {
     if (page === null || limit === null || !EVENT_SORTS.has(sort) ||
       (status !== null && !EVENT_STATUSES.has(status)) ||
       dateFrom === null || dateTo === null) {
-      return NextResponse.json({ status: 'error', message: 'Parameter daftar acara tidak valid' }, { status: 400 });
+      return NextResponse.json({ status: 'error', message: 'Invalid event list parameters' }, { status: 400 });
     }
 
     const conditions = [];

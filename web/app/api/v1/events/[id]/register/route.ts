@@ -59,7 +59,7 @@ class ParticipantFileUploadError extends Error {
   readonly providerCode: unknown;
 
   constructor(providerCode?: unknown) {
-    super('Berkas belum dapat diunggah. Silakan coba lagi.');
+    super('File could not be uploaded. Please try again.');
     this.name = 'ParticipantFileUploadError';
     this.providerCode = providerCode;
   }
@@ -149,15 +149,15 @@ function safeFailureCategory(stage: string, error: unknown): string {
 
 function userFailureMessage(stage: string): string {
   if (stage.includes('participant_file') || stage.includes('storage')) {
-    return 'Berkas pendaftaran belum dapat diproses. Periksa format dan ukuran berkas, lalu coba lagi.';
+    return 'Registration file could not be processed. Check file format and size, then try again.';
   }
   if (stage === 'persist_registration') {
-    return 'Gagal menyimpan registrasi. Silakan coba lagi.';
+    return 'Failed to save registration. Please try again.';
   }
   if (stage === 'load_event' || stage === 'load_form_fields') {
-    return 'Konfigurasi acara belum dapat dimuat. Silakan coba lagi.';
+    return 'Event configuration could not be loaded. Please try again.';
   }
-  return 'Pendaftaran gagal diproses. Silakan coba lagi.';
+  return 'Registration failed to process. Please try again.';
 }
 
 function redactLogText(value: string, maxLength = 512): string {
@@ -267,7 +267,7 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
     // Check if it's multipart/form-data
     const contentType = req.headers.get('content-type') || '';
     if (!contentType.includes('multipart/form-data')) {
-      return NextResponse.json({ status: 'error', message: 'Mesti multipart/form-data' }, { status: 400 });
+      return NextResponse.json({ status: 'error', message: 'Must be multipart/form-data' }, { status: 400 });
     }
 
     const formData = await req.formData();
@@ -284,11 +284,11 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
     failureStage = 'load_event';
     const [event] = await db.select({ id: events.id, name: events.name, status: events.status }).from(events).where(eq(events.slug, slug)).limit(1);
     if (!event) {
-      return NextResponse.json({ status: 'error', message: 'Event tidak ditemukan' }, { status: 404 });
+      return NextResponse.json({ status: 'error', message: 'Event not found' }, { status: 404 });
     }
     eventIdForLog = event.id;
     if (!isPublicEventStatus(event.status)) {
-      return NextResponse.json({ status: 'error', message: 'Event belum dipublikasikan atau sudah dibatalkan' }, { status: 409 });
+      return NextResponse.json({ status: 'error', message: 'Event unpublished or cancelled' }, { status: 409 });
     }
     failureStage = 'load_form_fields';
     const eventFormFields = await db.select({
@@ -334,7 +334,7 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
         if (value.size === 0) continue;
         const field = fieldsByKey.get(key);
         if (!field || !['file', 'image'].includes(field.fieldType)) {
-          throw new RegistrationFormValidationError(`Field ${key} tidak menerima berkas`);
+          throw new RegistrationFormValidationError(`Field ${key} does not accept files`);
         }
 
         const fileName = fileNameFor(value, 'berkas');
@@ -383,7 +383,7 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
       } else if (Array.isArray(value)) {
         if (value.some((item) => isRegistrationFileValue(item))) {
           const field = fieldsByKey.get(key);
-          throw new RegistrationFormValidationError(`Field ${field?.fieldName ?? key} hanya menerima satu berkas`);
+          throw new RegistrationFormValidationError(`Field ${field?.fieldName ?? key} only accepts one file`);
         }
         answers[key] = value;
       } else {
@@ -454,7 +454,7 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
         });
         return NextResponse.json({
           status: 'error',
-          message: 'Pendaftaran tersimpan, tetapi OTP belum dapat dikirim. Silakan kirim ulang formulir untuk membuat OTP baru.',
+          message: 'Registration saved, but OTP could not be sent. Please resubmit the form to generate a new OTP.',
           data: {
             ...toPublicRegistrationData(result),
             otp_delivery: 'failed',
@@ -482,7 +482,7 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
         const job = await import('@/lib/actions/ticketGenerationJob').then(({ getTicketGenerationJob }) => getTicketGenerationJob(result.registrationId));
         return NextResponse.json({
           status: 'error',
-          message: 'Pendaftaran diterima, tetapi pekerjaan penerbitan tiket gagal dikirim dan dapat dicoba ulang.',
+          message: 'Registration accepted, but ticket generation job failed to send and can be retried.',
           data: {
             ...toPublicRegistrationData(result),
             ticketJobId: job?.id || result.ticketJobId,
@@ -519,17 +519,17 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
     if (message.includes('NotFoundException')) {
       return NextResponse.json({ status: 'error', message }, { status: 404 });
     }
-    if (message.includes('Event belum dipublikasikan')) {
+    if (message.includes('Event unpublished')) {
       return NextResponse.json({ status: 'error', message }, { status: 409 });
     }
     if (message.includes('InvalidRegistrationResubmit')) {
-      return NextResponse.json({ status: 'error', message: 'Registrasi tidak dapat diperbarui untuk event atau status ini' }, { status: 409 });
+      return NextResponse.json({ status: 'error', message: 'Registration cannot be updated for this event or status' }, { status: 409 });
     }
     if (message.includes('ParticipantFileClaimFailed')) {
       return NextResponse.json({
         status: 'error',
         code: 'REGISTRATION_FILE_OWNERSHIP_CONFLICT',
-        message: 'Berkas pendaftaran berubah sebelum disimpan. Silakan kirim formulir kembali.',
+        message: 'Registration file changed before saving. Please submit the form again.',
       }, { status: 409 });
     }
     if (error instanceof RegistrationFormValidationError) {

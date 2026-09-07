@@ -78,7 +78,7 @@ class _DetailEventMetricsScreenState
                 _buildPosterSection(data),
                 const SizedBox(height: 32),
                 const Text(
-                  'Dashboard Metrik',
+                  'Metrics Dashboard',
                   style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
@@ -90,7 +90,7 @@ class _DetailEventMetricsScreenState
                 const SizedBox(height: 32),
 
                 const Text(
-                  'Manajemen Acara',
+                  'Event Management',
                   style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
@@ -165,7 +165,7 @@ class _DetailEventMetricsScreenState
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          'Informasi Acara',
+          'Event Information',
           style: TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.bold,
@@ -173,21 +173,21 @@ class _DetailEventMetricsScreenState
           ),
         ),
         const SizedBox(height: 14),
-        _buildMetadataRow('Nama Acara', _metadataValue(data['name'])),
+        _buildMetadataRow('Event Name', _metadataValue(data['name'])),
         const Divider(height: 1),
-        _buildMetadataRow('Deskripsi', _metadataValue(data['description'])),
+        _buildMetadataRow('Description', _metadataValue(data['description'])),
         const Divider(height: 1),
-        _buildMetadataRow('Lokasi', _metadataValue(data['location'])),
+        _buildMetadataRow('Location', _metadataValue(data['location'])),
         const Divider(height: 1),
-        _buildMetadataRow('Tanggal & Waktu', _formatEventDate(data['date'])),
+        _buildMetadataRow('Date & Time', _formatEventDate(data['date'])),
         const Divider(height: 1),
         _buildMetadataRow(
-          'Kapasitas',
+          'Capacity',
           '${_metadataValue(data['total_capacity'] ?? data['capacity'])} peserta',
         ),
         const Divider(height: 1),
         _buildMetadataRow(
-          'Mode Registrasi',
+          'Registration Mode',
           _metadataValue(data['registrationMode'] ?? data['registration_mode']),
         ),
         const Divider(height: 1),
@@ -235,7 +235,7 @@ class _DetailEventMetricsScreenState
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
             const Text(
-              'Poster Acara',
+              'Event Poster',
               style: TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
@@ -263,7 +263,7 @@ class _DetailEventMetricsScreenState
               borderRadius: BorderRadius.circular(12),
             ),
             child: const Text(
-              'Poster acara belum tersedia.',
+              'Event poster not available.',
               textAlign: TextAlign.center,
               style: TextStyle(color: AppColors.onSurfaceVariant),
             ),
@@ -426,22 +426,22 @@ class _DetailEventMetricsScreenState
       mainAxisExtent: 220,
       children: [
         _buildMetricCard(
-          title: 'Total Pendaftar',
+          title: 'Total Registrants',
           value: totalReg.toString(),
           icon: Icons.groups,
-          subtext: 'Dari $capacity Kapasitas',
+          subtext: 'Out of $capacity Capacity',
           iconColor: Colors.blue,
         ),
         _buildMetricCard(
           title: 'Pending',
           value: pending.toString(),
           icon: Icons.hourglass_empty,
-          subtext: 'Menunggu review',
+          subtext: 'Pending review',
           iconColor: Colors.orange,
           showActionReq: pending > 0,
         ),
         _buildMetricCardWithProgress(
-          title: 'Diterima',
+          title: 'Accepted',
           value: accepted.toString(),
           icon: Icons.check_circle,
           iconColor: AppColors.primary,
@@ -449,7 +449,7 @@ class _DetailEventMetricsScreenState
           total: totalReg > 0 ? totalReg : 1,
         ),
         _buildMetricCardWithProgress(
-          title: 'Sudah Check-in',
+          title: 'Checked In',
           value: present.toString(),
           icon: Icons.how_to_reg,
           iconColor: Colors.purple,
@@ -634,8 +634,8 @@ class _DetailEventMetricsScreenState
         _buildMenuTile(
           context,
           icon: Icons.edit_note,
-          title: 'Edit Detail Acara',
-          subtitle: 'Ubah informasi dasar, tanggal, dan lokasi',
+          title: 'Edit Event Details',
+          subtitle: 'Change basic information, date, and location',
           onTap: () async {
             await context.push('/edit-event/$eventId');
             if (!context.mounted) return;
@@ -645,8 +645,8 @@ class _DetailEventMetricsScreenState
         _buildMenuTile(
           context,
           icon: Icons.dynamic_form,
-          title: 'Kelola Form Pendaftaran',
-          subtitle: 'Kustomisasi field dan pertanyaan registrasi',
+          title: 'Manage Registration Form',
+          subtitle: 'Customize fields and registration questions',
           onTap: () async {
             await context.push('/form-builder/$eventId');
             if (!context.mounted) return;
@@ -656,8 +656,8 @@ class _DetailEventMetricsScreenState
         _buildMenuTile(
           context,
           icon: Icons.people_alt,
-          title: 'Daftar & Review Peserta',
-          subtitle: 'Terima atau tolak pendaftar yang pending',
+          title: 'Participants & Review',
+          subtitle: 'Accept or reject pending registrants',
           onTap: () async {
             await context.push('/participants/$eventId');
             if (!context.mounted) return;
@@ -667,8 +667,8 @@ class _DetailEventMetricsScreenState
         _buildMenuTile(
           context,
           icon: Icons.admin_panel_settings,
-          title: 'Kelola Akses Panitia',
-          subtitle: 'Atur PIN volunteer untuk check-in',
+          title: 'Manage Committee Access',
+          subtitle: 'Set volunteer PIN for check-in',
           onTap: () async {
             await context.push('/access-management/$eventId');
             if (!context.mounted) return;
@@ -678,8 +678,8 @@ class _DetailEventMetricsScreenState
         _buildMenuTile(
           context,
           icon: Icons.confirmation_number_outlined,
-          title: 'Template Tiket & Email',
-          subtitle: 'Atur tampilan tiket dan email approval Manual Review',
+          title: 'Ticket & Email Template',
+          subtitle: 'Configure ticket appearance and Manual Review approval email',
           onTap: () async {
             await context.push('/ticket-template/$eventId');
             if (!context.mounted) return;
@@ -712,7 +712,7 @@ class _DetailEventMetricsScreenState
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            'Publikasi Acara',
+            'Publish Event',
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.bold,
@@ -721,7 +721,7 @@ class _DetailEventMetricsScreenState
           ),
           const SizedBox(height: 6),
           const Text(
-            'Acara masih berupa draft dan belum terlihat oleh peserta. Publikasikan setelah form pendaftaran siap.',
+            'Event is still a draft and not visible to participants. Publish after the registration form is ready.',
             style: TextStyle(fontSize: 12, color: AppColors.onBackground),
           ),
           const SizedBox(height: 12),
@@ -730,7 +730,7 @@ class _DetailEventMetricsScreenState
             child: ElevatedButton.icon(
               key: const ValueKey('publish-event-button'),
               icon: const Icon(Icons.public),
-              label: const Text('PUBLIKASIKAN ACARA'),
+              label: const Text('PUBLISH EVENT'),
               onPressed: () async {
                 try {
                   await EventService().updateEvent(eventId, {
@@ -740,13 +740,13 @@ class _DetailEventMetricsScreenState
                   ref.invalidate(eventStatsProvider(eventId));
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
-                      content: Text('Acara berhasil dipublikasikan.'),
+                      content: Text('Event successfully published.'),
                     ),
                   );
                 } catch (e) {
                   if (!context.mounted) return;
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Gagal mempublikasikan acara: $e')),
+                    SnackBar(content: Text('Failed to publish event: $e')),
                   );
                 }
               },
@@ -825,7 +825,7 @@ class _DetailEventMetricsScreenState
           ),
           const SizedBox(height: 8),
           const Text(
-            'Tindakan di bawah ini tidak dapat dibatalkan. Berhati-hatilah.',
+            'The actions below cannot be undone. Please be careful.',
             style: TextStyle(color: Colors.red, fontSize: 12),
           ),
           if (status != 'Cancelled') ...[
@@ -846,15 +846,15 @@ class _DetailEventMetricsScreenState
                   final confirm = await showDialog<bool>(
                     context: context,
                     builder: (ctx) => AlertDialog(
-                      title: const Text('Batalkan Acara?'),
+                      title: const Text('Cancel Event?'),
                       content: const Text(
-                        'Acara akan dibatalkan dan peserta tidak bisa mendaftar lagi. '
-                        'Tindakan ini tidak dapat diurungkan.',
+                        'The event will be cancelled and participants can no longer register. '
+                        'This action cannot be undone.',
                       ),
                       actions: [
                         TextButton(
                           onPressed: () => Navigator.pop(ctx, false),
-                          child: const Text('Tidak'),
+                          child: const Text('No'),
                         ),
                         ElevatedButton(
                           style: ElevatedButton.styleFrom(
@@ -862,7 +862,7 @@ class _DetailEventMetricsScreenState
                             foregroundColor: Colors.white,
                           ),
                           onPressed: () => Navigator.pop(ctx, true),
-                          child: const Text('Ya, Batalkan'),
+                          child: const Text('Yes, Cancel'),
                         ),
                       ],
                     ),
@@ -875,7 +875,7 @@ class _DetailEventMetricsScreenState
                     if (!context.mounted) return;
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
-                        content: Text('Acara berhasil dibatalkan.'),
+                        content: Text('Event successfully cancelled.'),
                       ),
                     );
                     // [MOB-BUG-002] FIX: pop agar home_screen .then() callback re-load events
@@ -883,12 +883,12 @@ class _DetailEventMetricsScreenState
                   } catch (e) {
                     if (!context.mounted) return;
                     ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Gagal membatalkan acara: $e')),
+                      SnackBar(content: Text('Failed to cancel event: $e')),
                     );
                   }
                 },
                 child: const Text(
-                  'BATALKAN ACARA',
+                  'CANCEL EVENT',
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
                     letterSpacing: 1.5,
@@ -914,15 +914,15 @@ class _DetailEventMetricsScreenState
                 final confirm = await showDialog<bool>(
                   context: context,
                   builder: (ctx) => AlertDialog(
-                    title: const Text('Hapus Acara?'),
+                    title: const Text('Delete Event?'),
                     content: const Text(
-                      'Seluruh data acara, form, dan peserta akan DIHAPUS PERMANEN. '
-                      'Tindakan ini tidak dapat dibatalkan.',
+                      'All event, form, and participant data will be PERMANENTLY DELETED. '
+                      'This action cannot be undone.',
                     ),
                     actions: [
                       TextButton(
                         onPressed: () => Navigator.pop(ctx, false),
-                        child: const Text('Batal'),
+                        child: const Text('Cancel'),
                       ),
                       ElevatedButton(
                         style: ElevatedButton.styleFrom(
@@ -930,7 +930,7 @@ class _DetailEventMetricsScreenState
                           foregroundColor: Colors.white,
                         ),
                         onPressed: () => Navigator.pop(ctx, true),
-                        child: const Text('Ya, Hapus Permanen'),
+                        child: const Text('Yes, Delete Permanently'),
                       ),
                     ],
                   ),
@@ -940,19 +940,19 @@ class _DetailEventMetricsScreenState
                   await EventService().deleteEvent(eventId);
                   if (!context.mounted) return;
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Acara berhasil dihapus.')),
+                    const SnackBar(content: Text('Event successfully deleted.')),
                   );
                   // [MOB-BUG-002] FIX: pop agar home_screen .then() callback re-load events
                   context.pop();
                 } catch (e) {
                   if (!context.mounted) return;
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Gagal menghapus acara: $e')),
+                    SnackBar(content: Text('Failed to delete event: $e')),
                   );
                 }
               },
               child: const Text(
-                'HAPUS ACARA PERMANEN',
+                'DELETE EVENT PERMANENTLY',
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
                   letterSpacing: 1.5,
