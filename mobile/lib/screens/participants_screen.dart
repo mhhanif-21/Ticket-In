@@ -356,7 +356,7 @@ class _ParticipantsScreenState extends ConsumerState<ParticipantsScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Text(
-                        'Filter 'Filter & Urutkan' Sort',
+                        'Filter & Urutkan',
                         style: TextStyle(
                           fontSize: 20,
                           fontWeight: FontWeight.w600,

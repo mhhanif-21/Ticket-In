@@ -552,29 +552,32 @@ class _AccessManagementScreenState extends State<AccessManagementScreen> {
                                       ),
                                       child: Column(
                                         children: [
-                                          Row(
-                                            mainAxisSize: MainAxisSize.min,
-                                            mainAxisAlignment:
-                                                MainAxisAlignment.center,
-                                            children: [
-                                              Text(
-                                                activePin,
-                                                style: const TextStyle(
-                                                  fontSize: 48,
-                                                  fontWeight: FontWeight.w700,
-                                                  letterSpacing: 12.0,
-                                                  color: Color(0xFF1C1B1B),
-                                                  fontFamily: 'monospace',
-                                                ),
+                                            FittedBox(
+                                              fit: BoxFit.scaleDown,
+                                              child: Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                mainAxisAlignment:
+                                                    MainAxisAlignment.center,
+                                                children: [
+                                                  Text(
+                                                    activePin,
+                                                    style: const TextStyle(
+                                                      fontSize: 48,
+                                                      fontWeight: FontWeight.w700,
+                                                      letterSpacing: 12.0,
+                                                      color: Color(0xFF1C1B1B),
+                                                      fontFamily: 'monospace',
+                                                    ),
+                                                  ),
+                                                  const SizedBox(width: 8),
+                                                  const Icon(
+                                                    Icons.content_copy,
+                                                    size: 24,
+                                                    color: primaryColor,
+                                                  ),
+                                                ],
                                               ),
-                                              const SizedBox(width: 8),
-                                              const Icon(
-                                                Icons.content_copy,
-                                                size: 24,
-                                                color: primaryColor,
-                                              ),
-                                            ],
-                                          ),
+                                            ),
                                           const SizedBox(height: 8),
                                           const Text(
                                             'PIN ACTIVE (Tap to copy)',
