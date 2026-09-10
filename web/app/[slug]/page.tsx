@@ -55,15 +55,6 @@ export default async function PublicEventLandingPage(props: { params: Promise<{ 
               </div>
             </div>
             <div className="flex items-start gap-3">
-              <span className="material-symbols-outlined text-secondary mt-0.5">group</span>
-              <div>
-                <p className="font-label-caps text-label-caps text-secondary dark:text-white/60 uppercase">Quota</p>
-                <p className="font-body-md text-body-md text-on-surface dark:text-white font-medium mt-1">
-                   Remaining {Math.max(0, event.capacity - event.currentCount)} / {event.capacity}
-                </p>
-              </div>
-            </div>
-            <div className="flex items-start gap-3 md:col-span-2">
               <span className="material-symbols-outlined text-secondary mt-0.5">location_on</span>
               <div>
                 <p className="font-label-caps text-label-caps text-secondary dark:text-white/60 uppercase">Location</p>
