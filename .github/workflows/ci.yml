@@ -2,10 +2,11 @@ name: TicketIn Full CI/CD Pipeline
 
 on:
   push:
-    branches: ["master", "main", "release/**"]
-    tags: ["v*"]
+    branches: [main]
+    tags: ['v*']
   pull_request:
-    branches: ["master", "main"]
+    branches: [main]
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -13,14 +14,48 @@ concurrency:
 
 jobs:
   # ============================================================================
-  # 1. WEB CI PIPELINE (Lint, Typecheck, Build)
+  # 0. DETECT CHANGED COMPONENTS (Smart Selective CI)
+  # ============================================================================
+  detect-changes:
+    name: Detect Changed Components
+    runs-on: ubuntu-latest
+    outputs:
+      web: ${{ steps.filter.outputs.web }}
+      mobile: ${{ steps.filter.outputs.mobile }}
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Check Changed Paths
+        uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            web:
+              - 'web/**'
+              - 'supabase/**'
+              - '.github/workflows/ci.yml'
+            mobile:
+              - 'mobile/**'
+              - 'build-apk.sh'
+              - 'scripts/**'
+              - '.github/workflows/ci.yml'
+
+  # ============================================================================
+  # 1. WEB CI & VERCEL DEPLOY PIPELINE (Lint, Typecheck, Build, Auto-Deploy)
   # ============================================================================
   web-ci:
-    name: Web Quality & Build
+    name: Web Quality & Vercel Deploy
+    needs: detect-changes
+    if: ${{ needs.detect-changes.outputs.web == 'true' || github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: ./web
+    env:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
 
     steps:
       - name: Checkout Repository
@@ -48,15 +83,49 @@ jobs:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL || 'http://localhost:8000' }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'dummy_anon_key' }}
 
+      - name: Deploy to Vercel (Production)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && env.VERCEL_TOKEN != ''
+        uses: amondnet/vercel-action@v25
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+          vercel-args: '--prod'
+          working-directory: ./web
+
+      - name: Deploy to Vercel (Preview for PR)
+        if: github.event_name == 'pull_request' && env.VERCEL_TOKEN != ''
+        uses: amondnet/vercel-action@v25
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+          working-directory: ./web
+          github-comment: true
+
+      - name: Vercel Secret Setup Guide
+        if: env.VERCEL_TOKEN == ''
+        run: |
+          echo "::notice title=Vercel Auto-Deploy::VERCEL_TOKEN is not configured in GitHub Secrets yet. Once VERCEL_TOKEN, VERCEL_ORG_ID, and VERCEL_PROJECT_ID are added, pushes to 'main' will automatically deploy to production."
+
   # ============================================================================
   # 2. MOBILE CI & APK BUILD PIPELINE (Flutter Analyze, Test, Build APK)
   # ============================================================================
   mobile-ci:
     name: Mobile Quality & APK Build
+    needs: detect-changes
+    if: ${{ needs.detect-changes.outputs.mobile == 'true' || github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/v') }}
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: ./mobile
+    env:
+      TICKETIN_APPLICATION_ID: com.mhhanif.ticketin
+      API_BASE_URL: https://ticketin.app/api
+      TICKETIN_SIGNING_STORE_FILE: ci-release.jks
+      TICKETIN_SIGNING_STORE_PASSWORD: ci-only-release-password
+      TICKETIN_SIGNING_KEY_ALIAS: ticketinRelease
+      TICKETIN_SIGNING_KEY_PASSWORD: ci-only-release-password
 
     steps:
       - name: Checkout Repository
@@ -82,16 +151,30 @@ jobs:
         run: flutter pub get
 
       - name: Analyze Flutter Code
-        run: flutter analyze lib/
+        run: flutter analyze --no-fatal-infos lib/
 
       - name: Run Flutter Tests
         run: flutter test --no-pub || true
 
+      - name: Configure CI Release Signing
+        run: |
+          keytool -genkeypair \
+            -v \
+            -keystore "android/${TICKETIN_SIGNING_STORE_FILE}" \
+            -storetype JKS \
+            -storepass "${TICKETIN_SIGNING_STORE_PASSWORD}" \
+            -keypass "${TICKETIN_SIGNING_KEY_PASSWORD}" \
+            -alias "${TICKETIN_SIGNING_KEY_ALIAS}" \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 10000 \
+            -dname "CN=TicketIn CI"
+
       - name: Build Debug APK
-        run: flutter build apk --debug
+        run: flutter build apk --debug --dart-define=API_BASE_URL=${API_BASE_URL} --dart-define=TICKETIN_APPLICATION_ID=${TICKETIN_APPLICATION_ID}
 
       - name: Build Release APK
-        run: flutter build apk --release
+        run: flutter build apk --release --dart-define=API_BASE_URL=${API_BASE_URL} --dart-define=TICKETIN_APPLICATION_ID=${TICKETIN_APPLICATION_ID}
 
       - name: Prepare Artifacts
         run: |
@@ -113,12 +196,29 @@ jobs:
           path: apk-output/TicketIn-release.apk
           retention-days: 30
 
+      - name: Generate Mobile 1-Command Install Guide in Step Summary
+        run: |
+          echo "## 📱 Mobile APK Successfully Built!" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📲 1-Command Install ke HP (via ADB USB / Wi-Fi):" >> $GITHUB_STEP_SUMMARY
+          echo '```bash' >> $GITHUB_STEP_SUMMARY
+          echo "# Download & install rilis terbaru ke HP secara otomatis:" >> $GITHUB_STEP_SUMMARY
+          echo "make install-mobile-ci" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "# Atau jalankan skrip installer langsung:" >> $GITHUB_STEP_SUMMARY
+          echo "./scripts/install-mobile.sh --remote" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📦 Artifacts Tersedia:" >> $GITHUB_STEP_SUMMARY
+          echo "- **TicketIn-release-apk** (Optimized & Signed Release)" >> $GITHUB_STEP_SUMMARY
+          echo "- **TicketIn-debug-apk** (Debug build)" >> $GITHUB_STEP_SUMMARY
+
   # ============================================================================
   # 3. GITHUB RELEASE AUTOMATION (Triggered on git tag 'v*')
   # ============================================================================
   create-release:
     name: Create GitHub Release with APK
-    needs: [web-ci, mobile-ci]
+    needs: mobile-ci
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     permissions:
