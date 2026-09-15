@@ -121,7 +121,7 @@ jobs:
         working-directory: ./mobile
     env:
       TICKETIN_APPLICATION_ID: com.mhhanif.ticketin
-      API_BASE_URL: https://ticketin.app/api
+      API_BASE_URL: https://ticket-in-nine.vercel.app/api
       TICKETIN_SIGNING_STORE_FILE: ci-release.jks
       TICKETIN_SIGNING_STORE_PASSWORD: ci-only-release-password
       TICKETIN_SIGNING_KEY_ALIAS: ticketinRelease
