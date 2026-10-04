@@ -17,6 +17,7 @@ type TicketData = {
   ticket_code: string | null;
   qr_code_url: string | null;
   ticket_job_status: string | null;
+  whatsapp_group_url: string | null;
 };
 
 export default function StatusCheckPage() {
@@ -190,6 +191,25 @@ export default function StatusCheckPage() {
                 </button>
               </div>
             </div>
+          </section>
+        )}
+
+        {ticketData?.whatsapp_group_url && (ticketData.status === 'Pending' || ticketData.status === 'Accepted') && (
+          <section className="bg-surface-container-lowest rounded-xl p-stack-lg shadow-[0_4px_12px_rgba(0,0,0,0.05)] flex flex-col items-center justify-center text-center gap-stack-md border border-surface-variant">
+            <span className="material-symbols-outlined text-[32px] text-primary">forum</span>
+            <div>
+              <h3 className="font-body-lg text-body-lg text-primary font-bold mb-stack-sm">Gabung Grup WhatsApp</h3>
+              <p className="font-description text-description text-on-surface-variant">Dapatkan jadwal, pengumuman, dan informasi terbaru langsung dari panitia.</p>
+            </div>
+            <a
+              href={ticketData.whatsapp_group_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-primary text-on-primary font-label-caps text-label-caps hover:opacity-90 transition-colors"
+            >
+              <span className="material-symbols-outlined text-[18px]">group_add</span>
+              Gabung Grup
+            </a>
           </section>
         )}
 

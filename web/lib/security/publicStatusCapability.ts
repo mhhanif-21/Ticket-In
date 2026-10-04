@@ -4,6 +4,7 @@ import { and, eq, gt, isNull } from 'drizzle-orm';
 
 import { db } from '@/db';
 import {
+  events,
   registrationStatusCapabilities,
   registrations,
   ticketGenerationJobs,
@@ -25,6 +26,7 @@ export interface PublicRegistrationStatus {
   ticketCode: string | null;
   qrCodeUrl: string | null;
   ticketJobStatus: string | null;
+  whatsappGroupUrl: string | null;
 }
 
 export function hashRegistrationStatusCapability(token: string): string {
@@ -108,11 +110,16 @@ export async function getPublicRegistrationStatus(
       ticketCode: registrations.ticketCode,
       qrCodeUrl: registrations.qrCodeUrl,
       ticketJobStatus: ticketGenerationJobs.status,
+      whatsappGroupUrl: events.whatsappGroupUrl,
     })
     .from(registrationStatusCapabilities)
     .innerJoin(
       registrations,
       eq(registrationStatusCapabilities.registrationId, registrations.id),
+    )
+    .innerJoin(
+      events,
+      eq(events.id, registrations.eventId),
     )
     .leftJoin(
       ticketGenerationJobs,

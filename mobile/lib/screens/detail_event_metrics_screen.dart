@@ -190,6 +190,18 @@ class _DetailEventMetricsScreenState
           'Registration Mode',
           _metadataValue(data['registrationMode'] ?? data['registration_mode']),
         ),
+        if ((data['whatsapp_group_url'] ?? data['whatsappGroupUrl'])
+                ?.toString()
+                .isNotEmpty ==
+            true) ...[
+          const Divider(height: 1),
+          _buildMetadataRow(
+            'Grup WhatsApp',
+            _metadataValue(
+              data['whatsapp_group_url'] ?? data['whatsappGroupUrl'],
+            ),
+          ),
+        ],
         const Divider(height: 1),
         _buildMetadataRow('Status', status),
       ],

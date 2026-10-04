@@ -54,6 +54,8 @@ class _EditEventScreenState extends State<EditEventScreen> {
   final TextEditingController _capacityController = TextEditingController();
   final TextEditingController _dateController = TextEditingController();
   final TextEditingController _descriptionController = TextEditingController();
+  final TextEditingController _whatsappGroupUrlController =
+      TextEditingController();
 
   DateTime? _selectedDate;
   String _selectedMode = 'Auto-Accept';
@@ -81,6 +83,7 @@ class _EditEventScreenState extends State<EditEventScreen> {
         _locationController.text = event.location;
         _capacityController.text = event.capacity.toString();
         _descriptionController.text = event.description ?? '';
+        _whatsappGroupUrlController.text = event.whatsappGroupUrl ?? '';
         _selectedDate = event.date;
         _dateController.text = DateFormat('dd MMM yyyy').format(event.date);
         _selectedMode = event.registrationMode;
@@ -499,6 +502,7 @@ class _EditEventScreenState extends State<EditEventScreen> {
         'description': _descriptionController.text,
         'registration_mode': _selectedMode,
         'poster_aspect_mode': _posterAspectMode.wireValue,
+        'whatsapp_group_url': _whatsappGroupUrlController.text.trim(),
       };
 
       await _eventService.updateEvent(widget.eventId, data);
@@ -740,6 +744,7 @@ class _EditEventScreenState extends State<EditEventScreen> {
     _capacityController.dispose();
     _dateController.dispose();
     _descriptionController.dispose();
+    _whatsappGroupUrlController.dispose();
     super.dispose();
   }
 
@@ -1161,6 +1166,16 @@ class _EditEventScreenState extends State<EditEventScreen> {
                         ),
                       ],
                     ),
+                    if (_selectedMode == 'Manual Review') ...[
+                      const SizedBox(height: 16),
+                      _buildTextField(
+                        label: 'Link Grup WhatsApp (opsional)',
+                        hint: 'https://chat.whatsapp.com/...',
+                        icon: Icons.groups,
+                        keyboardType: TextInputType.url,
+                        controller: _whatsappGroupUrlController,
+                      ),
+                    ],
                   ],
                 ),
               ),

@@ -151,6 +151,7 @@ export async function POST(req: Request) {
       description: eventInput.description,
       registrationMode: eventInput.registrationMode,
       posterAspectMode: eventInput.posterAspectMode,
+      whatsappGroupUrl: eventInput.whatsappGroupUrl,
       volunteerPin: initialPin,
       volunteerPinHash: initialPinHash,
       creationKey: idempotencyKey,

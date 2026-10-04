@@ -70,6 +70,9 @@ export async function getPublicRegistrationStatusResponse(
       // These values are intentionally present only after capability proof.
       ticket_code: registration.ticketCode,
       qr_code_url: registration.qrCodeUrl,
+      // Shown after OTP verification so accepted/pending participants can join
+      // the event's official WhatsApp group.
+      whatsapp_group_url: registration.whatsappGroupUrl,
     },
   }, { headers: { 'Cache-Control': 'no-store' } });
 }

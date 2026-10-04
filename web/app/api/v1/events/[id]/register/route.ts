@@ -282,7 +282,12 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
     const preserveAnswers = formData.get('retry_only') === 'true';
 
     failureStage = 'load_event';
-    const [event] = await db.select({ id: events.id, name: events.name, status: events.status }).from(events).where(eq(events.slug, slug)).limit(1);
+    const [event] = await db.select({
+      id: events.id,
+      name: events.name,
+      status: events.status,
+      whatsappGroupUrl: events.whatsappGroupUrl,
+    }).from(events).where(eq(events.slug, slug)).limit(1);
     if (!event) {
       return NextResponse.json({ status: 'error', message: 'Event not found' }, { status: 404 });
     }
@@ -442,6 +447,7 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
           otpTemplate?.isActive
             ? { subject: otpTemplate.subject, body: otpTemplate.body }
             : undefined,
+          event.whatsappGroupUrl ?? null,
         );
       } catch (error) {
         logRegistrationFailure(requestId, failureStage, error, undefined, {

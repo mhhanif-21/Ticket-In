@@ -27,7 +27,7 @@ const TICKET_TEMPLATE_HEX_COLOR = /^#[0-9a-f]{6}$/i;
 export type EmailTemplateKind = 'otp' | 'ticket';
 
 export const EMAIL_TEMPLATE_TOKEN_OPTIONS: Record<EmailTemplateKind, readonly string[]> = {
-  otp: ['NAME', 'EMAIL', 'EVENT_NAME', 'CODE'],
+  otp: ['NAME', 'EMAIL', 'EVENT_NAME', 'CODE', 'WHATSAPP_GROUP_LINK'],
   ticket: ['NAME', 'EMAIL', 'EVENT_NAME', 'TICKET_IMAGE'],
 };
 

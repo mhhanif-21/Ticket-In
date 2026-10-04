@@ -274,6 +274,7 @@ class EventModel {
   final DateTime date;
   final String status;
   final String registrationMode;
+  final String? whatsappGroupUrl;
   final PosterAspectMode posterAspectMode;
   final String? posterUrl;
   final String? publicRegistrationUrl;
@@ -292,6 +293,7 @@ class EventModel {
     required this.date,
     required this.status,
     required this.registrationMode,
+    this.whatsappGroupUrl,
     this.posterAspectMode = PosterAspectMode.landscape,
     this.posterUrl,
     this.publicRegistrationUrl,
@@ -333,6 +335,9 @@ class EventModel {
           json['registration_mode'] ??
           json['registrationMode'] ??
           'Auto-Accept',
+      whatsappGroupUrl:
+          json['whatsapp_group_url']?.toString() ??
+          json['whatsappGroupUrl']?.toString(),
       posterAspectMode: posterAspectModeFromJson(
         json['poster_aspect_mode'] ?? json['posterAspectMode'],
       ),
@@ -357,6 +362,7 @@ class EventModel {
       'date': date.toIso8601String(),
       'status': status,
       'registration_mode': registrationMode,
+      'whatsapp_group_url': whatsappGroupUrl,
       'poster_aspect_mode': posterAspectMode.wireValue,
       'poster_url': posterUrl,
       'public_registration_url': publicRegistrationUrl,
@@ -386,6 +392,7 @@ class EventModel {
     DateTime? date,
     String? status,
     String? registrationMode,
+    String? whatsappGroupUrl,
     PosterAspectMode? posterAspectMode,
     String? posterUrl,
     String? publicRegistrationUrl,
@@ -403,6 +410,7 @@ class EventModel {
     date: date ?? this.date,
     status: status ?? this.status,
     registrationMode: registrationMode ?? this.registrationMode,
+    whatsappGroupUrl: whatsappGroupUrl ?? this.whatsappGroupUrl,
     posterAspectMode: posterAspectMode ?? this.posterAspectMode,
     posterUrl: posterUrl ?? this.posterUrl,
     publicRegistrationUrl: publicRegistrationUrl ?? this.publicRegistrationUrl,

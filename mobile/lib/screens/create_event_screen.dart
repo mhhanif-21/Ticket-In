@@ -44,6 +44,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
   final _capacityController = TextEditingController();
   final _descriptionController = TextEditingController(); // Added description
   final _dateController = TextEditingController();
+  final _whatsappGroupUrlController = TextEditingController();
 
   DateTime? _selectedDate;
   // One user-facing collection. The first item is persisted as the legacy
@@ -84,6 +85,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
     _capacityController.dispose();
     _descriptionController.dispose();
     _dateController.dispose();
+    _whatsappGroupUrlController.dispose();
     super.dispose();
   }
 
@@ -229,6 +231,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
         'description': _descriptionController.text,
         'registration_mode': _registrationMode,
         'poster_aspect_mode': _posterAspectMode.wireValue,
+        'whatsapp_group_url': _whatsappGroupUrlController.text.trim(),
       };
 
       final eventId = await _eventService.createEvent(
@@ -797,6 +800,16 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                         ),
                       ],
                     ),
+                    if (_registrationMode == 'Manual Review') ...[
+                      const SizedBox(height: 16),
+                      _buildTextField(
+                        label: 'Link Grup WhatsApp (opsional)',
+                        hint: 'https://chat.whatsapp.com/...',
+                        controller: _whatsappGroupUrlController,
+                        icon: Icons.groups,
+                        keyboardType: TextInputType.url,
+                      ),
+                    ],
                   ],
                 ),
               ),

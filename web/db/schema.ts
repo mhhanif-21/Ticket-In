@@ -29,6 +29,7 @@ export const events = pgTable(
     creationKey: varchar('creation_key', { length: 128 }),
     capacity: integer('capacity').notNull(),
     registrationMode: varchar('registration_mode', { length: 50 }).notNull(), // Auto-Accept, Manual Review
+    whatsappGroupUrl: text('whatsapp_group_url'),
     volunteerPin: varchar('volunteer_pin', { length: 255 }),
     volunteerPinHash: varchar('volunteer_pin_hash', { length: 255 }).notNull(),
     volunteerSessionVersion: integer('volunteer_session_version').notNull().default(1),

@@ -6,6 +6,13 @@ const MAX_LOCATION_LENGTH = 255;
 const MAX_DESCRIPTION_LENGTH = 10_000;
 const MAX_CAPACITY = 1_000_000;
 const SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+const WHATSAPP_GROUP_HOSTS = new Set([
+  'chat.whatsapp.com',
+  'wa.me',
+  'whatsapp.com',
+  'www.whatsapp.com',
+  'api.whatsapp.com',
+]);
 
 export class EventValidationError extends Error {
   constructor(
@@ -27,6 +34,7 @@ export interface ValidatedEventInput {
   date: Date;
   description: string | null;
   posterAspectMode: PosterAspectMode;
+  whatsappGroupUrl: string | null;
   status?: EventStatus;
 }
 
@@ -128,7 +136,30 @@ function parsePosterAspect(value: unknown): PosterAspectMode {
   }
 }
 
-const CREATE_KEYS = new Set(['name', 'slug', 'capacity', 'registration_mode', 'location', 'date', 'description', 'poster_aspect_mode']);
+function parseWhatsappGroupUrl(value: unknown): string | null {
+  const normalized = optionalTrimmedString(value, 'whatsapp_group_url', 2048);
+  if (!normalized) return null;
+  let parsed: URL;
+  try {
+    parsed = new URL(normalized);
+  } catch {
+    throw new EventValidationError(
+      'EVENT_WHATSAPP_GROUP_URL_INVALID',
+      'Link grup WhatsApp tidak valid.',
+      'whatsapp_group_url',
+    );
+  }
+  if (parsed.protocol !== 'https:' || !WHATSAPP_GROUP_HOSTS.has(parsed.hostname.toLowerCase())) {
+    throw new EventValidationError(
+      'EVENT_WHATSAPP_GROUP_URL_INVALID',
+      'Link grup WhatsApp harus berupa URL https://chat.whatsapp.com/... atau https://wa.me/...',
+      'whatsapp_group_url',
+    );
+  }
+  return parsed.toString();
+}
+
+const CREATE_KEYS = new Set(['name', 'slug', 'capacity', 'registration_mode', 'location', 'date', 'description', 'poster_aspect_mode', 'whatsapp_group_url']);
 const UPDATE_KEYS = new Set([...CREATE_KEYS, 'status']);
 
 function assertKnownKeys(payload: Record<string, unknown>, allowed: Set<string>): void {
@@ -152,6 +183,7 @@ export function validateEventCreatePayload(value: unknown): ValidatedEventInput 
     date: parseDate(payload.date),
     description: optionalTrimmedString(payload.description, 'description', MAX_DESCRIPTION_LENGTH),
     posterAspectMode: parsePosterAspect(payload.poster_aspect_mode),
+    whatsappGroupUrl: parseWhatsappGroupUrl(payload.whatsapp_group_url),
   };
 }
 
@@ -174,6 +206,7 @@ export function validateEventUpdatePayload(value: unknown): Partial<ValidatedEve
   if (payload.date !== undefined) update.date = parseDate(payload.date);
   if (payload.description !== undefined) update.description = optionalTrimmedString(payload.description, 'description', MAX_DESCRIPTION_LENGTH);
   if (payload.poster_aspect_mode !== undefined) update.posterAspectMode = parsePosterAspect(payload.poster_aspect_mode);
+  if (payload.whatsapp_group_url !== undefined) update.whatsappGroupUrl = parseWhatsappGroupUrl(payload.whatsapp_group_url);
   if (payload.status !== undefined) {
     try {
       update.status = normalizeEventStatus(payload.status);

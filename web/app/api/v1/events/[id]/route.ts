@@ -51,6 +51,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
         posterAspectMode: events.posterAspectMode,
         capacity: events.capacity,
         registrationMode: events.registrationMode,
+        whatsappGroupUrl: events.whatsappGroupUrl,
         status: events.status,
         volunteerPin: events.volunteerPin,
       })
@@ -134,7 +135,12 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
 
     // UUID adalah kontrak detail Admin yang dijaga middleware; slug adalah DTO publik.
     const responseData = isAdminDetail
-      ? { id: event.id, ...eventDetail, volunteer_pin: event.volunteerPin ?? null }
+      ? {
+        id: event.id,
+        ...eventDetail,
+        volunteer_pin: event.volunteerPin ?? null,
+        whatsapp_group_url: event.whatsappGroupUrl ?? null,
+      }
       : eventDetail;
 
     return NextResponse.json({ status: 'success', data: responseData });
@@ -199,6 +205,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
         updateData.capacity = input.capacity;
       }
       if (input.registrationMode !== undefined) updateData.registrationMode = input.registrationMode;
+      if (input.whatsappGroupUrl !== undefined) updateData.whatsappGroupUrl = input.whatsappGroupUrl;
       if (input.posterAspectMode !== undefined) updateData.posterAspectMode = input.posterAspectMode;
       if (input.status !== undefined) {
         const nextStatus = input.status;

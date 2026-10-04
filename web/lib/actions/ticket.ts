@@ -11,6 +11,7 @@ import {
 } from '../tickets/ticketTemplate';
 
 import { getConfiguredBrevoSender, sendEmail } from '../services/brevo';
+import { renderDefaultTicketEmail } from '../emailTemplates/ticketTemplate';
 import { events } from '../../db/schema';
 import { isPublicEventStatus } from '../events/eventLifecycle';
 import {
@@ -88,16 +89,13 @@ export async function triggerTicketEmailDelivery(registrationId: string) {
       answers: registration.answers,
       answerFieldLabels: registration.answerFieldLabels,
     })
-    : {
-      subject: `Your Ticket for ${event.name}`,
-      htmlContent: `
-        <h1>Hello ${registration.name},</h1>
-        <p>Your ticket for <strong>${event.name}</strong> is ready!</p>
-        <p>Ticket Code: <strong>${registration.ticketCode}</strong></p>
-        <p>Please show the QR code below at the entrance:</p>
-        <img src="${registration.qrCodeUrl}" alt="QR Code" />
-      `,
-    };
+    : renderDefaultTicketEmail({
+      name: registration.name,
+      ticketCode: registration.ticketCode,
+      qrCodeUrl: registration.qrCodeUrl,
+      date: event.date,
+      location: event.location,
+    });
 
   // Brevo wrapper already enforces the 3-second hard timeout
   const attachment = await getTicketQrAttachment(registration.qrCodeUrl, registration.ticketCode);

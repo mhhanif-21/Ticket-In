@@ -57,6 +57,11 @@ const MIGRATIONS = [
     path: resolve(process.cwd(), 'supabase/migrations/0016_event_poster_aspect_mode.sql'),
     lockKey: 2026082816,
   },
+  {
+    id: '0017_event-whatsapp-group-url',
+    path: resolve(process.cwd(), 'supabase/migrations/0017_event_whatsapp_group_url.sql'),
+    lockKey: 2026082917,
+  },
 ] as const;
 
 type SchemaRow = {
@@ -78,6 +83,7 @@ async function verifyLifecycleSchema(): Promise<void> {
     'volunteer_session_version',
     'form_version',
     'poster_aspect_mode',
+    'whatsapp_group_url',
   ];
   const columns = await client.unsafe<SchemaRow[]>(`
     SELECT column_name
@@ -89,7 +95,8 @@ async function verifyLifecycleSchema(): Promise<void> {
         'creation_key',
         'volunteer_session_version',
         'form_version',
-        'poster_aspect_mode'
+        'poster_aspect_mode',
+        'whatsapp_group_url'
       )
   `);
 
