@@ -43,8 +43,10 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     
     // Extract filters
     const search = searchParams.get('search');
-    const status = searchParams.get('status')?.trim() || null;
-    const attendance = searchParams.get('attendance')?.trim() || null;
+    const rawStatus = searchParams.get('status')?.trim();
+    const status = rawStatus && !/^(all|semua)$/i.test(rawStatus) ? rawStatus : null;
+    const rawAttendance = searchParams.get('attendance')?.trim();
+    const attendance = rawAttendance && !/^(all|semua)$/i.test(rawAttendance) ? rawAttendance : null;
     const startDate = searchParams.get('start_date');
     const endDate = searchParams.get('end_date');
     const sort = searchParams.get('sort') || 'desc';

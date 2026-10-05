@@ -68,21 +68,8 @@ export function renderDefaultTicketEmail(input: DefaultTicketEmailInput): {
 
   <!-- Ticket -->
   <tr><td align="center" bgcolor="#0B1630" style="background:#0B1630;padding:28px 44px;">
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #D4B53F;background:#0F1E40;">
-      <tr><td align="center" style="padding:16px;border-bottom:1px solid #D4B53F;color:#D4B53F;font-size:11px;letter-spacing:6px;">TIKET MASUK</td></tr>
-      <tr><td align="center" style="padding:28px 20px 20px;">
-        <table role="presentation" cellpadding="0" cellspacing="0" style="background:#FFFFFF;border:3px solid #D4B53F;">
-          <tr><td style="padding:14px;"><img src="${qrCodeUrl}" alt="QR Code Tiket" width="190" height="190" style="display:block;width:190px;height:190px;border:0;"></td></tr>
-        </table>
-        <div style="color:#8E99B3;font-size:12px;margin-top:14px;letter-spacing:1px;">Pindai QR di meja registrasi</div>
-      </td></tr>
-      <tr><td style="padding:0 24px;"><div style="border-top:1px dashed #4A5B85;font-size:0;line-height:0;">&nbsp;</div></td></tr>
-      <tr><td align="center" style="padding:22px 20px 28px;">
-        <div style="color:#D4B53F;font-size:10px;letter-spacing:5px;">KODE UNIK CADANGAN</div>
-        <div style="font-family:'Courier New',monospace;font-size:28px;font-weight:bold;letter-spacing:6px;color:#F3E39A;padding:10px 0 6px 6px;">${ticketCode}</div>
-        <div style="color:#8E99B3;font-size:12px;">Gunakan jika QR tidak dapat dipindai</div>
-      </td></tr>
-    </table>
+    <img src="${qrCodeUrl}" alt="Tiket Peserta ${ticketCode}" width="512" style="display:block;width:100%;max-width:512px;height:auto;border:0;">
+    <div style="color:#8E99B3;font-size:12px;margin-top:14px;letter-spacing:1px;">Tunjukkan gambar tiket ini di meja registrasi</div>
   </td></tr>
 
   <!-- Details -->

@@ -14,6 +14,7 @@ import 'screens/admin_dashboard_screen.dart';
 import 'screens/participants_screen.dart';
 import 'screens/review_detail_screen.dart';
 import 'screens/ticket_template_screen.dart';
+import 'screens/manual_book_screen.dart';
 import 'providers/admin_providers.dart';
 import 'services/auth_session.dart';
 
@@ -169,6 +170,10 @@ GoRouter buildAppRouter(AuthSessionController authSession) => GoRouter(
     GoRoute(
       path: '/admin-dashboard',
       builder: (context, state) => const AdminDashboardScreen(),
+    ),
+    GoRoute(
+      path: '/manual-book',
+      builder: (context, state) => const ManualBookScreen(),
     ),
     GoRoute(
       path: '/participants/:id',

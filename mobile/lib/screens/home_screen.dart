@@ -548,15 +548,13 @@ class _HomeScreenState extends State<HomeScreen> {
                   () => context.go('/admin-dashboard'),
                 ),
                 _buildNavItem(Icons.calendar_today, 'Event', true, () {}),
-                // [BUG-043] FIX: Settings menampilkan SnackBar "Segera Hadir"
-                _buildNavItem(Icons.settings, 'Settings', false, () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('⚙️ Settings — Coming Soon'),
-                      duration: Duration(seconds: 2),
-                    ),
-                  );
-                }),
+                // Manual Book admin menggantikan placeholder "Coming Soon".
+                _buildNavItem(
+                  Icons.settings,
+                  'Settings',
+                  false,
+                  () => context.push('/manual-book'),
+                ),
               ],
             ),
           ),

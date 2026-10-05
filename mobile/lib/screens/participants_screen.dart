@@ -248,8 +248,70 @@ class _ParticipantsScreenState extends ConsumerState<ParticipantsScreen> {
 
   Future<bool> _openExportUrl(String url) async {
     final uri = Uri.parse(url);
-    if (!await canLaunchUrl(uri)) return false;
-    return launchUrl(uri, mode: LaunchMode.externalApplication);
+    try {
+      if (await launchUrl(uri, mode: LaunchMode.externalApplication)) return true;
+    } catch (_) {}
+    try {
+      return await launchUrl(uri, mode: LaunchMode.platformDefault);
+    } catch (_) {
+      return false;
+    }
+  }
+
+  // Cadangan ketika email tiket tidak sampai: admin dapat mengunduh gambar
+  // tiket (QR + kode) milik peserta langsung dari daftar peserta.
+  Future<void> _downloadTicketArtwork(Map<String, dynamic> participant) async {
+    final rawUrl =
+        (participant['qrCodeUrl'] ?? participant['qr_code_url'])?.toString();
+    if (rawUrl == null || rawUrl.trim().isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Tiket QR belum tersedia untuk peserta ini.'),
+          ),
+        );
+      }
+      return;
+    }
+
+    final ticketCode =
+        (participant['ticketCode'] ?? participant['ticket_code'] ?? 'ticket')
+            .toString();
+    final uri = Uri.parse(rawUrl);
+    final downloadUri = uri.replace(
+      queryParameters: {
+        ...uri.queryParameters,
+        'download': 'ticket-$ticketCode.png',
+      },
+    );
+
+    var launched = false;
+    try {
+      launched = await launchUrl(
+        downloadUri,
+        mode: LaunchMode.externalApplication,
+      );
+    } catch (_) {}
+    if (!launched) {
+      try {
+        launched = await launchUrl(
+          downloadUri,
+          mode: LaunchMode.platformDefault,
+        );
+      } catch (_) {}
+    }
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            launched
+                ? 'Mengunduh tiket ke perangkat...'
+                : 'Tidak dapat membuka tautan unduhan tiket.',
+          ),
+        ),
+      );
+    }
   }
 
   void _setExportFeedback(String message) {
@@ -927,6 +989,14 @@ class _ParticipantsScreenState extends ConsumerState<ParticipantsScreen> {
                 ],
               ),
             ),
+            if (status.toString().toLowerCase() == 'accepted' &&
+                ((p['qrCodeUrl'] ?? p['qr_code_url'])?.toString().trim().isNotEmpty ??
+                    false))
+              IconButton(
+                tooltip: 'Unduh tiket',
+                onPressed: () => _downloadTicketArtwork(p),
+                icon: const Icon(Icons.download, color: AppColors.primary),
+              ),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(

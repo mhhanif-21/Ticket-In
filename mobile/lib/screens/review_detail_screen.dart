@@ -185,8 +185,20 @@ class _ReviewDetailScreenState extends State<ReviewDetailScreen> {
         if (mounted) await _showParticipantImage(resource);
       } else {
         final url = resource.url;
-        if (!await canLaunchUrl(url) ||
-            !await launchUrl(url, mode: LaunchMode.externalApplication)) {
+        bool launched = false;
+        try {
+          launched = await launchUrl(url, mode: LaunchMode.externalApplication);
+        } catch (_) {
+          launched = false;
+        }
+        if (!launched) {
+          try {
+            launched = await launchUrl(url, mode: LaunchMode.platformDefault);
+          } catch (_) {
+            launched = false;
+          }
+        }
+        if (!launched) {
           throw Exception('Application cannot open ${resource.fileName}.');
         }
       }

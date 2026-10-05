@@ -202,81 +202,104 @@ async function generateCustomTicket(
   return sharp(normalizedBackground).composite(composites).png({ compressionLevel: 9 }).toBuffer();
 }
 
+const TICKET_LOGO_FILE_NAMES = ['logo-ecx.jpeg', 'logo-ecx.png', 'logo.jpeg'] as const;
+const TICKET_LOGO_DIRECTORIES = ['public', 'assets'] as const;
+
+function loadTicketLogoBuffer(): Buffer | null {
+  for (const directory of TICKET_LOGO_DIRECTORIES) {
+    for (const fileName of TICKET_LOGO_FILE_NAMES) {
+      const candidate = path.join(process.cwd(), directory, fileName);
+      try {
+        if (fs.existsSync(candidate)) return fs.readFileSync(candidate);
+      } catch {
+        // Ignore unreadable candidates and continue searching.
+      }
+    }
+  }
+  return null;
+}
+
+function clampTicketText(value: string, maxLength: number): string {
+  const normalized = (value ?? '').trim();
+  if (normalized.length <= maxLength) return normalized;
+  return `${normalized.slice(0, maxLength - 1).trimEnd()}\u2026`;
+}
+
+/**
+ * Builds the default ticket artwork that matches the Engineering Career Expo
+ * email theme. The single image contains the branding, event, participant,
+ * QR code, and ticket code so a download yields the full ticket.
+ */
 async function generateDefaultQrCodeWithText(ticketCode: string, participantName: string, eventName: string): Promise<Buffer> {
   ensureTicketFontConfig();
 
-  // 1. Generate the base QR Code as a Buffer
+  const width = 720;
+  const height = 1240;
+  const gold = '#D4B53F';
+  const goldLight = '#F3E39A';
+  const cardBackground = '#0F1E40';
+  const muted = '#8E99B3';
+  const divider = '#4A5B85';
+
+  const safeEvent = escapeXml(clampTicketText(eventName, 32) || '-');
+  const safeName = escapeXml(clampTicketText(participantName, 26) || '-');
+  const safeCode = escapeXml(ticketCode);
+
   const qrBuffer = await QRCode.toBuffer(ticketCode, {
     errorCorrectionLevel: 'H',
     type: 'png',
-    margin: 2,
-    width: 300,
+    margin: 1,
+    width: 360,
   });
 
-  // 2. Generate an SVG containing the text to composite on top (or below) the QR Code.
-  // We'll create a nice vertical ticket layout:
-  // 600px width, 800px height.
-  // Top section: Event Name
-  // Middle section: QR Code
-  // Bottom section: Participant Name & Ticket Code
-  const width = 500;
-  const height = 750;
+  const svgText = `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
+    <rect x="0" y="0" width="${width}" height="${height}" rx="28" fill="${cardBackground}"/>
+    <rect x="1.5" y="1.5" width="${width - 3}" height="${height - 3}" rx="27" fill="none" stroke="${gold}" stroke-width="3"/>
 
-  // Escape HTML characters in names
-  const safeName = participantName.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  const safeEvent = eventName.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    <rect x="1.5" y="1.5" width="${width - 3}" height="208" rx="27" fill="#FFFFFF"/>
+    <rect x="1.5" y="175" width="${width - 3}" height="35" fill="#FFFFFF"/>
+    <rect x="1.5" y="209" width="${width - 3}" height="3" fill="${gold}"/>
 
-  const svgText = `
-    <svg width="${width}" height="${height}">
-      <!-- Background -->
-      <rect x="0" y="0" width="${width}" height="${height}" rx="24" fill="#ffffff"/>
-      <rect x="0" y="0" width="${width}" height="${height}" rx="24" fill="none" stroke="#e5e7eb" stroke-width="2"/>
+    <text x="${width / 2}" y="290" text-anchor="middle" font-family="${TICKET_FONT_FAMILY}" font-size="20" letter-spacing="6" fill="${gold}">TIKET MASUK</text>
+    <text x="${width / 2}" y="342" text-anchor="middle" font-family="${TICKET_FONT_FAMILY}" font-size="34" font-weight="bold" fill="#FFFFFF">${safeEvent}</text>
 
-      <!-- Top Section: Event Info -->
-      <rect x="0" y="0" width="${width}" height="140" fill="#4f46e5" rx="24"/>
-      <rect x="0" y="100" width="${width}" height="40" fill="#4f46e5"/> <!-- To square bottom of header -->
-      <text x="50%" y="70" font-family="${TICKET_FONT_FAMILY}" font-size="28" font-weight="bold" fill="#ffffff" text-anchor="middle">
-        EVENT TICKET
-      </text>
-      <text x="50%" y="110" font-family="${TICKET_FONT_FAMILY}" font-size="20" font-weight="normal" fill="#e0e7ff" text-anchor="middle">
-        ${safeEvent}
-      </text>
+    <text x="${width / 2}" y="432" text-anchor="middle" font-family="${TICKET_FONT_FAMILY}" font-size="17" letter-spacing="3" fill="${muted}">NAMA PESERTA</text>
+    <text x="${width / 2}" y="482" text-anchor="middle" font-family="${TICKET_FONT_FAMILY}" font-size="38" font-weight="bold" fill="#FFFFFF">${safeName}</text>
 
-      <!-- Bottom Section: Participant & Ticket Code -->
-      <text x="50%" y="540" font-family="${TICKET_FONT_FAMILY}" font-size="16" fill="#6b7280" text-anchor="middle" letter-spacing="2">
-        PARTICIPANT NAME
-      </text>
-      <text x="50%" y="580" font-family="${TICKET_FONT_FAMILY}" font-size="32" font-weight="bold" fill="#111827" text-anchor="middle">
-        ${safeName}
-      </text>
+    <rect x="150" y="540" width="420" height="420" rx="18" fill="#FFFFFF" stroke="${gold}" stroke-width="3"/>
 
-      <!-- Divider -->
-      <line x1="40" y1="620" x2="460" y2="620" stroke="#e5e7eb" stroke-width="2" stroke-dasharray="10, 10"/>
-      <circle cx="0" cy="620" r="16" fill="#f3f4f6"/>
-      <circle cx="500" cy="620" r="16" fill="#f3f4f6"/>
+    <line x1="60" y1="1030" x2="660" y2="1030" stroke="${divider}" stroke-width="2" stroke-dasharray="12,10"/>
 
-      <text x="50%" y="670" font-family="${TICKET_FONT_FAMILY}" font-size="16" fill="#6b7280" text-anchor="middle" letter-spacing="2">
-        TICKET CODE
-      </text>
-      <text x="50%" y="710" font-family="${TICKET_FONT_FAMILY}" font-size="36" font-weight="bold" fill="#4f46e5" text-anchor="middle" letter-spacing="4">
-        ${ticketCode}
-      </text>
-    </svg>
-  `;
+    <text x="${width / 2}" y="1082" text-anchor="middle" font-family="${TICKET_FONT_FAMILY}" font-size="17" letter-spacing="5" fill="${gold}">KODE TIKET</text>
+    <text x="${width / 2}" y="1146" text-anchor="middle" font-family="${TICKET_FONT_FAMILY}" font-size="52" font-weight="bold" letter-spacing="8" fill="${goldLight}">${safeCode}</text>
 
-  // 3. Composite using sharp
-  const finalImageBuffer = await sharp(Buffer.from(svgText))
-    .composite([
-      {
-        input: qrBuffer,
-        top: 180, // Position QR Code in the middle
-        left: 100, // (500 - 300) / 2
-      }
-    ])
-    .png()
-    .toBuffer();
+    <text x="${width / 2}" y="1202" text-anchor="middle" font-family="${TICKET_FONT_FAMILY}" font-size="16" fill="${muted}">Engineering Career Expo \u00B7 BEM FT UNILA</text>
+  </svg>`;
 
-  return finalImageBuffer;
+  const composites: sharp.OverlayOptions[] = [];
+
+  const logoBuffer = loadTicketLogoBuffer();
+  if (logoBuffer) {
+    try {
+      const resizedLogo = await sharp(logoBuffer)
+        .resize({ width: 190, withoutEnlargement: true })
+        .png()
+        .toBuffer();
+      const logoMetadata = await sharp(resizedLogo).metadata();
+      const logoWidth = logoMetadata.width ?? 190;
+      composites.push({
+        input: resizedLogo,
+        top: 12,
+        left: Math.round((width - logoWidth) / 2),
+      });
+    } catch {
+      // A broken logo must never block ticket generation.
+    }
+  }
+
+  composites.push({ input: qrBuffer, top: 570, left: 180 });
+
+  return sharp(Buffer.from(svgText)).composite(composites).png({ compressionLevel: 9 }).toBuffer();
 }
 
 /**

@@ -115,15 +115,13 @@ class AdminDashboardScreen extends ConsumerWidget {
                   false,
                   () => context.go('/home'),
                 ),
-                // [BUG-043] FIX: Settings menampilkan SnackBar "Segera Hadir" alih-alih diam
-                _buildNavItem(Icons.settings, 'Settings', false, () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('⚙️ Settings — Coming Soon'),
-                      duration: Duration(seconds: 2),
-                    ),
-                  );
-                }),
+                // Manual Book admin menggantikan placeholder "Coming Soon".
+                _buildNavItem(
+                  Icons.settings,
+                  'Settings',
+                  false,
+                  () => context.push('/manual-book'),
+                ),
               ],
             ),
           ),

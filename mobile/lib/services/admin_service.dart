@@ -81,9 +81,11 @@ class AdminService {
       'limit': limit.toString(),
     };
 
-    if (status != null && status != 'Semua') queryParameters['status'] = status;
-    if (attendance != null && attendance != 'Semua') {
-      queryParameters['attendance'] = attendance == 'Hadir' ? 'true' : 'false';
+    if (status != null && status.isNotEmpty && status != 'All' && status != 'Semua') {
+      queryParameters['status'] = status;
+    }
+    if (attendance != null && attendance.isNotEmpty && attendance != 'All' && attendance != 'Semua') {
+      queryParameters['attendance'] = (attendance == 'Present' || attendance == 'Hadir') ? 'true' : 'false';
     }
     if (sort != null) queryParameters['sort'] = sort;
     if (search != null && search.isNotEmpty) queryParameters['search'] = search;

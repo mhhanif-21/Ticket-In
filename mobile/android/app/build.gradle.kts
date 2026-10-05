@@ -22,11 +22,8 @@ fun configuredValue(name: String): String? =
         ?.trim()
         ?.takeIf { it.isNotEmpty() }
 
-val configuredApplicationId = configuredValue("TICKETIN_APPLICATION_ID")
-    ?: throw GradleException(
-        "TICKETIN_APPLICATION_ID wajib diisi dari environment atau -P untuk setiap Android build."
-    )
 val canonicalApplicationId = "com.mhhanif.ticketin"
+val configuredApplicationId = configuredValue("TICKETIN_APPLICATION_ID") ?: canonicalApplicationId
 
 val applicationIdPattern = Regex("^[A-Za-z][A-Za-z0-9_]*(\\.[A-Za-z][A-Za-z0-9_]*)+$")
 if (!applicationIdPattern.matches(configuredApplicationId)) {

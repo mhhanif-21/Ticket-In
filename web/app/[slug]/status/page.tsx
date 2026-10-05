@@ -13,7 +13,7 @@ const POLLING_INTERVAL_MS = 3000;
 const POLLING_TIMEOUT_MS = 60000;
 
 type TicketData = {
-  status: 'Draft' | 'Pending' | 'Accepted' | 'Rejected';
+  status: 'Draft' | 'Pending' | 'Accepted' | 'Rejected' | 'Expired';
   ticket_code: string | null;
   qr_code_url: string | null;
   ticket_job_status: string | null;
@@ -110,7 +110,13 @@ export default function StatusCheckPage() {
       <div className="w-full max-w-[600px] bg-surface-container-lowest rounded-xl shadow-[0_4px_12px_rgba(0,0,0,0.05)] p-stack-lg md:p-[64px] flex flex-col gap-stack-lg relative z-10">
         <div className="flex flex-col gap-stack-sm text-center items-center">
           <span className="material-symbols-outlined mb-2 text-4xl text-primary">
-            {loading ? 'progress_activity' : ticketData ? 'confirmation_number' : 'lock'}
+            {loading
+              ? 'progress_activity'
+              : ticketData
+                ? ticketData.status === 'Expired'
+                  ? 'timer_off'
+                  : 'confirmation_number'
+                : 'lock'}
           </span>
           <h2 className="font-display-lg-mobile text-display-lg-mobile md:font-display-lg md:text-display-lg text-primary">
             {loading ? 'Loading Status...' : ticketData ? 'Registration Status' : 'Status Access Not Available'}
@@ -156,6 +162,23 @@ export default function StatusCheckPage() {
           </section>
         )}
 
+        {ticketData?.status === 'Expired' && (
+          <section className="bg-error-container text-on-error-container rounded-xl p-stack-lg flex flex-col items-center justify-center text-center gap-stack-md">
+            <span className="material-symbols-outlined text-[32px]">timer_off</span>
+            <div>
+              <h3 className="font-body-lg text-body-lg font-bold mb-stack-sm">Verifikasi OTP Kedaluwarsa</h3>
+              <p className="font-description text-description">Waktu verifikasi OTP (10 menit) habis sebelum kamu menyelesaikannya, jadi pendaftaran ini tidak dapat dilanjutkan. Silakan daftar ulang dari halaman acara.</p>
+            </div>
+            <Link
+              href={`/${slug}`}
+              className="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-primary text-on-primary font-label-caps text-label-caps hover:opacity-90 transition-colors"
+            >
+              <span className="material-symbols-outlined text-[18px]">replay</span>
+              Daftar Ulang
+            </Link>
+          </section>
+        )}
+
         {ticketData?.status === 'Accepted' && pollingStatus === 'processing' && (
           <section className="bg-surface-container-lowest rounded-xl p-stack-lg shadow-[0_4px_12px_rgba(0,0,0,0.05)] flex flex-col items-center justify-center text-center gap-stack-md border border-surface-variant">
             <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin" />
@@ -181,7 +204,7 @@ export default function StatusCheckPage() {
                 </div>
               </div>
               <div className="bg-surface-container-lowest rounded-b-[16px] p-stack-lg relative border border-t-0 border-surface-variant flex flex-col items-center">
-                <img src={ticketData.qr_code_url} alt="Ticket QR Code" className="w-48 h-auto rounded-lg border border-surface-variant p-2 bg-surface-container" />
+                <img src={ticketData.qr_code_url} alt="Ticket QR Code" className="w-full max-w-xs h-auto rounded-lg border border-surface-variant" />
                 <button
                   onClick={() => window.open(ticketData.qr_code_url!, '_blank', 'noopener,noreferrer')}
                   className="mt-stack-md flex items-center gap-2 px-6 py-2 rounded-full border border-primary text-primary font-label-caps text-label-caps hover:bg-primary hover:text-on-primary transition-colors"
