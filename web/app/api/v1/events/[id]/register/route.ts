@@ -25,9 +25,11 @@ import {
   queueParticipantFileUploadsForCleanup,
 } from '@/lib/registration/participantFileLifecycle';
 import {
+  PARTICIPANT_FILE_MAX_BYTES,
   ParticipantFileValidationError,
   validateParticipantFileContent,
   validateParticipantFileMetadata,
+  validateParticipantFileTotalSize,
 } from '@/lib/validation/participantFile';
 
 export const runtime = 'nodejs';
@@ -271,6 +273,16 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
     }
 
     const formData = await req.formData();
+
+    // Request bodies over the hosting platform limit never reach this route,
+    // so reject an oversized total explicitly whenever it does arrive. Let the
+    // per-file check below report a single oversized file with its own code.
+    failureStage = 'validate_answers';
+    const submittedFiles = [...formData.values()]
+      .filter((value): value is File => typeof value !== 'string' && value.size > 0);
+    if (submittedFiles.every((file) => file.size <= PARTICIPANT_FILE_MAX_BYTES)) {
+      validateParticipantFileTotalSize(submittedFiles);
+    }
     
     failureStage = 'validate_identity';
     const identity = validateRegistrationIdentity({

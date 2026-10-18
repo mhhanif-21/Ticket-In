@@ -10,13 +10,27 @@ import {
   validateRegistrationAnswers,
   validateRegistrationIdentity,
 } from '@/lib/validation/registrationForm';
-import { validateParticipantFile } from '@/lib/validation/participantFile';
+import { validateParticipantFile, validateParticipantFileTotalSize, PARTICIPANT_FILE_TOTAL_MAX_BYTES } from '@/lib/validation/participantFile';
 import {
   loadRegistrationResubmitState,
   saveRegistrationResubmitState,
   type RegistrationResubmitState,
 } from '@/lib/client/registrationResubmit';
 import { saveRegistrationStatusCapability } from '@/lib/client/registrationStatusCapability';
+import { readJsonResponse } from '@/lib/client/apiResponse';
+
+interface RegistrationApiResponse {
+  status?: string;
+  message?: string;
+  data?: {
+    status?: string;
+    retryable?: boolean;
+    registrationId?: string;
+    resubmitToken?: string;
+    status_token?: string;
+    status_token_expires_at?: string;
+  };
+}
 
 function collectAnswerValues(formData: FormData): Record<string, unknown> {
   const answers: Record<string, unknown> = {};
@@ -117,12 +131,25 @@ export default function RegisterPage() {
         }
       }
 
+      // Vercel rejects multipart bodies above ~4.5 MB before the route runs,
+      // so block oversized totals in the browser where the message is helpful.
+      validateParticipantFileTotalSize(
+        [...formData.values()].filter((value): value is File => value instanceof File && value.size > 0),
+      );
+
       const res = await fetch(`/api/v1/events/${eventData.slug}/register`, {
         method: 'POST',
         body: formData, // fetch will automatically set multipart/form-data with boundary
       });
 
-      const result = await res.json();
+      const result = await readJsonResponse<RegistrationApiResponse>(res);
+      if (!result) {
+        if (res.status === 413) {
+          const maxMegabytes = PARTICIPANT_FILE_TOTAL_MAX_BYTES / (1024 * 1024);
+          throw new Error(`Ukuran total berkas melebihi batas ${maxMegabytes} MB. Kompres atau pilih berkas yang lebih kecil lalu coba lagi.`);
+        }
+        throw new Error('Server returned an unexpected response. Please try again.');
+      }
       const statusToken = result.data?.status_token;
       const statusTokenExpiresAt = result.data?.status_token_expires_at;
       if (typeof statusToken === 'string' && typeof statusTokenExpiresAt === 'string') {

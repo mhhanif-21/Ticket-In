@@ -1,10 +1,13 @@
-export const PARTICIPANT_FILE_MAX_BYTES = 5 * 1024 * 1024;
+// Vercel Functions reject request bodies above ~4.5 MB before the route runs,
+// so the upload limit must stay safely below the platform limit.
+export const PARTICIPANT_FILE_MAX_BYTES = 4 * 1024 * 1024;
+export const PARTICIPANT_FILE_TOTAL_MAX_BYTES = 4 * 1024 * 1024;
 
 export type ParticipantFileMime = 'image/jpeg' | 'image/png' | 'application/pdf';
 
 export class ParticipantFileValidationError extends Error {
   constructor(
-    public readonly code: 'REGISTRATION_FILE_TOO_LARGE' | 'REGISTRATION_FILE_TYPE_NOT_ALLOWED',
+    public readonly code: 'REGISTRATION_FILE_TOO_LARGE' | 'REGISTRATION_FILES_TOTAL_TOO_LARGE' | 'REGISTRATION_FILE_TYPE_NOT_ALLOWED',
     public readonly status: 413 | 415,
     message: string,
   ) {
@@ -53,7 +56,7 @@ export function validateParticipantFileMetadata(input: {
     throw new ParticipantFileValidationError(
       'REGISTRATION_FILE_TOO_LARGE',
       413,
-      `Ukuran ${input.fileName} melebihi batas 5 MB.`,
+      `Ukuran ${input.fileName} melebihi batas ${PARTICIPANT_FILE_MAX_BYTES / (1024 * 1024)} MB.`,
     );
   }
 
@@ -66,6 +69,17 @@ export function validateParticipantFileMetadata(input: {
       'REGISTRATION_FILE_TYPE_NOT_ALLOWED',
       415,
       `Format ${input.fileName} tidak didukung. Gunakan ${allowedFormatLabel(input.fieldType)}.`,
+    );
+  }
+}
+
+export function validateParticipantFileTotalSize(files: ReadonlyArray<{ size: number }>): void {
+  const totalBytes = files.reduce((sum, file) => sum + file.size, 0);
+  if (totalBytes > PARTICIPANT_FILE_TOTAL_MAX_BYTES) {
+    throw new ParticipantFileValidationError(
+      'REGISTRATION_FILES_TOTAL_TOO_LARGE',
+      413,
+      `Total ukuran berkas melebihi batas ${PARTICIPANT_FILE_TOTAL_MAX_BYTES / (1024 * 1024)} MB. Kompres atau pilih berkas yang lebih kecil.`,
     );
   }
 }

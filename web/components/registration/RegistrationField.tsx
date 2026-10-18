@@ -61,7 +61,7 @@ export function RegistrationField({
             className="w-full px-4 py-3 border border-outline-variant rounded-DEFAULT font-body-md text-primary bg-surface-bright file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-surface-dim file:text-primary hover:file:bg-surface-container-high"
           />
           <p className="font-body-sm text-on-surface-variant">
-            {field.fieldType === 'file' ? 'PDF max 5 MB.' : 'JPG or PNG max 5 MB.'}
+            {field.fieldType === 'file' ? 'PDF max 4 MB.' : 'JPG or PNG max 4 MB.'}
           </p>
           {fileError ? <p role="alert" className="font-body-sm text-error">{fileError}</p> : null}
         </>
