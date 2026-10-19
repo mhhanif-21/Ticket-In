@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { Html5Qrcode, Html5QrcodeSupportedFormats, Html5QrcodeCameraScanConfig } from 'html5-qrcode';
-import { RefreshCcw, CheckCircle, XCircle, AlertCircle, X } from 'lucide-react';
+import { RefreshCcw, CheckCircle, XCircle, AlertCircle, Loader2, X } from 'lucide-react';
 import { getScanFeedbackDismissMs, type ScanFeedbackStatus } from '@/lib/checkin/scanFeedback';
 
 type ScanTicketHandler = (ticketCode: string, method?: string) => Promise<void>;
@@ -34,6 +34,7 @@ export default function WebScannerPage() {
     }
 
     setScanResult(null);
+    isProcessingRef.current = false;
     setIsProcessing(false);
 
     try {
@@ -44,11 +45,6 @@ export default function WebScannerPage() {
       console.error('Failed to resume scanner after dismissing result', e);
     }
   }, []);
-
-  // Sync ref with state
-  useEffect(() => {
-    isProcessingRef.current = isProcessing;
-  }, [isProcessing]);
 
   const startScanner = useCallback(async () => {
     if (!scannerRef.current) {
@@ -136,6 +132,8 @@ export default function WebScannerPage() {
 
   const handleScannedTicket = useCallback(async (ticketCode: string, method: string = 'Manual') => {
     if (isProcessingRef.current) return;
+    // Lock immediately: camera callbacks can repeat before React renders.
+    isProcessingRef.current = true;
     setIsProcessing(true);
 
     let resultStatus: ScanFeedbackStatus = 'invalid';
@@ -182,7 +180,7 @@ export default function WebScannerPage() {
         resultStatus = 'invalid';
         setScanResult({
           status: 'invalid',
-          title: 'Failed: Ticket Not Found/Invalid',
+          title: data.message || 'Failed: Ticket Not Found/Invalid',
           subtitle: 'Invalid Entry'
         });
       }
@@ -323,9 +321,16 @@ export default function WebScannerPage() {
             </>
           )}
 
+          {isProcessing && !scanResult && (
+            <div role="status" className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-3 bg-black/60 text-white">
+              <Loader2 className="w-10 h-10 animate-spin" />
+              <p>Processing ticket...</p>
+            </div>
+          )}
+
           <button
             onClick={() => setFacingMode(prev => prev === 'environment' ? 'user' : 'environment')}
-            disabled={!hasCameras}
+            disabled={!hasCameras || isProcessing}
             className={`absolute top-4 right-4 w-11 h-11 rounded-full backdrop-blur-sm flex items-center justify-center transition-colors active:scale-95 z-20
               bg-primary/10 text-primary hover:bg-primary/20 dark:bg-on-primary dark:text-primary dark:hover:bg-on-primary/90
               disabled:opacity-50`}
@@ -366,7 +371,7 @@ export default function WebScannerPage() {
       {scanResult && (
         <>
           <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40 transition-opacity" />
-          <div className={`fixed bottom-0 left-0 right-0 w-full max-w-md mx-auto rounded-t-3xl p-stack-lg z-50 animate-slide-up shadow-[0_-8px_32px_rgba(0,0,0,0.1)] flex flex-col items-center text-center relative
+          <div role="alert" className={`fixed bottom-0 left-0 right-0 w-full max-w-md mx-auto rounded-t-3xl p-stack-lg z-[60] animate-slide-up shadow-[0_-8px_32px_rgba(0,0,0,0.1)] flex flex-col items-center text-center
             bg-surface-container-lowest dark:bg-[#1e1e1e] dark:border-t dark:border-white/10`}
           >
             <button
